@@ -1,0 +1,27 @@
+/* here to place your scss code and must import in index.ts file */
+.ichart-tooltip {
+  padding: 0.25em;
+  font-size: 12px;
+  min-width: 120px;
+  .category,
+  .item {
+    .flag {
+      display: inline-block;
+      height: 0.85em;
+      width: 0.85em;
+      border-radius: 2px;
+      margin-top: 0.15em;
+      margin-right: 0.3em;
+    }
+    display: flex;
+    align-items: center;
+    .name {
+      flex: 1;
+      text-overflow: ellipsis;
+    }
+    .value {
+      margin-left: 1em;
+      text-align: right;
+    }
+  }
+}
