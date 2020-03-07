@@ -1,3 +1,3 @@
 import './styles/main.scss';
 
-export * from './scripts/PieChart';
+export * from './scripts/pie/';

@@ -1,57 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { merge, omit } from 'lodash-es';
-import { globalOptions } from './settings';
+import { globalOptions } from '../settings';
 import * as echarts from 'echarts';
-import { ChartOptions } from './types';
-import { getColor } from './utils';
-
-export interface PieChartOptions extends ChartOptions {
-  radius?: string | string[];
-}
+import { getColor } from '../utils';
+import { PieChartOptions } from './pie-chart-options';
 
 export class PieChart {
   private chart: any;
 
   constructor(dom: HTMLDivElement | HTMLCanvasElement, public options: PieChartOptions) {
     this.chart = echarts.init(dom);
-
-    this.options = {
-      title: 'Pie',
-      subtitle: 'description for pie chart',
-      radius: ['60%', '70%'],
-      legend: {
-        show: true,
-        fnLabels: (key: string, v: number, p: number) => {
-          return [key, ` - ${v}(${p.toFixed(2)}%)`];
-        },
-        labelStyles: [
-          {
-            fontSize: 13,
-          },
-          {
-            width: 50,
-            textAlign: 'left',
-          },
-        ],
-      },
-      tooltip: {
-        getContent: (d) => {
-          return `<b>${d.name}</b>`;
-        },
-      },
-      // colors: {
-      //   Ireland: '#ff0000',
-      // },
-      colors: ['#ff0000', '#00ff00'],
-    };
-
-    const d = {
-      'Czech Republic': 123,
-      Ireland: 23,
-      Germany: 2323,
-    };
-    this.options.data = [d, d];
-
     this.render();
   }
 
