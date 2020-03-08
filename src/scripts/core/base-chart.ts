@@ -1,3 +1,4 @@
+import { merge } from 'lodash-es';
 import { ChartOptions } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -21,5 +22,52 @@ export class BaseChart<TOptions extends ChartOptions> {
       }
     }
     return result;
+  }
+
+  protected getLegendOptions(): any {
+    const result: any = {
+      show: true,
+      padding: [10, 10, 10, 10],
+    };
+    const locationMap = {
+      left: { top: 'center', left: 0, orient: 'vertical' },
+      right: { top: 'center', right: 0, orient: 'vertical' },
+      top: { top: 0, left: 'center', orient: 'horizontal' },
+      'top-left': { top: 0, left: 0, orient: 'horizontal' },
+      'top-right': { top: 0, right: 0, orient: 'horizontal' },
+      bottom: { bottom: 0, left: 'center', orient: 'horizontal' },
+      'bottom-left': { bottom: 0, left: 0, orient: 'horizontal' },
+      'bottom-right': { bottom: 0, right: 0, orient: 'horizontal' },
+    };
+
+    if (this.options.legend && this.options.legend.location) {
+      merge(result, locationMap[this.options.legend.location]);
+    } else {
+      merge(result, locationMap['bottom']);
+    }
+
+    if (this.options.legend && this.options.legend.fnLabels) {
+      result.formatter = (key: string) => {
+        const total = (Object.values(this.options.data) as number[]).reduce((t: number, d: number) => t + d);
+        const value = this.options.data[key];
+        const percent = (value * 100) / total;
+        if (this.options.legend?.fnLabels) {
+          return this.options.legend
+            .fnLabels(key, value, percent)
+            .map((label: string | number, i: number) => `{${i}|${label}}`)
+            .join('');
+        }
+      };
+      if (this.options.legend.labelStyles) {
+        const rich: any = {};
+        this.options.legend.labelStyles.forEach((style, i) => {
+          rich[`${i}`] = style;
+        });
+        result.textStyle = {
+          rich,
+        };
+      }
+    }
+    return merge({}, result, this.options.legend);
   }
 }

@@ -20,6 +20,7 @@ export interface ChartLegendOptions {
   left?: number;
   right?: number;
   bottom?: number;
+  location?: 'top' | 'top-left' | 'top-right' | 'bottom' | 'bottom-left' | 'bottom-right' | 'right' | 'left';
   orient?: 'vertical' | 'horizontal';
   fnLabels?: (key: string, value: number, total: number) => (string | number)[];
   labelStyles?: any[];

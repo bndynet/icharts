@@ -92,35 +92,9 @@ export class PieChart extends BaseChart<PieChartOptions> {
   }
 
   protected getLegendOptions(): any {
-    const result: any = {
-      show: false,
-      orient: 'horizontal',
-      bottom: 5,
-      data: Object.keys(this.options.data),
-    };
-    if (this.options.legend && this.options.legend.fnLabels) {
-      result.formatter = (key: string) => {
-        const total = (Object.values(this.options.data) as number[]).reduce((t: number, d: number) => t + d);
-        const value = this.options.data[key];
-        const percent = (value * 100) / total;
-        if (this.options.legend?.fnLabels) {
-          return this.options.legend
-            .fnLabels(key, value, percent)
-            .map((label: string | number, i: number) => `{${i}|${label}}`)
-            .join('');
-        }
-      };
-      if (this.options.legend.labelStyles) {
-        const rich: any = {};
-        this.options.legend.labelStyles.forEach((style, i) => {
-          rich[`${i}`] = style;
-        });
-        result.textStyle = {
-          rich,
-        };
-      }
-    }
-    return result;
+    return merge({}, super.getLegendOptions(), {
+      data: (Array.isArray(this.options.data) ? this.options.data : [this.options.data]).map((d) => Object.keys(d)).reduce((merged: any[], array: any[]) => (merged || []).concat(array)),
+    });
   }
 
   private getToolboxOptions() {

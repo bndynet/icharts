@@ -18,14 +18,15 @@ export class XYChart extends BaseChart<XYChartOptions> {
   private init() {
     this.categoryValues = this.options.data.map((item: any) => item[this.options.xKey]);
     const series: echarts.EChartOption.Series[] | any[] = [];
-    const legend: string[] = [];
+    const legend = this.getLegendOptions();
+    legend.data = [];
     this.options.data.forEach((dataItem: any, index: number) => {
       Object.keys(dataItem).forEach((key: string) => {
         if (key !== this.options.xKey) {
           let curSeries = series.find((s: any) => s.name === key);
           const curSeriesStyles = get(this.styles, `series[${key}]`);
           if (!curSeries) {
-            legend.push(key);
+            legend.data.push(key);
             curSeries = {
               name: key,
               type: get(curSeriesStyles, 'type') || 'line',
@@ -74,10 +75,8 @@ export class XYChart extends BaseChart<XYChartOptions> {
         },
         // ...axisStyle,
       },
-      legend: {
-        data: legend,
-      },
-      series: series,
+      legend,
+      series,
       // color: this._colors,
       tooltip: {
         trigger: 'axis',
