@@ -17,6 +17,21 @@
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/4.4.0/echarts.min.js"></script>
 
+  <!-- merge -->
+  <script src="https://cdn.jsdelivr.net/gh/yeikos/js.merge/dist/merge.browser.min.js"></script>
+  <!-- Code Mirror -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.58.3/codemirror.min.js"
+    integrity="sha512-zuvaVNiXwWY7U7HEdXsoTislTEElpKLELFoyQw0Bg7zfGhC4vG8eAhCxIQAvHmprW7dFhTq5zshUko4K3B4mSA=="
+    crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.58.3/codemirror.min.css"
+    integrity="sha512-xIf9AdJauwKIVtrVRZ0i4nHP61Ogx9fSRAkCLecmE2dL/U8ioWpDvFCAy4dcfecN72HHB9+7FfQj3aiO68aaaw=="
+    crossorigin="anonymous" />
+
+  <!-- faker.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Faker/3.1.0/faker.min.js"
+    integrity="sha512-/seDHxVfh1NvFUscAj8GsHQVZJvr2jjAoYsNL7As2FCaFHUHYIarl3sRCvVlFgyouVNiRgHIebyLKjpgd1SLDw=="
+    crossorigin="anonymous"></script>
+
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/github-markdown-css/github-markdown.css" />
   <script src="https://unpkg.com/showdown/dist/showdown.min.js"></script>
@@ -81,20 +96,9 @@
     <div class="jumbotron">
       <h1 class="display-4">Hello, world!</h1>
       <p class="lead">
-        This is just a template, you can start your site here for this project which will be published to
-        <b>gh-pages</b> with
-        <!-- dev -->
-        <a href="../docs/api">API documentation</a> and <a href="../coverage/lcov-report/">coverage report</a>.
-        <!-- /dev -->
-
-        <!-- prod
-                    <a href="../api">API documentation</a> and <a href="../coverage-report">coverage report</a>.
-                    -->
+        This project provides some simple charts to use easily.
       </p>
-      <hr class="my-4" />
-      <p>Try to run <code>npm run prebuild && npm run build && npm run predeploy-gh-pages</code> to view the final
-        <b>docs</b> directory for <b>gh-pages</b>.</p>
-      <a class="btn btn-primary btn-lg" href="aaa" role="button">
+      <a class="btn btn-primary btn-lg" href="https://github.com/bndynet/icharts" role="button">
         Fork me on GitHub
       </a>
     </div>
@@ -103,8 +107,63 @@
 
     <section id="example">
       <h1>Example</h1>
-      <div>
-        <div class="pie" style="height: 400px;"></div>
+      <div class="chart-group">
+        <button class="run">RUN</button>
+        <div class="editor-wrap">
+          <textarea class="code">
+{
+  "title": {
+    "text": "Chart",
+    "description": "description for chart"
+  },
+  "xKey": "Date",
+  "gridLine": "all",
+  "stacked": true,
+  "type": "bar",
+  "smooth": false,
+  "__": ""
+}
+        </textarea>
+        </div>
+        <div class="chart" type="xy"></div>
+      </div>
+
+      <div class="chart-group">
+        <button class="run">RUN</button>
+        <div class="editor-wrap">
+          <textarea class="code">
+{
+  "title": {
+    "text": "Pie Chart",
+    "description": "description for pie chart"
+  },
+  "radius": [
+    "60%",
+    "70%"
+  ],
+  "legend": {
+    "show": true,
+    "left": 0,
+    "orient": "vertical",
+    "top": 0,
+    "labelStyles": [
+      {
+        "fontSize": 13
+      },
+      {
+        "width": 100,
+        "textAlign": "left"
+      }
+    ]
+  },
+  "colors": [
+    "#ff0000",
+    "#00ff00"
+  ]
+}
+        </textarea>
+        </div>
+        <div class="chart" type="pie"></div>
       </div>
     </section>
 

@@ -1,13 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export interface ChartOptions {
   data?: any;
-  title?: string;
-  subtitle?: string;
+  title?: ChartTitleOptions;
   legend?: ChartLegendOptions;
   tooltip?: {
     getContent: (dataItem: any) => string;
   };
   colors?: { [key: string]: string } | string[];
+}
+
+export interface ChartTitleOptions {
+  text?: string;
+  description?: string;
 }
 
 export interface ChartLegendOptions {

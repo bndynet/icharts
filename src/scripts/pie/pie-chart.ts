@@ -1,15 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { merge, omit } from 'lodash-es';
+import { merge } from 'lodash-es';
 import { globalOptions } from '../settings';
-import * as echarts from 'echarts';
 import { getColor } from '../utils';
 import { PieChartOptions } from './pie-chart-options';
+import { BaseChart } from '../core/base-chart';
 
-export class PieChart {
-  private chart: any;
-
+export class PieChart extends BaseChart<PieChartOptions> {
   constructor(dom: HTMLDivElement | HTMLCanvasElement, public options: PieChartOptions) {
-    this.chart = echarts.init(dom);
+    super(dom, options);
     this.render();
   }
 
@@ -91,15 +89,6 @@ export class PieChart {
     );
     console.log(options);
     this.chart && this.chart.setOption(options);
-  }
-
-  private getTitleOptions(): any {
-    const result = {
-      text: this.options.title,
-      subtext: this.options.subtitle,
-    };
-    this.options = omit(this.options, 'title');
-    return result;
   }
 
   protected getLegendOptions(): any {
