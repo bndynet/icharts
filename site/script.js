@@ -11,8 +11,8 @@ axios.get('../CHANGELOG.md').then(function (response) {
 var editors = {};
 
 document.querySelectorAll('textarea.code').forEach(function (elem, index) {
-  elem.parentElement.parentElement.getElementsByClassName('run')[0].setAttribute('id', index);
-  console.debug(index);
+  var id = utils.stringUtils.getRandomId();
+  elem.parentElement.parentElement.getElementsByClassName('run')[0].setAttribute('id', id);
   var cm = CodeMirror.fromTextArea(elem, {
     lineNumbers: true,
     styleActiveLine: true,
@@ -21,7 +21,7 @@ document.querySelectorAll('textarea.code').forEach(function (elem, index) {
     height: 400,
   });
   cm.setSize('100%', 400);
-  editors[index] = cm;
+  editors[id] = cm;
 });
 
 document.querySelectorAll('.run').forEach((elem) => {
@@ -45,7 +45,7 @@ document.querySelectorAll('.run').forEach((elem) => {
     switch (chartElem.getAttribute('type')) {
       case 'pie':
         chartFn = icharts.PieChart;
-        chartData = generateMockData(1, {
+        chartData = utils.testUtils.generateMockData(1, {
           Visits: {
             type: 'number',
           },
@@ -59,7 +59,7 @@ document.querySelectorAll('.run').forEach((elem) => {
         break;
       case 'xy':
         chartFn = icharts.XYChart;
-        chartData = generateMockData(30, {
+        chartData = utils.testUtils.generateMockData(30, {
           Date: {
             type: 'date',
           },
@@ -93,45 +93,4 @@ document.querySelectorAll('.run').forEach((elem) => {
 var chartElements = document.querySelectorAll('.chart');
 for (var i = 0; i < chartElements.length; i++) {
   console.debug(chartElements[i]);
-}
-
-function generateMockData(count, fields) {
-  var result = [];
-  var mapping = {
-    // date: faker.date.past,
-    name: faker.name.findName,
-    gender: faker.name.gender,
-    phone: faker.phone.phoneNumber,
-    country: faker.address.country,
-    city: faker.address.city,
-    price: faker.commerce.price,
-    number: faker.random.number,
-    float: faker.random.float,
-    boolean: faker.random.boolean,
-    color: faker.internet.color,
-    url: faker.internet.url,
-    ip: faker.internet.ip,
-    username: faker.internet.userName,
-    password: faker.internet.password,
-    avatar: faker.internet.avatar,
-    email: faker.internet.exampleEmail,
-  };
-  for (var i = 0; i < count; i++) {
-    var item = {};
-    Object.keys(fields).forEach(function (key) {
-      if (fields[key].type) {
-        var fn = mapping[fields[key].type];
-        if (typeof fn === 'function') {
-          item[key] = fn();
-        } else if (fields[key].type === 'date') {
-          var stamp = parseInt(Date.now());
-          item[key] = new Date(stamp - (count - i) * 24 * 60 * 60 * 1000).toLocaleDateString();
-        } else {
-          item[key] = faker.random.words();
-        }
-      }
-    });
-    result.push(item);
-  }
-  return result;
 }
