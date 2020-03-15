@@ -2,7 +2,7 @@ import { merge } from 'lodash-es';
 import { ChartOptions } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export class BaseChart<TOptions extends ChartOptions> {
+export abstract class BaseChart<TOptions extends ChartOptions> {
   protected chart: any;
   protected options: TOptions;
 
@@ -10,6 +10,8 @@ export class BaseChart<TOptions extends ChartOptions> {
     this.chart = echarts.init(dom);
     this.options = options;
   }
+
+  protected abstract render(): void;
 
   protected getTitleOptions(): any {
     const result: any = {};
@@ -69,5 +71,25 @@ export class BaseChart<TOptions extends ChartOptions> {
       }
     }
     return merge({}, result, this.options.legend);
+  }
+
+  protected getToolboxOptions(): any {
+    return merge(
+      {},
+      {
+        show: false,
+        feature: {
+          mark: { show: true },
+          dataView: { show: true, readOnly: false },
+          magicType: {
+            show: true,
+            type: ['pie', 'funnel'],
+          },
+          restore: { show: true },
+          saveAsImage: { show: true },
+        },
+      },
+      this.options.toolbox,
+    );
   }
 }

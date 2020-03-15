@@ -6,6 +6,7 @@ export interface ChartOptions {
   tooltip?: {
     getContent: (dataItem: any) => string;
   };
+  toolbox?: ChartToolboxOptions;
   colors?: { [key: string]: string } | string[];
 }
 
@@ -33,4 +34,8 @@ export interface ChartTooltipOptions {
   backgroundColor?: string;
   fontSize?: number;
   padding?: number[];
+}
+
+export interface ChartToolboxOptions {
+  show?: boolean;
 }

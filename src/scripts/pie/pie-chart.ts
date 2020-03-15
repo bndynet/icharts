@@ -11,7 +11,7 @@ export class PieChart extends BaseChart<PieChartOptions> {
     this.render();
   }
 
-  render(): void {
+  protected render(): void {
     const series: any[] = [];
     const seriesData = Array.isArray(this.options.data) ? this.options.data : [this.options.data];
     const seriesWidthWithSpace = 40 / (seriesData.length - 1);
@@ -95,21 +95,5 @@ export class PieChart extends BaseChart<PieChartOptions> {
     return merge({}, super.getLegendOptions(), {
       data: (Array.isArray(this.options.data) ? this.options.data : [this.options.data]).map((d) => Object.keys(d)).reduce((merged: any[], array: any[]) => (merged || []).concat(array)),
     });
-  }
-
-  private getToolboxOptions() {
-    return {
-      show: true,
-      feature: {
-        mark: { show: true },
-        dataView: { show: true, readOnly: false },
-        magicType: {
-          show: true,
-          type: ['pie', 'funnel'],
-        },
-        restore: { show: true },
-        saveAsImage: { show: true },
-      },
-    };
   }
 }

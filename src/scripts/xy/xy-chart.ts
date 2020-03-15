@@ -12,10 +12,10 @@ export class XYChart extends BaseChart<XYChartOptions> {
 
   constructor(domElement: HTMLDivElement, public options: XYChartOptions) {
     super(domElement, options);
-    this.init();
+    this.render();
   }
 
-  private init() {
+  protected render(): void {
     this.categoryValues = this.options.data.map((item: any) => item[this.options.xKey]);
     const series: echarts.EChartOption.Series[] | any[] = [];
     const legend = this.getLegendOptions();
@@ -87,6 +87,7 @@ export class XYChart extends BaseChart<XYChartOptions> {
           },
         },
       },
+      toolbox: this.getToolboxOptions(),
     };
     option = merge({}, globalOptions, option, this.options);
     console.log(option);
