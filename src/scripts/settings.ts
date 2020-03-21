@@ -33,7 +33,7 @@ export const globalOptions = {
     fontSize: 12,
     padding: [5, 10],
   },
-  color: colorSet.default,
+  color: colorSet.dark,
 };
 
 export function registerColorSet(name: string, colors: string[]): void {

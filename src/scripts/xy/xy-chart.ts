@@ -1,5 +1,4 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import * as echarts from 'echarts';
 import { globalOptions } from '../settings';
 import { merge, find, get } from 'lodash-es';
 import { XYChartOptions } from './xy-chart-options';
@@ -50,9 +49,26 @@ export class XYChart extends BaseChart<XYChartOptions> {
             if (this.options.type) {
               curSeries.type = this.options.type;
             }
-            if (this.options.type === 'area' || get(curSeriesStyles, 'type') === 'area') {
+            if (this.options.type === 'area' || this.options.type === 'sparkline' || get(curSeriesStyles, 'type') === 'area') {
               curSeries.type = 'line';
               curSeries.areaStyle = {};
+              if (this.options.type === 'sparkline') {
+                curSeries.areaStyle.opacity = 0.1;
+                curSeries.symbol = 'none';
+                curSeries.smooth = 0.6;
+                curSeries.areaStyle.normal = {
+                  color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                    {
+                      offset: 0,
+                      color: 'rgba(40, 182, 252, 0.85)',
+                    },
+                    {
+                      offset: 1,
+                      color: 'rgba(28, 159, 255, 0)',
+                    },
+                  ]),
+                };
+              }
             }
             series.push(curSeries);
           }
@@ -61,21 +77,11 @@ export class XYChart extends BaseChart<XYChartOptions> {
       });
     });
     this.xAxisStartWithZero = !find(series, (serie: any) => serie.type === 'bar');
-    let option: echarts.EChartOption = {
+    let option: any = {
       title: this.getTitleOptions(),
       xAxis: this.getXAxisOptions(),
-      yAxis: {
-        name: get(this.styles, 'axes[1].name'),
-        type: 'value',
-        axisLabel: {
-          formatter: get(this.styles, 'axes[1].formatter'),
-        },
-        splitLine: {
-          show: this.options.gridLine === 'all' || this.options.gridLine === 'horizontal',
-        },
-        // ...axisStyle,
-      },
-      legend,
+      yAxis: this.getYAxisOptions(),
+      legend: this.getLegendOptions(),
       series,
       // color: this._colors,
       tooltip: {
@@ -89,8 +95,32 @@ export class XYChart extends BaseChart<XYChartOptions> {
       },
       toolbox: this.getToolboxOptions(),
     };
-    option = merge({}, globalOptions, option, this.options);
-    console.log(option);
+    option = merge({}, globalOptions, option);
+    if (this.options.type === 'sparkline') {
+      option = merge(option, {
+        grid: {
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+        },
+        xAxis: {
+          show: false,
+        },
+        yAxis: {
+          show: false,
+        },
+        legend: null,
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'line',
+          },
+        },
+      });
+    }
+    console.debug('echarts options:');
+    console.debug(option);
     this.chart && this.chart.setOption(option);
   }
 
@@ -102,13 +132,49 @@ export class XYChart extends BaseChart<XYChartOptions> {
       data: this.categoryValues,
       splitLine: {
         show: this.options.gridLine === 'all' || this.options.gridLine === 'vertial',
+        lineStyle: {
+          color: '#888888',
+          opacity: 0.4,
+        },
       },
+      axisLine: {
+        lineStyle: {
+          color: '#888888',
+          opacity: 0.6,
+        },
+      },
+      axisLabel: {},
       // ...axisStyle,
     };
     if (this.options.styles && this.options.styles.xAxis && this.options.styles.xAxis.labelFormatter) {
-      options.axisLabel = {
-        formatter: this.options.styles.xAxis.labelFormatter,
-      };
+      options.axisLabel.formatter = this.options.styles.xAxis.labelFormatter;
+    }
+    if (this.options.textColor) {
+      options.axisLabel.color = this.options.textColor;
+    }
+    return options;
+  }
+
+  private getYAxisOptions(): any {
+    const options: any = {
+      type: 'value',
+      splitLine: {
+        show: this.options.gridLine === 'all' || this.options.gridLine === 'horizontal',
+        lineStyle: {
+          color: '#888888',
+          opacity: 0.4,
+        },
+      },
+      axisLine: {
+        lineStyle: {
+          color: '#888888',
+          opacity: 0.6,
+        },
+      },
+      axisLabel: {},
+    };
+    if (this.options.textColor) {
+      options.axisLabel.color = this.options.textColor;
     }
     return options;
   }

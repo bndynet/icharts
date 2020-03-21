@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { merge } from 'lodash-es';
 import { ChartOptions } from '../types';
 
@@ -15,6 +16,16 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
 
   protected getTitleOptions(): any {
     const result: any = {};
+    if (this.options.textColor) {
+      result.textStyle = {
+        color: this.options.textColor,
+      };
+    }
+    if (this.options.mutedTextColor) {
+      result.subtextStyle = {
+        color: this.options.mutedTextColor,
+      };
+    }
     if (this.options.title) {
       if (this.options.title.text) {
         result.text = this.options.title.text;
@@ -22,15 +33,21 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
       if (this.options.title.description) {
         result.subtext = this.options.title.description;
       }
+      if (this.options.title.color) {
+        result.textStyle = {
+          color: this.options.title.color,
+        };
+      }
     }
     return result;
   }
 
   protected getLegendOptions(): any {
-    const result: any = {
+    const result: any = merge({
       show: true,
       padding: [10, 10, 10, 10],
-    };
+      textStyle: this.getTextStyle(this.options.legend),
+    });
     const locationMap = {
       left: { top: 'center', left: 0, orient: 'vertical' },
       right: { top: 'center', right: 0, orient: 'vertical' },
@@ -91,5 +108,16 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
       },
       this.options.toolbox,
     );
+  }
+
+  protected getTextStyle(currentNodeOptions: any): any {
+    const result: any = {};
+    if (this.options.textColor) {
+      result.color = this.options.textColor;
+    }
+    if (currentNodeOptions && currentNodeOptions.color) {
+      result.color = currentNodeOptions.color;
+    }
+    return result;
   }
 }

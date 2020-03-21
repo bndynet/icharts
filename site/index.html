@@ -117,6 +117,8 @@
     "text": "Chart",
     "description": "description for chart"
   },
+  "textColor": "#ffffff",
+  "mutedTextColor": "#666666",
   "xKey": "Date",
   "gridLine": "all",
   "stacked": true,
@@ -129,7 +131,7 @@
 }
         </textarea>
         </div>
-        <div class="chart" type="xy"></div>
+        <div class="chart" type="xy" style="background-color: #333333;"></div>
       </div>
 
       <div class="chart-group">
@@ -168,6 +170,20 @@
         </textarea>
         </div>
         <div class="chart" type="pie"></div>
+      </div>
+
+      <div class="chart-group">
+        <button class="run">RUN</button>
+        <div class="editor-wrap">
+          <textarea class="code">
+{
+  "xKey": "Date",
+  "type": "sparkline",
+  "__": ""
+}
+        </textarea>
+        </div>
+        <div class="chart" type="xy" data-series-count="1" data-length="5" style="margin: 4rem auto; width: 200px; height: 120px;"></div>
       </div>
     </section>
 

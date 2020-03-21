@@ -5,7 +5,7 @@ export interface XYChartOptions extends ChartOptions {
   data: any[];
   xKey: string;
   gridLine?: 'none' | 'all' | 'vertial' | 'horizontal';
-  type?: 'line' | 'bar' | 'area';
+  type?: 'line' | 'bar' | 'area' | 'sparkline';
   stacked?: boolean;
   smooth?: boolean;
   styles?: {

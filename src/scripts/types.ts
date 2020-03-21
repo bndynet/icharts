@@ -8,11 +8,15 @@ export interface ChartOptions {
   };
   toolbox?: ChartToolboxOptions;
   colors?: { [key: string]: string } | string[];
+  style?: ChartStyleOptions;
+  textColor?: string;
+  mutedTextColor?: string;
 }
 
 export interface ChartTitleOptions {
   text?: string;
   description?: string;
+  color?: string;
 }
 
 export interface ChartLegendOptions {
@@ -39,3 +43,5 @@ export interface ChartTooltipOptions {
 export interface ChartToolboxOptions {
   show?: boolean;
 }
+
+export interface ChartStyleOptions {}

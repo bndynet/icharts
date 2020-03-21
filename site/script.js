@@ -40,6 +40,8 @@ document.querySelectorAll('.run').forEach((elem) => {
       );
     }
     var chartElem = elem.parentElement.getElementsByClassName('chart')[0];
+    var seriesCount = parseInt(chartElem.getAttribute('data-series-count')) || 4;
+    var count = parseInt(chartElem.getAttribute('data-length')) || 30;
     var chartFn;
     var chartData;
     switch (chartElem.getAttribute('type')) {
@@ -59,29 +61,19 @@ document.querySelectorAll('.run').forEach((elem) => {
         break;
       case 'xy':
         chartFn = icharts.XYChart;
-        chartData = utils.testUtils.generateMockData(30, {
+        var seriesDefinition = {};
+        for(var i = 0; i< seriesCount; i++) {
+          seriesDefinition[`S${i}`] = {
+            type: "number",
+          };
+        }
+        chartData = utils.testUtils.generateMockData(count, {
           Date: {
             type: 'date',
           },
-          Visits: {
-            type: 'number',
-          },
-          Views: {
-            type: 'number',
-          },
-          Hits: {
-            type: 'number',
-          },
-          S1: {
-            type: 'number',
-          },
-          S2: {
-            type: 'number',
-          },
-          S3: {
-            type: 'number',
-          },
+          ...seriesDefinition,
         });
+        console.debug(chartData);
         break;
     }
     chartOptions.data = chartData;
