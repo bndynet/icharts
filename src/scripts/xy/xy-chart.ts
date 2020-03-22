@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { globalOptions } from '../settings';
-import { merge, find, get } from 'lodash-es';
-import { XYChartOptions } from './xy-chart-options';
+import find from 'lodash-es/find';
+import get from 'lodash-es/get';
+import merge from 'lodash-es/merge';
 import { BaseChart } from '../core/base-chart';
+import { globalOptions } from '../settings';
+import { XYChartOptions } from './xy-chart-options';
 
 export class XYChart extends BaseChart<XYChartOptions> {
   private styles: any;
@@ -26,10 +28,11 @@ export class XYChart extends BaseChart<XYChartOptions> {
           const curSeriesStyles = get(this.styles, `series[${key}]`);
           if (!curSeries) {
             legend.data.push(key);
+            const curSeriesColor = this.getColor(key, series.length);
             curSeries = {
               name: key,
               type: get(curSeriesStyles, 'type') || 'line',
-              color: get(curSeriesStyles, 'color'),
+              color: curSeriesColor,
               smooth: this.options.smooth,
               tooltip: {
                 formatter: (params: any): string => {
@@ -56,18 +59,20 @@ export class XYChart extends BaseChart<XYChartOptions> {
                 curSeries.areaStyle.opacity = 0.1;
                 curSeries.symbol = 'none';
                 curSeries.smooth = 0.6;
-                curSeries.areaStyle.normal = {
-                  color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    {
-                      offset: 0,
-                      color: 'rgba(40, 182, 252, 0.85)',
-                    },
-                    {
-                      offset: 1,
-                      color: 'rgba(28, 159, 255, 0)',
-                    },
-                  ]),
-                };
+                if (curSeriesColor) {
+                  curSeries.areaStyle.normal = {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                      {
+                        offset: 0,
+                        color: curSeriesColor,
+                      },
+                      {
+                        offset: 1,
+                        color: `${curSeriesColor}00`,
+                      },
+                    ]),
+                  };
+                }
               }
             }
             series.push(curSeries);
@@ -149,8 +154,8 @@ export class XYChart extends BaseChart<XYChartOptions> {
     if (this.options.styles && this.options.styles.xAxis && this.options.styles.xAxis.labelFormatter) {
       options.axisLabel.formatter = this.options.styles.xAxis.labelFormatter;
     }
-    if (this.options.textColor) {
-      options.axisLabel.color = this.options.textColor;
+    if (this.textColors.primary) {
+      options.axisLabel.color = this.textColors.primary;
     }
     return options;
   }
@@ -173,8 +178,8 @@ export class XYChart extends BaseChart<XYChartOptions> {
       },
       axisLabel: {},
     };
-    if (this.options.textColor) {
-      options.axisLabel.color = this.options.textColor;
+    if (this.textColors.primary) {
+      options.axisLabel.color = this.textColors.primary;
     }
     return options;
   }

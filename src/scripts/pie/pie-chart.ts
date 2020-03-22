@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { merge } from 'lodash-es';
+import merge from 'lodash-es/merge';
+import { BaseChart } from '../core/base-chart';
 import { globalOptions } from '../settings';
 import { getColor } from '../utils';
 import { PieChartOptions } from './pie-chart-options';
-import { BaseChart } from '../core/base-chart';
 
 export class PieChart extends BaseChart<PieChartOptions> {
   constructor(dom: HTMLDivElement | HTMLCanvasElement, public options: PieChartOptions) {

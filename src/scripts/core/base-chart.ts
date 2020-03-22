@@ -1,29 +1,33 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import { merge } from 'lodash-es';
-import { ChartOptions } from '../types';
+import merge from 'lodash-es/merge';
+import { ChartOptions, ChartTextColorOptions } from '../types';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export abstract class BaseChart<TOptions extends ChartOptions> {
   protected chart: any;
   protected options: TOptions;
+  protected textColors: ChartTextColorOptions;
 
   constructor(dom: HTMLDivElement | HTMLCanvasElement, options: TOptions) {
     this.chart = echarts.init(dom);
     this.options = options;
+    this.textColors = this.getTextColor();
+    console.debug(this.textColors);
   }
 
   protected abstract render(): void;
 
   protected getTitleOptions(): any {
     const result: any = {};
-    if (this.options.textColor) {
+    const textColors = this.getTextColor();
+    if (textColors.primary) {
       result.textStyle = {
-        color: this.options.textColor,
+        color: textColors.primary,
       };
     }
-    if (this.options.mutedTextColor) {
+    if (textColors.secondary) {
       result.subtextStyle = {
-        color: this.options.mutedTextColor,
+        color: textColors.secondary,
       };
     }
     if (this.options.title) {
@@ -32,11 +36,6 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
       }
       if (this.options.title.description) {
         result.subtext = this.options.title.description;
-      }
-      if (this.options.title.color) {
-        result.textStyle = {
-          color: this.options.title.color,
-        };
       }
     }
     return result;
@@ -112,12 +111,46 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
 
   protected getTextStyle(currentNodeOptions: any): any {
     const result: any = {};
-    if (this.options.textColor) {
-      result.color = this.options.textColor;
+    if (this.textColors.primary) {
+      result.color = this.textColors.primary;
     }
     if (currentNodeOptions && currentNodeOptions.color) {
       result.color = currentNodeOptions.color;
     }
     return result;
+  }
+
+  private getTextColor(): ChartTextColorOptions {
+    const result: ChartTextColorOptions = {};
+    if (this.options.isDark) {
+      result.primary = '#ffffff';
+      result.secondary = '#cccccc';
+    } else {
+      result.primary = '#000000';
+      result.secondary = '#666666';
+    }
+    if (this.options.textColor) {
+      result.primary = this.options.textColor;
+    }
+    if (this.options.mutedTextColor) {
+      result.secondary = this.options.mutedTextColor;
+    }
+    return result;
+  }
+
+  protected getColor(key: string, index: number): string {
+    if (this.options.colors) {
+      if (typeof this.options.colors === 'string') {
+        return this.options.colors;
+      } else if (Array.isArray(this.options.colors)) {
+        if (this.options.colors.length > index) {
+          return this.options.colors[index];
+        }
+      } else {
+        return this.options.colors[key];
+      }
+    }
+
+    return '';
   }
 }

@@ -11,12 +11,17 @@ export interface ChartOptions {
   style?: ChartStyleOptions;
   textColor?: string;
   mutedTextColor?: string;
+  isDark?: boolean;
+}
+
+export interface ChartTextColorOptions {
+  primary?: string;
+  secondary?: string;
 }
 
 export interface ChartTitleOptions {
   text?: string;
   description?: string;
-  color?: string;
 }
 
 export interface ChartLegendOptions {
