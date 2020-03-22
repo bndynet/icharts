@@ -30,8 +30,10 @@ export const globalOptions = {
   tooltip: {
     color: '#ffffff',
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    fontSize: 12,
     padding: [5, 10],
+    textStyle: {
+      fontSize: 13,
+    },
   },
   color: colorSet.dark,
 };

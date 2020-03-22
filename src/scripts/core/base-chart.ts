@@ -1,8 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import merge from 'lodash-es/merge';
 import { ChartOptions, ChartTextColorOptions } from '../types';
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export abstract class BaseChart<TOptions extends ChartOptions> {
   protected chart: any;
   protected options: TOptions;
@@ -12,7 +11,10 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
     this.chart = echarts.init(dom);
     this.options = options;
     this.textColors = this.getTextColor();
-    console.debug(this.textColors);
+  }
+
+  dispose(): void {
+    this.chart && this.chart.dispose();
   }
 
   protected abstract render(): void;

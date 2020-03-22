@@ -51,7 +51,7 @@ export class PieChart extends BaseChart<PieChartOptions> {
                 <span class="name">${params.name}</span>
               </div>
               <div class="item">
-                <span class="name">${params.value}</span>
+                <span class="name">${params.value.toLocaleString()}</span>
                 <span class="value">${params.percent}%</span>
               </div>
             </div>`;

@@ -97,6 +97,7 @@ export class XYChart extends BaseChart<XYChartOptions> {
             backgroundColor: '#6a7985',
           },
         },
+        formatter: (p: any) => this.getTooltipFormatter(p),
       },
       toolbox: this.getToolboxOptions(),
     };
@@ -182,5 +183,19 @@ export class XYChart extends BaseChart<XYChartOptions> {
       options.axisLabel.color = this.textColors.primary;
     }
     return options;
+  }
+
+  private getTooltipFormatter(params: any): string {
+    const colorSpan = (color: any) => `<span class="flag" style="background-color:${color};"></span>`;
+    let rez = '<div class="ichart-tooltip"><div class="category">' + params[0].axisValue + '</div>';
+    //console.log(params); //quite useful for debug
+    params.forEach((item: any) => {
+      rez += `<div class="item">${colorSpan(item.color)}
+      <span class="name">${item.seriesName}</span>
+      <span class="value">${item.data.toLocaleString()}</span>
+      </div>`;
+    });
+    rez += `</div>`;
+    return rez;
   }
 }
