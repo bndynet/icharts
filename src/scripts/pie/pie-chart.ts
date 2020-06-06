@@ -27,7 +27,7 @@ export class PieChart extends BaseChart<PieChartOptions> {
         label: {
           position: isInnerSeries ? 'inner' : 'outside',
           formatter: isInnerSeries ? '{b}' : '{b}: {d}%',
-          color: isInnerSeries ? '#ffffff' : null,
+          color: isInnerSeries ? '#ffffff' : this.getTextColor().primary,
           textShadowColor: isInnerSeries ? '#000' : null,
           textShadowOffsetX: isInnerSeries ? 1 : 0,
           textShadowOffsetY: isInnerSeries ? 1 : 0,

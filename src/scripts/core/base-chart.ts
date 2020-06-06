@@ -17,6 +17,11 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
     this.chart && this.chart.dispose();
   }
 
+  rerender(options: TOptions): void {
+    merge(this.options, options);
+    this.render();
+  }
+
   protected abstract render(): void;
 
   protected getTitleOptions(): any {
@@ -122,7 +127,7 @@ export abstract class BaseChart<TOptions extends ChartOptions> {
     return result;
   }
 
-  private getTextColor(): ChartTextColorOptions {
+  protected getTextColor(): ChartTextColorOptions {
     const result: ChartTextColorOptions = {};
     if (this.options.isDark) {
       result.primary = '#ffffff';
