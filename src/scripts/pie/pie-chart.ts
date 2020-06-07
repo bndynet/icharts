@@ -17,9 +17,9 @@ export class PieChart extends BaseChart<PieChartOptions> {
     const seriesWidthWithSpace = 40 / (seriesData.length - 1);
     seriesData.forEach((d: any, index: number) => {
       const isInnerSeries = index < seriesData.length - 1;
-      let radius = index === 0 ? [0, seriesData.length === 1 ? '80%' : '40%'] : [`${40 + seriesWidthWithSpace * index - seriesWidthWithSpace / 2}%`, `${40 + seriesWidthWithSpace * index}%`];
+      let radius = index === 0 ? [0, seriesData.length === 1 ? '70%' : '40%'] : [`${40 + seriesWidthWithSpace * index - seriesWidthWithSpace / 2}%`, `${40 + seriesWidthWithSpace * index}%`];
       if (index === seriesData.length - 1 && this.options.radius) {
-        radius = Array.isArray(this.options.radius) ? this.options.radius : [this.options.radius, '80%'];
+        radius = Array.isArray(this.options.radius) ? this.options.radius : [this.options.radius, '70%'];
       }
       const s = {
         type: 'pie',
