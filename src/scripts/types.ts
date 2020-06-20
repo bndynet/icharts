@@ -50,5 +50,5 @@ export interface ChartToolboxOptions {
 }
 
 export interface ChartStyleOptions {
-  todo?: string
+  todo?: string;
 }
