@@ -49,4 +49,6 @@ export interface ChartToolboxOptions {
   show?: boolean;
 }
 
-export interface ChartStyleOptions {}
+export interface ChartStyleOptions {
+  todo?: string
+}
