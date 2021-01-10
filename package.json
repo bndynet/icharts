@@ -1,6 +1,6 @@
 {
   "name": "@bndynet/icharts",
-  "version": "0.0.0-dev",
+  "version": "1.0.0",
   "description": "Chart library",
   "main": "dist/icharts.umd.js",
   "module": "dist/icharts.es5.js",
