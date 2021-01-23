@@ -11,7 +11,7 @@ axios.get('../CHANGELOG.md').then(function (response) {
 var editors = {};
 
 document.querySelectorAll('textarea.code').forEach(function (elem, index) {
-  var id = utils.stringUtils.getRandomId();
+  var id = utils.string.getRandomId();
   elem.parentElement.parentElement.getElementsByClassName('run')[0].setAttribute('id', id);
   var cm = CodeMirror.fromTextArea(elem, {
     lineNumbers: true,
@@ -47,35 +47,45 @@ document.querySelectorAll('.run').forEach((elem) => {
     switch (chartElem.getAttribute('type')) {
       case 'pie':
         chartFn = icharts.PieChart;
-        chartData = utils.testUtils.generateMockData(1, {
+        chartData = dator.generate(1, {
           Visits: {
             type: 'number',
+            args: { min: 10, max: 10000 },
           },
           Views: {
             type: 'number',
+            args: { min: 10, max: 10000 },
           },
           Hits: {
             type: 'number',
+            args: { min: 10, max: 10000 },
           },
         });
         break;
       case 'xy':
         chartFn = icharts.XYChart;
         var seriesDefinition = {};
-        for(var i = 0; i< seriesCount; i++) {
+        for (var i = 0; i < seriesCount; i++) {
           seriesDefinition[`S${i}`] = {
-            type: "number",
+            type: 'number',
+            args: { min: 10, max: 10000 },
           };
         }
-        chartData = utils.testUtils.generateMockData(count, {
+        chartData = dator.generate(count, {
           Date: {
             type: 'date',
           },
           ...seriesDefinition,
         });
-        console.debug(chartData);
         break;
     }
+    if (Array.isArray(chartData)) {
+      chartData = chartData.map((item) => {
+        item.Date = item.Date.toDateString();
+        return item;
+      });
+    }
+    console.debug(chartData);
     chartOptions.data = chartData;
     new chartFn(chartElem, chartOptions);
   });
