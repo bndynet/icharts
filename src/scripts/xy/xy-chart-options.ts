@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { ChartOptions } from '../types';
+import { ChartOptions } from '../../types';
 
-export interface XYChartOptions extends ChartOptions {
+export interface XYChartOptions extends ChartOptions<any> {
   data: any[];
   xKey: string;
   gridLine?: 'none' | 'all' | 'vertial' | 'horizontal';

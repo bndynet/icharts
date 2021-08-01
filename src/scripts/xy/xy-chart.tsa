@@ -1,37 +1,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import find from 'lodash-es/find';
-import get from 'lodash-es/get';
-import merge from 'lodash-es/merge';
-import { BaseChart } from '../core/base-chart';
-import { globalOptions } from '../settings';
+import * as echarts from 'echarts/core';
+import { Chart } from '../core/chart';
 import { XYChartOptions } from './xy-chart-options';
+import { getValueByPath, mergeObjects } from '../utils';
 
-export class XYChart extends BaseChart<XYChartOptions> {
+export class XYChart extends Chart<XYChartOptions> {
   private styles: any;
   private categoryValues: any[] = [];
   private xAxisStartWithZero = true;
 
   constructor(domElement: HTMLDivElement, public options: XYChartOptions) {
     super(domElement, options);
-    this.render();
   }
 
-  protected render(): void {
+  public render(): void {
+    this.chart && this.chart.setOption(this.getEChartsOption());
+  }
+
+  protected init(): void { }
+
+  protected getEChartsOption(): any {
     this.categoryValues = this.options.data.map((item: any) => item[this.options.xKey]);
-    const series: echarts.EChartOption.Series[] | any[] = [];
+    const series: any[] = [];
     const legend = this.getLegendOptions();
     legend.data = [];
     this.options.data.forEach((dataItem: any, index: number) => {
       Object.keys(dataItem).forEach((key: string) => {
         if (key !== this.options.xKey) {
           let curSeries = series.find((s: any) => s.name === key);
-          const curSeriesStyles = get(this.styles, `series[${key}]`);
+          const curSeriesStyles = getValueByPath(this.styles, `series[${key}]`);
           if (!curSeries) {
             legend.data.push(key);
-            const curSeriesColor = this.getColor(key, series.length);
+            const curSeriesColor = this.getColorByName(key);
             curSeries = {
               name: key,
-              type: get(curSeriesStyles, 'type') || 'line',
+              type: getValueByPath(curSeriesStyles, 'type') || 'line',
               color: curSeriesColor,
               smooth: this.options.smooth,
               tooltip: {
@@ -52,7 +56,7 @@ export class XYChart extends BaseChart<XYChartOptions> {
             if (this.options.type) {
               curSeries.type = this.options.type;
             }
-            if (this.options.type === 'area' || this.options.type === 'sparkline' || get(curSeriesStyles, 'type') === 'area') {
+            if (this.options.type === 'area' || this.options.type === 'sparkline' || getValueByPath(curSeriesStyles, 'type') === 'area') {
               curSeries.type = 'line';
               curSeries.areaStyle = {};
               if (this.options.type === 'sparkline') {
@@ -101,9 +105,8 @@ export class XYChart extends BaseChart<XYChartOptions> {
       },
       toolbox: this.getToolboxOptions(),
     };
-    option = merge({}, globalOptions, option);
     if (this.options.type === 'sparkline') {
-      option = merge(option, {
+      option = mergeObjects(option, {
         grid: {
           top: 0,
           left: 0,
@@ -125,14 +128,13 @@ export class XYChart extends BaseChart<XYChartOptions> {
         },
       });
     }
-    console.debug('echarts options:');
-    console.debug(option);
-    this.chart && this.chart.setOption(option);
+
+    return option;
   }
 
   private getXAxisOptions(): any {
     const options: any = {
-      name: get(this.styles, 'axes[0].name'),
+      name: getValueByPath(this.styles, 'axes[0].name'),
       type: 'category',
       boundaryGap: !this.xAxisStartWithZero,
       data: this.categoryValues,
@@ -155,9 +157,6 @@ export class XYChart extends BaseChart<XYChartOptions> {
     if (this.options.styles && this.options.styles.xAxis && this.options.styles.xAxis.labelFormatter) {
       options.axisLabel.formatter = this.options.styles.xAxis.labelFormatter;
     }
-    if (this.textColors.primary) {
-      options.axisLabel.color = this.textColors.primary;
-    }
     return options;
   }
 
@@ -179,9 +178,6 @@ export class XYChart extends BaseChart<XYChartOptions> {
       },
       axisLabel: {},
     };
-    if (this.textColors.primary) {
-      options.axisLabel.color = this.textColors.primary;
-    }
     return options;
   }
 
