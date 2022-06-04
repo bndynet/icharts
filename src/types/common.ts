@@ -9,3 +9,10 @@ export enum Position {
   Left = 'left',
   Center = 'center',
 }
+
+export interface TopRightBottomLeft {
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
+}

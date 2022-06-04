@@ -1,13 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { LegendItemContext, OnLegendContext, Position } from '../../types';
+import { LegendItemContext, OnLegendContext } from '../../types';
+import {
+  getValueByIndex,
+  mergeObjectsTo,
+  setValueToObjectIfValueDefined,
+} from '../../utils';
 import { Chart } from '../core/chart';
-import { getValueByIndex, isUndefined, mergeObjects, setValueToObjectIfValueNotUndefined } from '../utils';
 import { PieChartData, PieChartOptions, PieVariant } from './types';
 
 const percentOfDefaultOuterRadius = 75;
 const defaultOuterRadius = `${percentOfDefaultOuterRadius}%`;
 
-export class PieChart extends Chart<PieChartData, PieChartOptions> implements OnLegendContext {
+export class PieChart
+  extends Chart<PieChartData, PieChartOptions>
+  implements OnLegendContext
+{
   static defaults: PieChartOptions = {
     variant: PieVariant.None,
     autoSort: true,
@@ -16,7 +23,7 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
     },
     slice: {
       borderRadius: 4,
-      borderWidth: 2,
+      gap: 1,
     },
     label: {
       show: true,
@@ -26,21 +33,18 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
     },
   };
 
-  private data: PietData = [];
-  private legendNames = new Set<string>();
-  private multipleSeries = false;
-
-  constructor(
-    protected dom: HTMLDivElement | HTMLCanvasElement,
-    protected options: PieChartOptions,
-  ) {
-    super(dom, mergeObjects(PieChart.defaults, options));
-    this.init();
-  }
+  private _data: PietData = [];
+  private _legendNames = new Set<string>();
+  private _multipleSeries = false;
 
   iGetItemContext(name: string): LegendItemContext {
-    const result: LegendItemContext = { name, color: this.getColorByName(name), details: [] };
-    this.data.forEach((series) => {
+    const color = this.getColorByName(name);
+    const result: LegendItemContext = {
+      name,
+      color: Array.isArray(color) ? color[0] : color,
+      details: [],
+    };
+    this._data.forEach((series) => {
       const sameLegendItem = series.items.find((si) => si.name === name);
       const item = {
         name: series.name || '',
@@ -53,20 +57,30 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
     return result;
   }
 
-  private init(): void {
-    this.data = [];
-    if (Array.isArray(this.allOptions.data)) {
-      if (this.allOptions.data.length > 0 && 'name' in this.allOptions.data[0] && 'value' in this.allOptions.data[0]) {
+  protected getDefaultOptions(): PieChartOptions {
+    return PieChart.defaults;
+  }
+
+  protected init(): void {
+    this._data = [];
+    console.log('type', this.options.variant);
+    if (Array.isArray(this.data)) {
+      console.log('type array', this.data);
+      if (
+        this.data.length > 0 &&
+        'name' in this.data[0] &&
+        'value' in this.data[0]
+      ) {
         // format: [{name, value}, ...]
-        this.data.push({
-          name: getValueByIndex(this.allOptions.seriesNames, 0),
-          items: this.allOptions.data as { name: string; value: number }[],
+        this._data.push({
+          name: getValueByIndex(this.allOptions.series, 0)?.name,
+          items: this.data as { name: string; value: number }[],
         });
       } else {
         // format(nested): [{k1, k2, k3}, {}]
-        this.allOptions.data.forEach((d: any, idx) => {
-          this.data.push({
-            name: getValueByIndex(this.allOptions.seriesNames, idx),
+        this.data.forEach((d: any, idx) => {
+          this._data.push({
+            name: getValueByIndex(this.allOptions.series, idx)?.name,
             items: Object.keys(d).map((key) => ({
               name: key,
               value: d[key],
@@ -76,23 +90,29 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
       }
     } else {
       // format: {}
-      this.data.push({
-        name: getValueByIndex(this.allOptions.seriesNames, 0),
-        items: Object.keys(this.allOptions.data as object).map((key) => ({
+      console.log('-----', this.data);
+      this._data.push({
+        name: getValueByIndex(this.allOptions.series, 0)?.name,
+        items: Object.keys(this.data as object).map((key) => ({
           name: key,
-          value: (this.allOptions.data as any)[key],
+          value: (this.data as any)[key],
         })),
       });
     }
 
-    this.data.forEach((seriesList) => {
-      const total = seriesList.items.map((item) => item.value).reduce((total, cur) => total + cur, 0);
+    this._data.forEach((seriesList) => {
+      const total = seriesList.items
+        .map((item) => item.value)
+        .reduce((total, cur) => total + cur, 0);
       seriesList.items.forEach((seriesItem) => {
-        this.legendNames.add(seriesItem.name);
+        this._legendNames.add(seriesItem.name);
         seriesItem.iTotal = total;
         seriesItem.iPercent = (seriesItem.value * 100) / total;
         // hide the label if the value/percent less than the threshold
-        if (this.options.label?.percentToHide && seriesItem.iPercent < this.options.label?.percentToHide) {
+        if (
+          this.options.label?.percentToHide &&
+          seriesItem.iPercent < this.options.label?.percentToHide
+        ) {
           seriesItem.label = { show: false };
         }
       });
@@ -102,7 +122,7 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
       }
     });
 
-    this.multipleSeries = this.data.length > 1;
+    this._multipleSeries = this._data.length > 1;
   }
 
   protected getEOption(): any {
@@ -110,30 +130,13 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
       series: this.getSeriesOptions(),
     };
     if (this.allOptions.legend?.show) {
-      option.data = (Array.isArray(this.allOptions.data) ? this.allOptions.data : [this.allOptions.data]).map((d) => Object.keys(d as object)).reduce((merged: any[], array: any[]) => (merged || []).concat(array));
-      let legendPosition = Position.Top;
-      if (!isUndefined(this.allOptions.legend.top)) {
-        legendPosition = Position.Top;
-      } else if (!isUndefined(this.allOptions.legend.bottom)) {
-        legendPosition = Position.Bottom;
-      }
-      if (!isUndefined(this.allOptions.legend.left)) {
-        legendPosition = Position.Left;
-      } else if (!isUndefined(this.allOptions.legend.right)) {
-        legendPosition = Position.Right;
-      }
-      console.log(`🚀 ~ PieChart ~ getEOption ~ legendPosition:`, legendPosition);
+      option.data = (Array.isArray(this.data) ? this.data : [this.data])
+        .map((d) => Object.keys(d as object))
+        .reduce((merged: any[], array: any[]) => (merged || []).concat(array));
+      const area = this.getAreaWithoutLegend();
 
       option.series.forEach((s: any) => {
-        if (legendPosition === Position.Top && this.allOptions.legend?.height) {
-          s.top = this.allOptions.legend.height;
-        } else if (legendPosition === Position.Bottom && this.allOptions.legend?.height) {
-          s.bottom = this.allOptions.legend.height;
-        } else if (legendPosition === Position.Left && this.allOptions.legend?.width) {
-          s.left = this.allOptions.legend.width;
-        } else if (legendPosition === Position.Right && this.allOptions.legend?.width) {
-          s.right = this.allOptions.legend.width;
-        }
+        mergeObjectsTo(s, area);
       });
     }
 
@@ -141,27 +144,33 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
   }
 
   protected getLegendNames(): string[] {
-    return [...this.legendNames];
+    return [...this._legendNames];
   }
 
   private getSeriesOptions(): any {
     const seriesList: any[] = [];
     const radiusList: Array<Array<string | number>> = [];
-    const radiusStep = percentOfDefaultOuterRadius / this.data.length;
+    const radiusStep = percentOfDefaultOuterRadius / this._data.length;
 
-    this.data.forEach((seriesItem, idx) => {
-      const isLastSeries = idx === this.data.length - 1;
+    this._data.forEach((seriesItem, idx) => {
+      const isLastSeries = idx === this._data.length - 1;
       const data = seriesItem.items;
       if (idx === 0) {
-        if (this.multipleSeries) {
+        if (this._multipleSeries) {
           radiusList.push([0, `${radiusStep}%`]);
         } else {
-          radiusList.push([this.allOptions.innerRadius || 0, this.allOptions.outerRadius || defaultOuterRadius]);
+          radiusList.push([
+            this.allOptions.innerRadius || 0,
+            this.allOptions.outerRadius || defaultOuterRadius,
+          ]);
         }
       } else {
         // calculate the step of radius if more than one series
-        if (this.multipleSeries) {
-          radiusList.push([`${radiusStep * (idx + 1) - radiusStep / 2}%`, `${radiusStep * (idx + 1)}%`]);
+        if (this._multipleSeries) {
+          radiusList.push([
+            `${radiusStep * (idx + 1) - radiusStep / 2}%`,
+            `${radiusStep * (idx + 1)}%`,
+          ]);
         }
       }
       const series: any = {
@@ -170,7 +179,9 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
         radius: radiusList[idx],
         avoidLabelOverlap: true,
         label: {
-          show: this.multipleSeries ? isLastSeries : this.allOptions.label?.show,
+          show: this._multipleSeries
+            ? isLastSeries
+            : this.allOptions.label?.show,
           position: this.allOptions.label?.position,
           formatter: '{b}: {d}%',
           textShadowColor: '#000',
@@ -200,26 +211,23 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
   }
 
   private setItemStyleForSeries(series: any): void {
+    setValueToObjectIfValueDefined(
+      series,
+      this.allOptions.slice?.gap,
+      'padAngle',
+    );
     if (this.allOptions.slice) {
       series.itemStyle = {};
-      setValueToObjectIfValueNotUndefined(series.itemStyle, this.allOptions.slice?.borderColor, 'borderColor');
-      setValueToObjectIfValueNotUndefined(series.itemStyle, this.allOptions.slice?.borderRadius, 'borderRadius');
-      setValueToObjectIfValueNotUndefined(series.itemStyle, this.allOptions.slice?.borderWidth, 'borderWidth');
-    }
-  }
-
-  private setTooltipForSeries(series: any): void {
-    series.tooltip = this.options.tooltip ?? {};
-
-    if (this.options.callbacks?.tooltip?.formatValue) {
-      series.tooltip.valueFormatter = (value: number | string, dataIndex: number) => {
-        return this.options.callbacks!.tooltip!.formatValue!(value, dataIndex);
-      };
-    }
-    if (this.options.callbacks?.tooltip?.getContent) {
-      series.tooltip.formatter = (params: any, ticket: string, callback: (ticket: string, html: string) => void) => {
-        return this.options.callbacks!.tooltip!.getContent!(params, ticket, callback);
-      };
+      setValueToObjectIfValueDefined(
+        series.itemStyle,
+        this.allOptions.slice?.borderColor,
+        'borderColor',
+      );
+      setValueToObjectIfValueDefined(
+        series.itemStyle,
+        this.allOptions.slice?.borderRadius,
+        'borderRadius',
+      );
     }
   }
 
@@ -258,11 +266,6 @@ export class PieChart extends Chart<PieChartData, PieChartOptions> implements On
           show: true,
           fontSize: this.allOptions.label.highlightFontSize,
           fontWeight: 'bold',
-        },
-        itemStyle: {
-          shadowBlur: 10,
-          shadowOffsetX: 0,
-          shadowColor: 'rgba(0, 0, 0, 0.5)',
         },
       };
     }

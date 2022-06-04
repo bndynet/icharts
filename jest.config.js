@@ -4,7 +4,9 @@ module.exports = {
   roots: ['<rootDir>/src/'],
   preset: 'ts-jest',
   moduleNameMapper: {
-    '.+\\.(css|styl|less|sass|scss|png|jpg|ttf|woff|woff2)$': 'jest-transform-stub',
+    '.+\\.(css|styl|less|sass|scss|png|jpg|ttf|woff|woff2)$':
+      'jest-transform-stub',
+    'lodash-es': 'lodash',
   },
   globals: {
     'ts-jest': {
@@ -15,7 +17,11 @@ module.exports = {
   testRegex: '(/__tests__/.*|\\.(test|spec))\\.(ts|tsx|js)$',
   setupFilesAfterEnv: ['./jest.setup.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js'],
-  coveragePathIgnorePatterns: ['/node_modules/', '/src/styles/', 'src/index.ts'],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/src/styles/',
+    'src/index.ts',
+  ],
   coverageThreshold: {
     global: {
       branches: 0,

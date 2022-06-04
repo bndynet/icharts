@@ -1,1 +1,2 @@
-export * from './xy-chart-options';
+export * from './types';
+export * from './xy';

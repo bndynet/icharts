@@ -1,4 +1,4 @@
-import { ChartOptions } from '../../types';
+import { ChartData, ChartOptions } from '../../types';
 
 export type PieChartData =
   | { [key: string]: number }
@@ -6,7 +6,8 @@ export type PieChartData =
   | {
       name: string;
       value: number;
-    }[];
+    }[]
+  | ChartData;
 
 export enum PieVariant {
   None = 'none',
@@ -23,7 +24,7 @@ export interface PieChartOptions extends ChartOptions<PieChartData> {
   slice?: {
     borderRadius?: number;
     borderColor?: string;
-    borderWidth?: number;
+    gap?: number;
   };
   label?: {
     show?: boolean;

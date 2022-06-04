@@ -10,6 +10,7 @@ export interface Option {
   tooltip?: Tooltip;
   toolbox?: Toolbox;
   textStyle?: TextStyle;
+  // series?: Series[];
 }
 
 /**
@@ -51,6 +52,7 @@ export interface Tooltip {
   borderWidth?: number;
   padding?: number | number[];
   textStyle?: TextStyle;
+  confine?: boolean;
   /**
    * the value can be found at https://echarts.apache.org/en/option.html#tooltip.formatter
    * load tooltip from promise
@@ -63,7 +65,13 @@ export interface Tooltip {
    *    return 'Loading';
    * }
    */
-  formatter?: string | ((params: TooltipFormatterParams, ticket: any, callback: (ticket: any, tooltipHtml: string | HTMLElement) => void) => string);
+  formatter?:
+    | string
+    | ((
+        params: TooltipFormatterParams,
+        ticket: any,
+        callback: (ticket: any, tooltipHtml: string | HTMLElement) => void,
+      ) => string);
 
   valueFormatter?: (value: number | string, dataIndex: number) => string;
 }
@@ -135,6 +143,15 @@ export interface Legend {
   inactiveBorderWidth?: string;
 }
 
+export interface Series {
+  name?: string;
+  type?: SeriesType;
+  label?: {
+    show?: boolean;
+  };
+  data?: number[];
+}
+
 export interface Toolbox {
   show?: boolean;
 }
@@ -155,4 +172,39 @@ export enum Icon {
   None = 'none',
 }
 
-export type RichProperty = 'color' | 'fontStyle' | 'fontWeight' | 'fontFamily' | 'fontSize' | 'align' | 'verticalAlign' | 'lineHeight' | 'backgroundColor' | 'borderColor' | 'borderWidth' | 'borderType' | 'borderDashOffset' | 'borderRadius' | 'padding' | 'shadowColor' | 'shadowBlur' | 'shadowOffsetX' | 'shadowOffsetY' | 'width' | 'height' | 'textBorderColor' | 'textBorderWidth' | 'textBorderType' | 'textBorderDashOffset' | 'textShadowColor' | 'textShadowBlur' | 'textShadowOffsetX' | 'textShadowOffsetY';
+export enum SeriesType {
+  Line = 'line',
+  Bar = 'bar',
+  Pie = 'pie',
+}
+
+export type RichProperty =
+  | 'color'
+  | 'fontStyle'
+  | 'fontWeight'
+  | 'fontFamily'
+  | 'fontSize'
+  | 'align'
+  | 'verticalAlign'
+  | 'lineHeight'
+  | 'backgroundColor'
+  | 'borderColor'
+  | 'borderWidth'
+  | 'borderType'
+  | 'borderDashOffset'
+  | 'borderRadius'
+  | 'padding'
+  | 'shadowColor'
+  | 'shadowBlur'
+  | 'shadowOffsetX'
+  | 'shadowOffsetY'
+  | 'width'
+  | 'height'
+  | 'textBorderColor'
+  | 'textBorderWidth'
+  | 'textBorderType'
+  | 'textBorderDashOffset'
+  | 'textShadowColor'
+  | 'textShadowBlur'
+  | 'textShadowOffsetX'
+  | 'textShadowOffsetY';
