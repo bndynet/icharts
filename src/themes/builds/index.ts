@@ -7,6 +7,7 @@ import { buildBarTheme, buildLineTheme, buildPieTheme } from './series';
 
 export function buildTheme(options: ThemeOptions) {
   return {
+    base: options,
     ...buildBasicTheme(options),
     ...buildLegendTheme(options),
     ...buildAxisTheme(options),

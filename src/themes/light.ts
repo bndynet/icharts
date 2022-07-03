@@ -1,6 +1,7 @@
 import { buildTheme } from './builds';
 
 export const lightTheme = buildTheme({
+  baseColor: '#ffffff',
   color: [
     '#2ec7c9',
     '#b6a2de',

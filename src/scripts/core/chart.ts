@@ -30,46 +30,54 @@ export abstract class Chart<
     return isDarkTheme(this.options.theme);
   }
 
-  private chart: any;
-  private theme: typeof lightTheme;
-  protected allOptions: TOptions;
+  protected chart: any;
+  protected optionsWithDefaults: TOptions;
+  protected optionsWithAll: TOptions;
+  protected theme: typeof lightTheme;
 
   private colormap = new Map();
-  private colors: string[];
 
   constructor(
     protected dom: HTMLDivElement | HTMLCanvasElement,
     protected data: TData,
     protected options: TOptions = {} as TOptions,
   ) {
-    this.allOptions = mergeObjects(
+    this.options = mergeObjects(this.getDefaultOptions(), options);
+    this.optionsWithDefaults = mergeObjects(this.getDefaultOptions(), options);
+    this.optionsWithAll = mergeObjects(
       Chart.defaults,
-      this.getDefaultOptions(),
       this.processedOptions(),
-      options,
+      this.options,
     );
-    if (!this.allOptions.theme) {
-      this.allOptions.theme = defaultTheme;
+
+    if (!this.optionsWithAll.theme) {
+      this.optionsWithAll.theme = defaultTheme;
     }
 
-    this.chart = echarts.init(dom, this.allOptions.theme);
-    this.theme = themes[this.allOptions.theme];
+    this.chart = echarts.init(dom, this.optionsWithAll.theme);
+    this.theme = themes[this.optionsWithAll.theme];
     console.log(`🚀 ~ Chart<TData ~ theme:`, this.theme);
-    this.colors = (this.allOptions.colors ?? []).concat(this.theme.color || []);
+    this.optionsWithAll.colors = (this.options.colors ?? []).concat(
+      this.theme.color || [],
+    );
   }
 
   render(): void {
     this.init();
-    mergeObjectsTo(this.allOptions, this.getCommonEOption(), this.getEOption());
+    mergeObjectsTo(
+      this.optionsWithAll,
+      this.getCommonEOption(),
+      this.getEOption(),
+    );
 
     // set color for chart
-    this.allOptions.color = this.getLegendNames()
+    this.optionsWithAll.color = this.getLegendNames()
       .map((name) => this.getColorByName(name))
       .filter((color) => color !== null)
       .map((color) => (Array.isArray(color) ? color[0] : color));
 
-    console.log(`🚀 ~ ${Chart.name} ~ option:`, this.allOptions);
-    this.chart && this.chart.setOption(this.allOptions);
+    console.log(`🚀 ~ ${Chart.name} ~ option:`, this.optionsWithAll);
+    this.chart && this.chart.setOption(this.optionsWithAll);
   }
 
   dispose(): void {
@@ -177,15 +185,17 @@ export abstract class Chart<
       return this.colormap.get(name);
     }
 
-    if (this.allOptions.colormap && this.allOptions.colormap[name]) {
+    if (this.optionsWithAll.colormap && this.optionsWithAll.colormap[name]) {
       const value =
-        typeof this.allOptions.colormap[name] === 'function'
-          ? this.allOptions.colormap[name].call(this, this.options)
-          : this.allOptions.colormap[name];
+        typeof this.optionsWithAll.colormap[name] === 'function'
+          ? this.optionsWithAll.colormap[name].call(this, this.options)
+          : this.optionsWithAll.colormap[name];
       this.colormap.set(name, value);
     } else {
       const usedColors = [...this.colormap.values()];
-      const matchedColor = this.colors.find((c) => !usedColors.includes(c));
+      const matchedColor = this.optionsWithAll.colors!.find(
+        (c) => !usedColors.includes(c),
+      );
       if (matchedColor) {
         this.colormap.set(name, matchedColor);
       } else {
@@ -204,36 +214,36 @@ export abstract class Chart<
   protected getAreaWithoutLegend(): TopRightBottomLeft {
     const result: TopRightBottomLeft = {};
 
-    if (this.allOptions.legend?.show) {
+    if (this.optionsWithAll.legend?.show) {
       // check legend position
       let legendPosition = Position.Top;
-      if (isNumber(this.allOptions.legend.top)) {
+      if (isNumber(this.optionsWithAll.legend.top)) {
         legendPosition = Position.Top;
-      } else if (isNumber(this.allOptions.legend.bottom)) {
+      } else if (isNumber(this.optionsWithAll.legend.bottom)) {
         legendPosition = Position.Bottom;
       }
-      if (isNumber(this.allOptions.legend.left)) {
+      if (isNumber(this.optionsWithAll.legend.left)) {
         legendPosition = Position.Left;
-      } else if (isNumber(this.allOptions.legend.right)) {
+      } else if (isNumber(this.optionsWithAll.legend.right)) {
         legendPosition = Position.Right;
       }
 
       const defaultHeight = 40;
       // set area
       if (legendPosition === Position.Top) {
-        result.top = this.allOptions.legend?.height ?? defaultHeight;
+        result.top = this.optionsWithAll.legend?.height ?? defaultHeight;
       } else if (legendPosition === Position.Bottom) {
-        result.bottom = this.allOptions.legend?.height ?? defaultHeight;
+        result.bottom = this.optionsWithAll.legend?.height ?? defaultHeight;
       } else if (
         legendPosition === Position.Left &&
-        this.allOptions.legend?.width
+        this.optionsWithAll.legend?.width
       ) {
-        result.left = this.allOptions.legend.width;
+        result.left = this.optionsWithAll.legend.width;
       } else if (
         legendPosition === Position.Right &&
-        this.allOptions.legend?.width
+        this.optionsWithAll.legend?.width
       ) {
-        result.right = this.allOptions.legend.width;
+        result.right = this.optionsWithAll.legend.width;
       }
     }
 
@@ -264,6 +274,12 @@ export abstract class Chart<
         );
       };
     }
+  }
+
+  protected getBaseColor(opacity: number): string {
+    return this.isDark
+      ? `rgba(255, 255, 255, ${opacity})`
+      : `rgba(0, 0, 0, ${opacity})`;
   }
 
   private getCommonEOption(): any {

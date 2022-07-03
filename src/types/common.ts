@@ -16,3 +16,7 @@ export interface TopRightBottomLeft {
   bottom?: number;
   left?: number;
 }
+
+export type CouldBeFunction<TReturn, TInput> =
+  | TReturn
+  | ((input: TInput) => TReturn);

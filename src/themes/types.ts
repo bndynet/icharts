@@ -1,4 +1,5 @@
 export interface ThemeOptions {
+  baseColor?: string;
   color?: string[];
   backgroundColor?: string;
   textColor?: string;

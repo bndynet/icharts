@@ -1,11 +1,13 @@
 import { ChartData, ChartOptions } from '../types';
 import { Chart } from './core/chart';
+import { GaugeChart } from './gauge';
 import { PieChart } from './pie';
 import { XYChart } from './xy';
 
 export enum ChartType {
   Pie = 'pie',
   Line = 'line',
+  Gauge = 'gauge',
 }
 
 const componentMap: Record<
@@ -20,6 +22,7 @@ const componentMap: Record<
 > = {
   [ChartType.Line]: XYChart,
   [ChartType.Pie]: PieChart,
+  [ChartType.Gauge]: GaugeChart,
 };
 
 export function chart<TData, TOptions>(

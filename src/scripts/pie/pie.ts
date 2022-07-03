@@ -73,14 +73,14 @@ export class PieChart
       ) {
         // format: [{name, value}, ...]
         this._data.push({
-          name: getValueByIndex(this.allOptions.series, 0)?.name,
+          name: getValueByIndex(this.optionsWithAll.series, 0)?.name,
           items: this.data as { name: string; value: number }[],
         });
       } else {
         // format(nested): [{k1, k2, k3}, {}]
         this.data.forEach((d: any, idx) => {
           this._data.push({
-            name: getValueByIndex(this.allOptions.series, idx)?.name,
+            name: getValueByIndex(this.optionsWithAll.series, idx)?.name,
             items: Object.keys(d).map((key) => ({
               name: key,
               value: d[key],
@@ -92,7 +92,7 @@ export class PieChart
       // format: {}
       console.log('-----', this.data);
       this._data.push({
-        name: getValueByIndex(this.allOptions.series, 0)?.name,
+        name: getValueByIndex(this.optionsWithAll.series, 0)?.name,
         items: Object.keys(this.data as object).map((key) => ({
           name: key,
           value: (this.data as any)[key],
@@ -117,7 +117,7 @@ export class PieChart
         }
       });
 
-      if (this.allOptions.autoSort) {
+      if (this.optionsWithAll.autoSort) {
         seriesList.items.sort((a, b) => b.value - a.value);
       }
     });
@@ -129,7 +129,7 @@ export class PieChart
     const option: any = {
       series: this.getSeriesOptions(),
     };
-    if (this.allOptions.legend?.show) {
+    if (this.optionsWithAll.legend?.show) {
       option.data = (Array.isArray(this.data) ? this.data : [this.data])
         .map((d) => Object.keys(d as object))
         .reduce((merged: any[], array: any[]) => (merged || []).concat(array));
@@ -160,8 +160,8 @@ export class PieChart
           radiusList.push([0, `${radiusStep}%`]);
         } else {
           radiusList.push([
-            this.allOptions.innerRadius || 0,
-            this.allOptions.outerRadius || defaultOuterRadius,
+            this.optionsWithAll.innerRadius || 0,
+            this.optionsWithAll.outerRadius || defaultOuterRadius,
           ]);
         }
       } else {
@@ -181,8 +181,8 @@ export class PieChart
         label: {
           show: this._multipleSeries
             ? isLastSeries
-            : this.allOptions.label?.show,
-          position: this.allOptions.label?.position,
+            : this.optionsWithAll.label?.show,
+          position: this.optionsWithAll.label?.position,
           formatter: '{b}: {d}%',
           textShadowColor: '#000',
           textShadowOffsetX: 1,
@@ -213,26 +213,26 @@ export class PieChart
   private setItemStyleForSeries(series: any): void {
     setValueToObjectIfValueDefined(
       series,
-      this.allOptions.slice?.gap,
+      this.optionsWithAll.slice?.gap,
       'padAngle',
     );
-    if (this.allOptions.slice) {
+    if (this.optionsWithAll.slice) {
       series.itemStyle = {};
       setValueToObjectIfValueDefined(
         series.itemStyle,
-        this.allOptions.slice?.borderColor,
+        this.optionsWithAll.slice?.borderColor,
         'borderColor',
       );
       setValueToObjectIfValueDefined(
         series.itemStyle,
-        this.allOptions.slice?.borderRadius,
+        this.optionsWithAll.slice?.borderRadius,
         'borderRadius',
       );
     }
   }
 
   private setVariantForSeries(series: any): void {
-    switch (this.allOptions.variant) {
+    switch (this.optionsWithAll.variant) {
       case PieVariant.Doughnut:
         series.radius[0] = '50%';
         break;
@@ -242,7 +242,7 @@ export class PieChart
         series.endAngle = 360;
         series.center = ['50%', '80%'];
         series.radius[0] = '100%';
-        if (!this.allOptions.outerRadius) {
+        if (!this.optionsWithAll.outerRadius) {
           series.radius[1] = '130%';
         }
         break;
@@ -255,16 +255,16 @@ export class PieChart
   }
 
   private highlightLabelForSeries(series: any): void {
-    if (this.allOptions.label?.highlight) {
+    if (this.optionsWithAll.label?.highlight) {
       // highlight the label when hover the slice
       // first to hide the label if it is center
-      if (this.allOptions.label.position === 'center') {
+      if (this.optionsWithAll.label.position === 'center') {
         series.label.show = false;
       }
       series.emphasis = {
         label: {
           show: true,
-          fontSize: this.allOptions.label.highlightFontSize,
+          fontSize: this.optionsWithAll.label.highlightFontSize,
           fontWeight: 'bold',
         },
       };

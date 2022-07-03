@@ -177,3 +177,14 @@ export function formatNumber(value?: number | string): string {
   }
   return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
+
+export function getValueForCouldBeFunction(
+  target: any,
+  context: any,
+  ...args: any[]
+): any {
+  if (typeof target === 'function') {
+    return target.apply(context, args);
+  }
+  return target;
+}
