@@ -12,13 +12,16 @@ export class GaugeChart extends Chart<GaugeChartData, GaugeChartOptions> {
       chart.isDark ? '#3f3f46' : '#e2e8f0',
   };
 
+  private autoOptions: GaugeChartOptions = {};
+
   private animationDuration = 1000;
 
   private indicatorOuterRadius: number = 0;
   private indicatorInnerRadius: number = 0;
   private pointerInnerRadius = 40;
   private panelOuterRadius: number = 0;
-  private textBoxTopOffset = 10;
+  private textBoxTopOffset = 0;
+  private padding = 16;
 
   private maxRadius?: number;
 
@@ -42,7 +45,7 @@ export class GaugeChart extends Chart<GaugeChartData, GaugeChartOptions> {
 
   protected init(): void {
     const { width, height } = this.getContainerSize();
-    this.maxRadius = (width > height ? height : width) / 2 - 10;
+    this.maxRadius = (width > height ? height : width) / 2 - this.padding;
   }
 
   protected getDefaultOptions(): GaugeChartOptions {
@@ -65,15 +68,13 @@ export class GaugeChart extends Chart<GaugeChartData, GaugeChartOptions> {
 
   private getEOptionForDefaultVariant(): any {
     const radius =
-      this.maxRadius! +
-      this.optionsWithAll.primaryTextFontSize! +
-      this.textBoxTopOffset;
+      this.maxRadius! + this.optionsWithDefaults.primaryTextFontSize!;
     const option = {
       series: [
         {
           type: 'gauge',
           startAngle: 180,
-          center: ['50%', radius],
+          center: ['50%', radius + this.padding],
           radius: radius,
           endAngle: 0,
           min: 0,
@@ -153,7 +154,7 @@ export class GaugeChart extends Chart<GaugeChartData, GaugeChartOptions> {
             ],
             valueAnimation: true,
             formatter: (value: number) => {
-              return `{value|${value.toFixed(0)}}{sText|${this.optionsWithAll.secondaryText ?? ''}}`;
+              return `{value|${value.toFixed(0)}} {sText|${this.optionsWithAll.secondaryText ?? ''}}`;
             },
             rich: {
               value: {
@@ -219,9 +220,16 @@ export class GaugeChart extends Chart<GaugeChartData, GaugeChartOptions> {
       this.panelOuterRadius,
     );
 
+    this.autoOptions.primaryTextFontSize = (this.panelOuterRadius * 2) / 3;
+    this.autoOptions.secondaryTextFontSize =
+      this.autoOptions.primaryTextFontSize / 2;
+
     if (!this.options.primaryTextFontSize) {
-      this.optionsWithAll.primaryTextFontSize = (this.panelOuterRadius * 2) / 3;
+      this.optionsWithAll.primaryTextFontSize =
+        this.autoOptions.primaryTextFontSize;
     }
+
+    console.log('all', this.optionsWithAll);
 
     const eOption = {
       animationEasing: 'quarticInOut',

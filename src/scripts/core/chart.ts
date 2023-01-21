@@ -42,11 +42,11 @@ export abstract class Chart<
     protected data: TData,
     protected options: TOptions = {} as TOptions,
   ) {
-    this.options = mergeObjects(this.getDefaultOptions(), options);
     this.optionsWithDefaults = mergeObjects(this.getDefaultOptions(), options);
     this.optionsWithAll = mergeObjects(
       Chart.defaults,
       this.processedOptions(),
+      this.optionsWithDefaults,
       this.options,
     );
 
