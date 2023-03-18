@@ -6,7 +6,7 @@ on:
       - master
 
 env:
-  NODE_VERION: 12.x
+  NODE_VERION: 20.x
 
 jobs:
   build:
@@ -15,13 +15,13 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
       with:
         fetch-depth: 0
         persist-credentials: false
 
     - name: Use Node.js ${{ env.NODE_VERION }}
-      uses: actions/setup-node@v1
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERION }}
         registry-url: https://registry.npmjs.org
