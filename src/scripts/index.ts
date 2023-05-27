@@ -25,13 +25,12 @@ const componentMap: Record<
   [ChartType.Gauge]: GaugeChart,
 };
 
-export function chart<TData, TOptions>(
+export function chart(
   element: HTMLDivElement | HTMLCanvasElement,
   type: ChartType,
   data: ChartData,
   options?: ChartOptions<ChartData>,
 ): Chart {
-  debugger;
   const ctor = componentMap[type];
   if (!ctor) {
     throw Error(`Chart "${type}" does not support.`);

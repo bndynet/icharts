@@ -74,4 +74,6 @@ export interface ISeries {
   type?: 'line' | 'pie' | 'bar';
 }
 
-export interface IGrid extends GridOption {}
+export interface IGrid extends GridOption {
+  noop?: boolean; // just placeholder for solving eslint error
+}

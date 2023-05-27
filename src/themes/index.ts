@@ -5,6 +5,7 @@ import { darkTheme } from './dark';
 import { lightTheme } from './light';
 import { ThemeOptions } from './types';
 
+/* disable @typescript-eslint/no-explicit-any */
 export const themes: any = {
   light: lightTheme,
   dark: darkTheme,
@@ -48,3 +49,5 @@ function createTheme(options: ThemeOptions, basedOnDark?: boolean) {
 Object.keys(themes).forEach((themeName) => {
   echarts.registerTheme(themeName, themes[themeName]);
 });
+
+export * from './types';

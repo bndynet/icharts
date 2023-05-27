@@ -102,7 +102,7 @@ export interface TooltipFormatterParams {
   // }
   encode: Object;
   // dimension names list
-  dimensionNames: Array<String>;
+  dimensionNames: Array<string>;
   // data dimension index, for example 0 or 1 or 2 ...
   // Only work in `radar` series.
   dimensionIndex: number;
