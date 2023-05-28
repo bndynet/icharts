@@ -1,6 +1,7 @@
 import 'echarts';
 import './styles/main.scss';
 export * from './scripts';
+export * from './scripts/components';
 export * from './scripts/core';
 export * from './scripts/gauge';
 export * from './scripts/pie';
