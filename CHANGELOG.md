@@ -1,3 +1,11 @@
+# [1.1.0](https://github.com/bndynet/icharts/compare/v1.0.0...v1.1.0) (2025-01-06)
+
+
+### Features
+
+* **gauge:** new chart type ([174446f](https://github.com/bndynet/icharts/commit/174446fa2ec925db5677e95c95fcb8a1672cd10c))
+* xy charts ([4fec95a](https://github.com/bndynet/icharts/commit/4fec95af1c5a7b08a17e5c55c9144f1f53d67e81))
+
 # 1.0.0 (2021-01-10)
 
 
