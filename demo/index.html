@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>@bndynet/icharts — Demo</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --text: #1d2939;
+    --text2: #667085;
+    --border: #e4e7ec;
+    --accent: #2563eb;
+  }
+  [data-theme="dark"] {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --border: #334155;
+    --accent: #60a5fa;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header h1 span { color: var(--accent); }
+  .header-controls { display: flex; gap: 12px; align-items: center; }
+  .header-controls label { font-size: 13px; color: var(--text2); }
+  .header-controls select, .header-controls button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .header-controls button { background: var(--accent); color: #fff; border: none; font-weight: 600; }
+  .header-controls button:hover { opacity: 0.9; }
+
+  main { max-width: 1280px; margin: 0 auto; padding: 32px; }
+  h2 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text2);
+    margin-bottom: 16px;
+    margin-top: 40px;
+  }
+  h2:first-child { margin-top: 0; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+    gap: 20px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-header h3 { font-size: 14px; font-weight: 600; }
+  .card-header code {
+    font-size: 11px;
+    background: var(--bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--text2);
+  }
+  .chart-box {
+    height: 320px;
+    padding: 12px;
+  }
+
+  .code-toggle {
+    padding: 0 18px 14px;
+  }
+  .code-toggle summary {
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+  }
+  .code-toggle pre {
+    margin-top: 8px;
+    padding: 12px;
+    background: var(--bg);
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text2);
+  }
+
+  footer {
+    text-align: center;
+    padding: 40px;
+    font-size: 13px;
+    color: var(--text2);
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>&lt;i-chart&gt;</span> Demo</h1>
+  <div class="header-controls">
+    <label>Theme:</label>
+    <select id="themePicker">
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+      <option value="ocean">Ocean (custom)</option>
+      <option value="rose">Rose (custom)</option>
+    </select>
+  </div>
+</header>
+
+<main>
+
+<!-- LINE / AREA -->
+<h2>Line &amp; Area Charts</h2>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Line Chart</h3><code>type="line"</code></div>
+    <div class="chart-box" id="chart-line"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'line', {
+  categories: ['Jan','Feb','Mar','Apr','May','Jun'],
+  series: [
+    { name: 'Revenue', data: [820,932,901,934,1290,1330] },
+    { name: 'Expenses', data: [620,732,701,734,1090,1130] },
+  ],
+}, { title: 'Monthly Financials' });</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Area Chart</h3><code>type="area"</code></div>
+    <div class="chart-box" id="chart-area"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'area', {
+  categories: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+  series: [
+    { name: 'Visits', data: [820,932,901,934,1290,1330,1520] },
+  ],
+}, { title: 'Weekly Visits' });</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Stacked Area</h3><code>stacked: true</code></div>
+    <div class="chart-box" id="chart-stacked-area"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'area', data, {
+  stacked: true,
+  title: 'Traffic Sources',
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Line with Mark Lines</h3><code>markLines / markPoints</code></div>
+    <div class="chart-box" id="chart-mark"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'line', data, {
+  series: {
+    '*': {
+      markLines: ['average'],
+      markPoints: ['max', 'min'],
+    },
+  },
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Spark Line</h3><code>variant="spark"</code></div>
+    <div class="chart-box" id="chart-spark" style="height: 80px;"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'line', data, { variant: 'spark' });</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Spark Area</h3><code>type="area" variant="spark"</code></div>
+    <div class="chart-box" id="chart-spark-area" style="height: 80px;"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'area', data, { variant: 'spark', series: { '*': { smooth: 0.6 } } });</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Time Axis — Date Strings</h3><code>categories: ['2024-01-01', ...]</code></div>
+    <div class="chart-box" id="chart-time-str"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'line', {
+  categories: ['2024-01-01','2024-02-01','2024-03-01','2024-04-01','2024-05-01','2024-06-01'],
+  series: [{ name: 'Revenue', data: [820,932,901,934,1290,1330] }],
+}, {
+  title: 'Monthly Revenue',
+  xAxis: { dateFormat: 'MM/DD', cursorFormat: 'YYYY-MM-DD' },
+  tooltip: { dateFormat: 'YYYY-MM-DD' },
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Time Axis — Unix Timestamps</h3><code>categories: [1704067200000, ...]</code></div>
+    <div class="chart-box" id="chart-time-ts"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'area', {
+  categories: [/* 13-digit ms timestamps */],
+  series: [{ name: 'Visits', data: [120,145,98,167,203,180,221] }],
+}, {
+  title: 'Daily Visits (timestamps)',
+  xAxis: { dateFormat: 'MM-DD', cursorFormat: 'YYYY-MM-DD' },
+  tooltip: { dateFormat: 'YYYY-MM-DD' },
+});</pre></details></div>
+  </div>
+
+</div>
+
+<!-- BAR -->
+<h2>Bar Charts</h2>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Bar Chart</h3><code>type="bar"</code></div>
+    <div class="chart-box" id="chart-bar"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'bar', {
+  categories: ['Q1','Q2','Q3','Q4'],
+  series: [
+    { name: 'Product A', data: [430,460,390,510] },
+    { name: 'Product B', data: [320,382,301,354] },
+  ],
+}, { title: 'Quarterly Sales' });</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Stacked Bar</h3><code>stacked: true</code></div>
+    <div class="chart-box" id="chart-stacked-bar"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'bar', data, {
+  stacked: true,
+  title: 'Stacked Revenue',
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Horizontal Bar</h3><code>variant="horizontal"</code></div>
+    <div class="chart-box" id="chart-hbar"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'bar', data, {
+  variant: 'horizontal',
+  title: 'Browser Share',
+});</pre></details></div>
+  </div>
+
+</div>
+
+<!-- PIE -->
+<h2>Pie Charts</h2>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Pie Chart</h3><code>type="pie"</code></div>
+    <div class="chart-box" id="chart-pie"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'pie', [
+  { name: 'Chrome', value: 65 },
+  { name: 'Firefox', value: 15 },
+  { name: 'Safari', value: 12 },
+  { name: 'Edge', value: 8 },
+]);</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Doughnut</h3><code>variant="doughnut"</code></div>
+    <div class="chart-box" id="chart-doughnut"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'pie', pieData, {
+  variant: 'doughnut',
+  legend: { show: true, position: 'right' },
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Nightingale Rose</h3><code>variant="nightingale"</code></div>
+    <div class="chart-box" id="chart-rose"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'pie', pieData, {
+  variant: 'nightingale',
+});</pre></details></div>
+  </div>
+
+</div>
+
+<!-- GAUGE -->
+<h2>Gauge Charts</h2>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Gauge</h3><code>type="gauge"</code></div>
+    <div class="chart-box" id="chart-gauge"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'gauge', {
+  value: 72,
+  max: 100,
+  label: 'Score',
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Percentage Gauge</h3><code>variant="percentage"</code></div>
+    <div class="chart-box" id="chart-gauge-pct"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'gauge', {
+  value: 85, max: 100, label: 'CPU',
+}, { variant: 'percentage' });</pre></details></div>
+  </div>
+
+</div>
+
+<!-- WEB COMPONENT -->
+<h2>Web Component <code style="font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px;color:var(--text2);text-transform:none;letter-spacing:0">&lt;i-chart&gt;</code></h2>
+<p style="font-size:13px;color:var(--text2);margin-bottom:16px;margin-top:-8px;">
+  Drop <code>&lt;i-chart&gt;</code> directly into HTML and bind <code>.data</code> / <code>.options</code> via JS property assignment.
+</p>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Line Chart</h3><code>&lt;i-chart type="line"&gt;</code></div>
+    <div class="chart-box">
+      <i-chart id="wc-line" type="line"></i-chart>
+    </div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>&lt;i-chart id="myChart" type="line"&gt;&lt;/i-chart&gt;
+
+&lt;script&gt;
+const chart = document.getElementById('myChart');
+chart.data = {
+  categories: ['Jan','Feb','Mar','Apr','May','Jun'],
+  series: [
+    { name: 'Revenue', data: [820,932,901,934,1290,1330] },
+    { name: 'Expenses', data: [620,732,701,734,1090,1130] },
+  ],
+};
+chart.options = { title: 'Monthly Financials' };
+&lt;/script&gt;</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Doughnut Chart</h3><code>&lt;i-chart type="pie"&gt;</code></div>
+    <div class="chart-box">
+      <i-chart id="wc-pie" type="pie"></i-chart>
+    </div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>&lt;i-chart id="myChart" type="pie"&gt;&lt;/i-chart&gt;
+
+&lt;script&gt;
+const chart = document.getElementById('myChart');
+chart.data = [
+  { name: 'Chrome', value: 65 },
+  { name: 'Firefox', value: 15 },
+  { name: 'Safari', value: 12 },
+  { name: 'Edge', value: 8 },
+];
+chart.options = {
+  variant: 'doughnut',
+  legend: { show: true, position: 'right' },
+};
+&lt;/script&gt;</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3>Live Update</h3>
+      <button id="wc-refresh-btn" style="padding:4px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer;">Refresh Data</button>
+    </div>
+    <div class="chart-box">
+      <i-chart id="wc-live" type="bar"></i-chart>
+    </div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>&lt;i-chart id="myChart" type="bar"&gt;&lt;/i-chart&gt;
+&lt;button onclick="refreshChart()"&gt;Refresh Data&lt;/button&gt;
+
+&lt;script&gt;
+const chart = document.getElementById('myChart');
+
+function randomData() {
+  return Array.from({ length: 4 }, () => Math.round(Math.random() * 500 + 100));
+}
+
+function refreshChart() {
+  chart.data = {
+    categories: ['Q1','Q2','Q3','Q4'],
+    series: [
+      { name: 'Product A', data: randomData() },
+      { name: 'Product B', data: randomData() },
+    ],
+  };
+}
+
+refreshChart();
+&lt;/script&gt;</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Gauge</h3><code>&lt;i-chart type="gauge"&gt;</code></div>
+    <div class="chart-box">
+      <i-chart id="wc-gauge" type="gauge"></i-chart>
+    </div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>&lt;i-chart id="myChart" type="gauge"&gt;&lt;/i-chart&gt;
+
+&lt;script&gt;
+const chart = document.getElementById('myChart');
+chart.data = { value: 72, max: 100, label: 'Score' };
+chart.options = { variant: 'percentage' };
+&lt;/script&gt;</pre></details></div>
+  </div>
+
+</div>
+
+<!-- MIXED -->
+<h2>Advanced</h2>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Mixed Line + Bar</h3><code>series type override</code></div>
+    <div class="chart-box" id="chart-mixed"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'line', data, {
+  title: 'Revenue vs Trend',
+  series: {
+    'Revenue': { type: 'bar' },
+    'Trend':   { smooth: true, lineStyle: 'dashed' },
+  },
+});</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>Custom Colors</h3><code>colorMap</code></div>
+    <div class="chart-box" id="chart-colors"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'pie', pieData, {
+  colorMap: {
+    'Chrome': '#4285F4',
+    'Firefox': '#FF7139',
+    'Safari': '#000000',
+    'Edge': '#0078D4',
+  },
+});</pre></details></div>
+  </div>
+
+</div>
+
+</main>
+
+<footer>
+  Built with <a href="https://github.com/bndynet/icharts">@bndynet/icharts</a>
+  &middot; ECharts + Lit 3 + color-hub
+</footer>
+
+<script src="/dist/index.global.js"></script>
+<script>
+(function () {
+  const { createChart, registerTheme } = iCharts;
+
+  // ── Register custom themes ───────────────────────────────────
+  // Only override the tokens you want — the rest are inherited from the base.
+
+  registerTheme({
+    name: 'ocean',
+    colorMode: 'dark',
+    colors: {
+      background:   '#0c1a2e',
+      surface:      '#112240',
+      surfaceText:  '#ccd6f6',
+      textPrimary:  '#ccd6f6',
+      textSecondary:'#8892b0',
+      gridLine:     '#112240',
+      axisLine:     '#1d3557',
+    },
+    palette: ['#64ffda', '#00b4d8', '#48cae4', '#90e0ef', '#caf0f8', '#7b2d8b', '#a663cc'],
+  });
+
+  registerTheme({
+    name: 'rose',
+    colorMode: 'light',
+    colors: {
+      background:   '#fff1f2',
+      textPrimary:  '#881337',
+      textSecondary:'#be123c',
+      gridLine:     '#ffe4e6',
+      axisLine:     '#fda4af',
+    },
+    palette: ['#e11d48', '#be123c', '#f43f5e', '#fb7185', '#fda4af', '#4c1d95', '#7c3aed'],
+  });
+
+  // ── Shared data ──────────────────────────────────────────────
+
+  const xyData = {
+    categories: ['Jan','Feb','Mar','Apr','May','Jun'],
+    series: [
+      { name: 'Revenue', data: [820,932,901,934,1290,1330] },
+      { name: 'Expenses', data: [620,732,701,734,1090,1130] },
+    ],
+  };
+
+  const weekData = {
+    categories: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    series: [
+      { name: 'Visits', data: [820,932,901,934,1290,1330,1520] },
+    ],
+  };
+
+  const trafficData = {
+    categories: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    series: [
+      { name: 'Direct',  data: [320,302,301,334,390,330,320] },
+      { name: 'Search',  data: [120,132,101,134,90,230,210] },
+      { name: 'Referral', data: [220,182,191,234,290,330,310] },
+    ],
+  };
+
+  const barData = {
+    categories: ['Q1','Q2','Q3','Q4'],
+    series: [
+      { name: 'Product A', data: [430,460,390,510] },
+      { name: 'Product B', data: [320,382,301,354] },
+    ],
+  };
+
+  const hbarData = {
+    categories: ['Chrome','Firefox','Safari','Edge','Opera'],
+    series: [
+      { name: 'Share %', data: [65,15,12,5,3] },
+    ],
+  };
+
+  const pieData = [
+    { name: 'Chrome', value: 65 },
+    { name: 'Firefox', value: 15 },
+    { name: 'Safari', value: 12 },
+    { name: 'Edge', value: 8 },
+  ];
+
+  const sparkData = {
+    categories: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
+    series: [{ name: 'Trend', data: [5,8,3,12,6,9,15,7,11,4,8,13,6,10,14,3,9,7,12,8] }],
+  };
+
+  const mixedData = {
+    categories: ['Jan','Feb','Mar','Apr','May','Jun'],
+    series: [
+      { name: 'Revenue', data: [820,932,901,934,1290,1330] },
+      { name: 'Trend', data: [720,832,851,884,1100,1230] },
+    ],
+  };
+
+  // Time axis — date strings
+  const timeStrData = {
+    categories: ['2024-01-01','2024-02-01','2024-03-01','2024-04-01','2024-05-01','2024-06-01'],
+    series: [
+      { name: 'Revenue', data: [820,932,901,934,1290,1330] },
+      { name: 'Expenses', data: [620,732,701,734,1090,1130] },
+    ],
+  };
+
+  // Time axis — Unix ms timestamps (one per day, starting 2024-01-01)
+  const timeOrigin = Date.UTC(2024, 0, 1);
+  const timeTsData = {
+    categories: Array.from({ length: 7 }, (_, i) => timeOrigin + i * 86400000),
+    series: [{ name: 'Visits', data: [120,145,98,167,203,180,221] }],
+  };
+
+  // ── Create all charts ────────────────────────────────────────
+
+  const charts = [];
+
+  function createAll(themeName) {
+    charts.forEach(c => c.dispose());
+    charts.length = 0;
+
+    const opts = { theme: themeName };
+
+    charts.push(createChart(el('chart-line'), 'line', xyData,
+      { ...opts, title: 'Monthly Financials' }));
+
+    charts.push(createChart(el('chart-area'), 'area', weekData,
+      { ...opts, title: 'Weekly Visits' }));
+
+    charts.push(createChart(el('chart-stacked-area'), 'area', trafficData,
+      { ...opts, stacked: true, title: 'Traffic Sources' }));
+
+    charts.push(createChart(el('chart-mark'), 'line', xyData,
+      { ...opts, title: 'With Mark Lines', series: { '*': { markLines: ['average'], markPoints: ['max', 'min'] } } }));
+
+    charts.push(createChart(el('chart-spark'), 'line', sparkData,
+      { ...opts, variant: 'spark' }));
+
+    charts.push(createChart(el('chart-spark-area'), 'area', sparkData,
+      { ...opts, variant: 'spark', series: { '*': { smooth: 0.6 } } }));
+
+    charts.push(createChart(el('chart-bar'), 'bar', barData,
+      { ...opts, title: 'Quarterly Sales' }));
+
+    charts.push(createChart(el('chart-stacked-bar'), 'bar', barData,
+      { ...opts, stacked: true, title: 'Stacked Revenue' }));
+
+    charts.push(createChart(el('chart-hbar'), 'bar', hbarData,
+      { ...opts, variant: 'horizontal', title: 'Browser Share' }));
+
+    charts.push(createChart(el('chart-pie'), 'pie', pieData, opts));
+
+    charts.push(createChart(el('chart-doughnut'), 'pie', pieData,
+      { ...opts, variant: 'doughnut', legend: { show: true, position: 'right' } }));
+
+    charts.push(createChart(el('chart-rose'), 'pie', pieData,
+      { ...opts, variant: 'nightingale' }));
+
+    charts.push(createChart(el('chart-gauge'), 'gauge',
+      { value: 72, max: 100, label: 'Score' }, opts));
+
+    charts.push(createChart(el('chart-gauge-pct'), 'gauge',
+      { value: 85, max: 100, label: 'CPU' },
+      { ...opts, variant: 'percentage' }));
+
+    charts.push(createChart(el('chart-mixed'), 'line', mixedData,
+      { ...opts, title: 'Revenue vs Trend', series: { 'Revenue': { type: 'bar' }, 'Trend': { smooth: true, lineStyle: 'dashed' } } }));
+
+    charts.push(createChart(el('chart-colors'), 'pie', pieData,
+      { ...opts, colorMap: { 'Chrome': '#4285F4', 'Firefox': '#FF7139', 'Safari': '#000000', 'Edge': '#0078D4' } }));
+
+    charts.push(createChart(el('chart-time-str'), 'line', timeStrData, {
+      ...opts,
+      title: 'Monthly Revenue (Date Strings)',
+      xAxis: { dateFormat: 'MM/DD', cursorFormat: 'YYYY-MM-DD' },
+      tooltip: { dateFormat: 'YYYY-MM-DD' },
+    }));
+
+    charts.push(createChart(el('chart-time-ts'), 'area', timeTsData, {
+      ...opts,
+      title: 'Daily Visits (Timestamps)',
+      xAxis: { dateFormat: 'MM-DD', cursorFormat: 'YYYY-MM-DD' },
+      tooltip: { dateFormat: 'YYYY-MM-DD' },
+    }));
+  }
+
+  function el(id) { return document.getElementById(id); }
+
+  // ── Web Component examples ───────────────────────────────────
+
+  const wcLine  = document.getElementById('wc-line');
+  const wcPie   = document.getElementById('wc-pie');
+  const wcLive  = document.getElementById('wc-live');
+  const wcGauge = document.getElementById('wc-gauge');
+
+  function randomBarData() {
+    return Array.from({ length: 4 }, () => Math.round(Math.random() * 500 + 100));
+  }
+
+  function initWcCharts(themeName) {
+    const wcOpts = { theme: themeName };
+
+    wcLine.data = xyData;
+    wcLine.options = { ...wcOpts, title: 'Monthly Financials' };
+
+    wcPie.data = pieData;
+    wcPie.options = { ...wcOpts, variant: 'doughnut', legend: { show: true, position: 'right' } };
+
+    wcLive.data = {
+      categories: ['Q1','Q2','Q3','Q4'],
+      series: [
+        { name: 'Product A', data: randomBarData() },
+        { name: 'Product B', data: randomBarData() },
+      ],
+    };
+    wcLive.options = { ...wcOpts, title: 'Quarterly Sales' };
+
+    wcGauge.data = { value: 72, max: 100, label: 'Score' };
+    wcGauge.options = { ...wcOpts, variant: 'percentage' };
+  }
+
+  document.getElementById('wc-refresh-btn').addEventListener('click', function () {
+    wcLive.data = {
+      categories: ['Q1','Q2','Q3','Q4'],
+      series: [
+        { name: 'Product A', data: randomBarData() },
+        { name: 'Product B', data: randomBarData() },
+      ],
+    };
+  });
+
+  // ── Theme switching ──────────────────────────────────────────
+
+  const picker = document.getElementById('themePicker');
+  const darkThemes = new Set(['dark', 'ocean']);
+
+  picker.addEventListener('change', function () {
+    const name = this.value;
+    document.documentElement.setAttribute('data-theme', darkThemes.has(name) ? 'dark' : 'light');
+    createAll(name);
+    initWcCharts(name);
+  });
+
+  // ── Resize ───────────────────────────────────────────────────
+
+  let resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      charts.forEach(c => c.resize());
+    }, 200);
+  });
+
+  // ── Init ─────────────────────────────────────────────────────
+
+  createAll('light');
+  initWcCharts('light');
+
+})();
+</script>
+
+</body>
+</html>
