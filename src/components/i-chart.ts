@@ -35,10 +35,10 @@ export class IChartElement extends LitElement {
   @property({ type: String })
   type: string = 'line';
 
-  @property({ attribute: false })
+  @property({ type: Object })
   data: ChartData | null = null;
 
-  @property({ attribute: false })
+  @property({ type: Object })
   options: ChartOptions = {};
 
   private echartsInstance: echarts.ECharts | null = null;
@@ -107,7 +107,8 @@ export class IChartElement extends LitElement {
     const container = this.shadowRoot?.querySelector('.ichart-container') as HTMLElement | null;
     if (!container) return;
 
-    const themeName = resolveThemeName(this.options.theme);
+    const opts = this.options ?? {};
+    const themeName = resolveThemeName(opts.theme);
 
     // ECharts bakes the theme into the instance at init() time — setOption()
     // cannot change structural colors (background, text, grid, axes) after the
@@ -122,8 +123,8 @@ export class IChartElement extends LitElement {
       this.echartsInstance = echarts.init(container, themeName);
     }
 
-    const eOption = resolveEChartsOption(this.type, this.data, this.options);
-    applyChartColors(this.type, eOption, this.data, this.options);
+    const eOption = resolveEChartsOption(this.type, this.data, opts);
+    applyChartColors(this.type, eOption, this.data, opts);
     this.echartsInstance.setOption(eOption, true);
   }
 }
