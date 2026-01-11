@@ -89,7 +89,7 @@ export class IChartElement extends LitElement {
       update: (newData?: ChartData, newOptions?: ChartOptions) => {
         const d = newData ?? data;
         const o = newOptions ? { ...options, ...newOptions } : options;
-        const eOption = resolveEChartsOption(type, d, o);
+        const { option: eOption } = resolveEChartsOption(type, d, o);
         applyChartColors(type, eOption, d, o);
         instance.setOption(eOption, true);
       },
@@ -123,9 +123,10 @@ export class IChartElement extends LitElement {
       this.echartsInstance = echarts.init(container, themeName);
     }
 
-    const eOption = resolveEChartsOption(this.type, this.data, opts);
+    const { option: eOption, onInit } = resolveEChartsOption(this.type, this.data, opts);
     applyChartColors(this.type, eOption, this.data, opts);
     this.echartsInstance.setOption(eOption, true);
+    onInit?.(this.echartsInstance);
   }
 }
 

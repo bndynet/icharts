@@ -15,6 +15,12 @@ export {
   type PieData,
   type PieDataItem,
   type GaugeData,
+  type SankeyData,
+  type SankeyNode,
+  type SankeyLink,
+  type ChordData,
+  type ChordNode,
+  type ChordLink,
   type SeriesOptions,
   type LegendOptions,
   type GridOptions,
@@ -27,6 +33,9 @@ export {
   type AreaVariant,
   type PieVariant,
   type GaugeVariant,
+  type SankeyVariant,
+  isSankeyData,
+  isChordData,
 } from './types.js';
 
 // Theme utilities

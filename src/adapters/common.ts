@@ -45,7 +45,7 @@ export function getCommonDefaults(): Record<string, unknown> {
 // Title helpers
 // ---------------------------------------------------------------------------
 
-const TITLE_DEFAULT_FONT_SIZE = 16;
+const TITLE_DEFAULT_FONT_SIZE = 14;
 const TITLE_DEFAULT_PADDING = 8;
 /** Extra gap between the bottom of the title and the top of the plot area. */
 const TITLE_CHART_GAP = 8;

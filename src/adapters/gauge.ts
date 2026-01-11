@@ -1,6 +1,31 @@
 import type { GaugeData, ChartOptions, GaugeVariant } from '../types.js';
 import { deepMerge } from '../utils.js';
-import { buildTitle } from './common.js';
+import { buildTitle, getTitleHeight } from './common.js';
+
+/**
+ * Reference chart height (px) used to convert the title area into a
+ * percentage offset for `center`.  Matches the `.chart-box` height used in
+ * the demo and is a common real-world card height.
+ */
+const GAUGE_REFERENCE_HEIGHT = 320;
+
+/**
+ * Returns the gauge `center` array.  When a title is present the y position
+ * is shifted downward so the arc is visually centred in the space below the
+ * title rather than in the full canvas.
+ */
+function buildGaugeCenter(options: ChartOptions): (string | number)[] {
+  const p = options.padding ?? 12;
+  const titleOffset = getTitleHeight(options);
+  if (titleOffset === 0) return ['50%', '50%'];
+
+  // Compute how much of the chart height the title area occupies and shift
+  // the center y by half that amount so the gauge sits in the middle of the
+  // remaining space.
+  const titleTop = p + titleOffset;
+  const centerY = Math.round(50 + (titleTop / GAUGE_REFERENCE_HEIGHT) * 50);
+  return ['50%', `${centerY}%`];
+}
 
 export function resolveGaugeOptions(
   data: GaugeData,
@@ -33,6 +58,7 @@ function buildDefaultSeries(
   return [
     {
       type: 'gauge',
+      center: buildGaugeCenter(options),
       min: 0,
       max,
       progress: { show: true, width },
@@ -78,6 +104,7 @@ function buildPercentageSeries(
   return [
     {
       type: 'gauge',
+      center: buildGaugeCenter(options),
       startAngle: 90,
       endAngle: -270,
       min: 0,

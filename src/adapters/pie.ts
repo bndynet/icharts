@@ -1,6 +1,6 @@
 import type { PieData, ChartOptions, PieVariant } from '../types.js';
 import { deepMerge } from '../utils.js';
-import { buildTitle, buildLegend } from './common.js';
+import { buildTitle, buildLegend, getTitleHeight } from './common.js';
 
 const DEFAULT_OUTER_RADIUS = '75%';
 
@@ -40,6 +40,8 @@ function buildPieSeries(
 ): Record<string, unknown>[] {
   const innerRadius = options.innerRadius ?? 0;
   const outerRadius = options.outerRadius ?? DEFAULT_OUTER_RADIUS;
+  const p = options.padding ?? 12;
+  const titleOffset = getTitleHeight(options);
 
   const series: Record<string, unknown> = {
     type: 'pie',
@@ -51,6 +53,7 @@ function buildPieSeries(
       position: 'outside',
       formatter: '{b}: {d}%',
     },
+    ...(titleOffset > 0 ? { top: p + titleOffset } : {}),
   };
 
   applySliceStyle(series, options);

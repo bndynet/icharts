@@ -26,16 +26,17 @@ export function createChart(
   ensureThemesRegistered();
 
   const echartsInstance = echarts.init(el, resolveThemeName(options.theme));
-  const eOption = resolveEChartsOption(type, data, options);
+  const { option, onInit } = resolveEChartsOption(type, data, options);
 
-  applyChartColors(type, eOption, data, options);
-  echartsInstance.setOption(eOption);
+  applyChartColors(type, option, data, options);
+  echartsInstance.setOption(option);
+  onInit?.(echartsInstance);
 
   return {
     update(newData?: ChartData, newOptions?: ChartOptions) {
       const d = newData ?? data;
       const o = newOptions ? { ...options, ...newOptions } : options;
-      const updated = resolveEChartsOption(type, d, o);
+      const { option: updated } = resolveEChartsOption(type, d, o);
       applyChartColors(type, updated, d, o);
       echartsInstance.setOption(updated, true);
     },

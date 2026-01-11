@@ -1,5 +1,5 @@
-import type { ChartData, ChartOptions, XYData, PieData } from './types.js';
-import { ChartType, isXYData, isPieData } from './types.js';
+import type { ChartData, ChartOptions, XYData, PieData, SankeyData } from './types.js';
+import { ChartType, isXYData, isPieData, isSankeyData } from './types.js';
 import { resolveSeriesColors, colorHub, resolveThemeName } from './themes/index.js';
 
 // ---------------------------------------------------------------------------
@@ -122,6 +122,7 @@ export function buildSparkAreaGradient(hex: string): Record<string, unknown> {
 export function getSeriesNames(data: ChartData): string[] {
   if (isXYData(data)) return (data as XYData).series.map((s) => s.name);
   if (isPieData(data)) return (data as PieData).map((d) => d.name);
+  if (isSankeyData(data)) return (data as SankeyData).nodes.map((n) => n.name);
   return [];
 }
 

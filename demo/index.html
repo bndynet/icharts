@@ -98,6 +98,12 @@
     height: 320px;
     padding: 12px;
   }
+  .card--full {
+    grid-column: 1 / -1;
+  }
+  .card--full .chart-box {
+    height: 480px;
+  }
 
   .code-toggle {
     padding: 0 18px 14px;
@@ -282,13 +288,14 @@
   { name: 'Firefox', value: 15 },
   { name: 'Safari', value: 12 },
   { name: 'Edge', value: 8 },
-]);</pre></details></div>
+], { title: 'Browser Market Share' });</pre></details></div>
   </div>
 
   <div class="card">
     <div class="card-header"><h3>Doughnut</h3><code>variant="doughnut"</code></div>
     <div class="chart-box" id="chart-doughnut"></div>
     <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'pie', pieData, {
+  title: 'Browser Market Share',
   variant: 'doughnut',
   legend: { show: true, position: 'right' },
 });</pre></details></div>
@@ -298,6 +305,7 @@
     <div class="card-header"><h3>Nightingale Rose</h3><code>variant="nightingale"</code></div>
     <div class="chart-box" id="chart-rose"></div>
     <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'pie', pieData, {
+  title: 'Nightingale Rose',
   variant: 'nightingale',
 });</pre></details></div>
   </div>
@@ -315,7 +323,7 @@
   value: 72,
   max: 100,
   label: 'Score',
-});</pre></details></div>
+}, { title: 'Performance Score' });</pre></details></div>
   </div>
 
   <div class="card">
@@ -323,7 +331,7 @@
     <div class="chart-box" id="chart-gauge-pct"></div>
     <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'gauge', {
   value: 85, max: 100, label: 'CPU',
-}, { variant: 'percentage' });</pre></details></div>
+}, { title: 'CPU Usage', variant: 'percentage' });</pre></details></div>
   </div>
 
 </div>
@@ -421,6 +429,72 @@ const chart = document.getElementById('myChart');
 chart.data = { value: 72, max: 100, label: 'Score' };
 chart.options = { variant: 'percentage' };
 &lt;/script&gt;</pre></details></div>
+  </div>
+
+</div>
+
+<!-- CHORD -->
+<h2>Chord Charts</h2>
+<div class="grid">
+
+  <div class="card card--full">
+    <div class="card-header"><h3>Team Collaboration</h3><code>type="chord"</code></div>
+    <div class="chart-box" id="chart-chord"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'chord', chordData, {
+  title: 'Team Collaboration',
+  tooltip: { formatValue: (v) => v + ' interactions' },
+});</pre></details></div>
+  </div>
+
+</div>
+
+<!-- SANKEY -->
+<h2>Sankey Charts</h2>
+<div class="grid">
+
+  <div class="card">
+    <div class="card-header"><h3>Energy Flow</h3><code>type="sankey"</code></div>
+    <div class="chart-box" id="chart-sankey"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'sankey', {
+  nodes: [
+    { name: 'Coal' }, { name: 'Natural Gas' }, { name: 'Solar' },
+    { name: 'Electricity' }, { name: 'Heat' },
+    { name: 'Industry' }, { name: 'Residential' }, { name: 'Transport' },
+  ],
+  links: [
+    { source: 'Coal',        target: 'Electricity', value: 120 },
+    { source: 'Coal',        target: 'Heat',        value: 60  },
+    { source: 'Natural Gas', target: 'Electricity', value: 80  },
+    { source: 'Natural Gas', target: 'Heat',        value: 90  },
+    { source: 'Solar',       target: 'Electricity', value: 50  },
+    { source: 'Electricity', target: 'Industry',    value: 130 },
+    { source: 'Electricity', target: 'Residential', value: 80  },
+    { source: 'Electricity', target: 'Transport',   value: 40  },
+    { source: 'Heat',        target: 'Industry',    value: 70  },
+    { source: 'Heat',        target: 'Residential', value: 80  },
+  ],
+}, { title: 'Energy Flow' });</pre></details></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h3>User Journey</h3><code>variant="vertical"</code></div>
+    <div class="chart-box" id="chart-sankey-vertical"></div>
+    <div class="code-toggle"><details><summary>Show code</summary><pre>createChart(el, 'sankey', {
+  nodes: [
+    { name: 'Landing Page' }, { name: 'Pricing' }, { name: 'Blog' },
+    { name: 'Sign Up' }, { name: 'Trial' },
+    { name: 'Converted' }, { name: 'Churned' },
+  ],
+  links: [
+    { source: 'Landing Page', target: 'Pricing',     value: 800 },
+    { source: 'Landing Page', target: 'Blog',        value: 400 },
+    { source: 'Pricing',      target: 'Sign Up',     value: 500 },
+    { source: 'Blog',         target: 'Sign Up',     value: 200 },
+    { source: 'Sign Up',      target: 'Trial',       value: 600 },
+    { source: 'Trial',        target: 'Converted',   value: 380 },
+    { source: 'Trial',        target: 'Churned',     value: 220 },
+  ],
+}, { title: 'User Journey', variant: 'vertical' });</pre></details></div>
   </div>
 
 </div>
@@ -576,6 +650,62 @@ chart.options = { variant: 'percentage' };
     series: [{ name: 'Visits', data: [120,145,98,167,203,180,221] }],
   };
 
+  const chordData = {
+    nodes: [
+      { name: 'Frontend' }, { name: 'Backend' },
+      { name: 'Design' },   { name: 'QA' },
+      { name: 'DevOps' },   { name: 'Product' },
+    ],
+    links: [
+      { source: 'Frontend', target: 'Backend',  value: 42 },
+      { source: 'Frontend', target: 'Design',   value: 35 },
+      { source: 'Frontend', target: 'QA',       value: 28 },
+      { source: 'Backend',  target: 'DevOps',   value: 30 },
+      { source: 'Backend',  target: 'QA',       value: 25 },
+      { source: 'Design',   target: 'Product',  value: 40 },
+      { source: 'QA',       target: 'DevOps',   value: 18 },
+      { source: 'Product',  target: 'Frontend', value: 22 },
+      { source: 'Product',  target: 'Backend',  value: 20 },
+    ],
+  };
+
+  const sankeyData = {
+    nodes: [
+      { name: 'Coal' }, { name: 'Natural Gas' }, { name: 'Solar' },
+      { name: 'Electricity' }, { name: 'Heat' },
+      { name: 'Industry' }, { name: 'Residential' }, { name: 'Transport' },
+    ],
+    links: [
+      { source: 'Coal',        target: 'Electricity', value: 120 },
+      { source: 'Coal',        target: 'Heat',        value: 60  },
+      { source: 'Natural Gas', target: 'Electricity', value: 80  },
+      { source: 'Natural Gas', target: 'Heat',        value: 90  },
+      { source: 'Solar',       target: 'Electricity', value: 50  },
+      { source: 'Electricity', target: 'Industry',    value: 130 },
+      { source: 'Electricity', target: 'Residential', value: 80  },
+      { source: 'Electricity', target: 'Transport',   value: 40  },
+      { source: 'Heat',        target: 'Industry',    value: 70  },
+      { source: 'Heat',        target: 'Residential', value: 80  },
+    ],
+  };
+
+  const sankeyJourneyData = {
+    nodes: [
+      { name: 'Landing Page' }, { name: 'Pricing' }, { name: 'Blog' },
+      { name: 'Sign Up' }, { name: 'Trial' },
+      { name: 'Converted' }, { name: 'Churned' },
+    ],
+    links: [
+      { source: 'Landing Page', target: 'Pricing',   value: 800 },
+      { source: 'Landing Page', target: 'Blog',      value: 400 },
+      { source: 'Pricing',      target: 'Sign Up',   value: 500 },
+      { source: 'Blog',         target: 'Sign Up',   value: 200 },
+      { source: 'Sign Up',      target: 'Trial',     value: 600 },
+      { source: 'Trial',        target: 'Converted', value: 380 },
+      { source: 'Trial',        target: 'Churned',   value: 220 },
+    ],
+  };
+
   // ── Create all charts ────────────────────────────────────────
 
   const charts = [];
@@ -613,20 +743,32 @@ chart.options = { variant: 'percentage' };
     charts.push(createChart(el('chart-hbar'), 'bar', hbarData,
       { ...opts, variant: 'horizontal', title: 'Browser Share' }));
 
-    charts.push(createChart(el('chart-pie'), 'pie', pieData, opts));
+    charts.push(createChart(el('chart-pie'), 'pie', pieData,
+      { ...opts, title: 'Browser Market Share' }));
 
     charts.push(createChart(el('chart-doughnut'), 'pie', pieData,
-      { ...opts, variant: 'doughnut', legend: { show: true, position: 'right' } }));
+      { ...opts, title: 'Browser Market Share', variant: 'doughnut', legend: { show: true, position: 'right' } }));
 
     charts.push(createChart(el('chart-rose'), 'pie', pieData,
-      { ...opts, variant: 'nightingale' }));
+      { ...opts, title: 'Nightingale Rose', variant: 'nightingale' }));
 
     charts.push(createChart(el('chart-gauge'), 'gauge',
-      { value: 72, max: 100, label: 'Score' }, opts));
+      { value: 72, max: 100, label: 'Score' },
+      { ...opts, title: 'Performance Score' }));
 
     charts.push(createChart(el('chart-gauge-pct'), 'gauge',
       { value: 85, max: 100, label: 'CPU' },
-      { ...opts, variant: 'percentage' }));
+      { ...opts, title: 'CPU Usage', variant: 'percentage' }));
+
+    charts.push(createChart(el('chart-chord'), 'chord', chordData,
+      { ...opts, title: 'Team Collaboration',
+        tooltip: { formatValue: (v) => v + ' interactions' } }));
+
+    charts.push(createChart(el('chart-sankey'), 'sankey', sankeyData,
+      { ...opts, title: 'Energy Flow' }));
+
+    charts.push(createChart(el('chart-sankey-vertical'), 'sankey', sankeyJourneyData,
+      { ...opts, title: 'User Journey', variant: 'vertical' }));
 
     charts.push(createChart(el('chart-mixed'), 'line', mixedData,
       { ...opts, title: 'Revenue vs Trend', series: { 'Revenue': { type: 'bar' }, 'Trend': { smooth: true, lineStyle: 'dashed' } } }));
@@ -669,7 +811,7 @@ chart.options = { variant: 'percentage' };
     wcLine.options = { ...wcOpts, title: 'Monthly Financials' };
 
     wcPie.data = pieData;
-    wcPie.options = { ...wcOpts, variant: 'doughnut', legend: { show: true, position: 'right' } };
+    wcPie.options = { ...wcOpts, title: 'Browser Market Share', variant: 'doughnut', legend: { show: true, position: 'right' } };
 
     wcLive.data = {
       categories: ['Q1','Q2','Q3','Q4'],
@@ -681,7 +823,7 @@ chart.options = { variant: 'percentage' };
     wcLive.options = { ...wcOpts, title: 'Quarterly Sales' };
 
     wcGauge.data = { value: 72, max: 100, label: 'Score' };
-    wcGauge.options = { ...wcOpts, variant: 'percentage' };
+    wcGauge.options = { ...wcOpts, title: 'Performance Score', variant: 'percentage' };
   }
 
   document.getElementById('wc-refresh-btn').addEventListener('click', function () {

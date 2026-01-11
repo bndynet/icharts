@@ -10,6 +10,8 @@ export enum ChartType {
   Area = 'area',
   Pie = 'pie',
   Gauge = 'gauge',
+  Sankey = 'sankey',
+  Chord = 'chord',
 }
 
 // ---------------------------------------------------------------------------
@@ -21,13 +23,15 @@ export type BarVariant = 'default' | 'horizontal' | 'spark';
 export type AreaVariant = 'default' | 'spark';
 export type PieVariant = 'default' | 'doughnut' | 'half-doughnut' | 'nightingale';
 export type GaugeVariant = 'default' | 'percentage';
+export type SankeyVariant = 'default' | 'vertical';
 
 export type ChartVariant =
   | LineVariant
   | BarVariant
   | AreaVariant
   | PieVariant
-  | GaugeVariant;
+  | GaugeVariant
+  | SankeyVariant;
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -56,7 +60,46 @@ export interface GaugeData {
   label?: string;
 }
 
-export type ChartData = XYData | PieData | GaugeData;
+export interface SankeyNode {
+  name: string;
+  /** Optional fixed color for this specific node */
+  color?: string;
+}
+
+export interface SankeyLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface SankeyData {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+}
+
+export interface ChordNode {
+  name: string;
+  /** Optional fixed color for this node's arc and outgoing ribbons */
+  color?: string;
+  /**
+   * Relative weight of the node arc.
+   * When omitted the arc size is derived from the sum of connected link values.
+   */
+  value?: number;
+}
+
+export interface ChordLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface ChordData {
+  nodes: ChordNode[];
+  links: ChordLink[];
+}
+
+export type ChartData = XYData | PieData | GaugeData | SankeyData | ChordData;
 
 // ---------------------------------------------------------------------------
 // Options types
@@ -213,6 +256,36 @@ export function isGaugeData(data: ChartData): data is GaugeData {
     typeof data === 'object' &&
     !Array.isArray(data) &&
     'value' in data &&
-    !('categories' in data)
+    !('categories' in data) &&
+    !('nodes' in data)
+  );
+}
+
+export function isSankeyData(data: ChartData): data is SankeyData {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    'nodes' in data &&
+    'links' in data &&
+    Array.isArray((data as SankeyData).nodes) &&
+    Array.isArray((data as SankeyData).links)
+  );
+}
+
+/**
+ * ChordData and SankeyData share the same runtime shape ({ nodes, links }).
+ * The chart type — not the data shape — determines which adapter is used.
+ * This guard validates the structural contract for ChordData.
+ */
+export function isChordData(data: ChartData): data is ChordData {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    'nodes' in data &&
+    'links' in data &&
+    Array.isArray((data as ChordData).nodes) &&
+    Array.isArray((data as ChordData).links)
   );
 }
