@@ -43,7 +43,6 @@ export class IChartElement extends LitElement {
 
   private echartsInstance: echarts.ECharts | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  /** Tracks the theme name used when the current instance was created. */
   private _activeTheme: string | undefined = undefined;
 
   override render() {
@@ -110,17 +109,13 @@ export class IChartElement extends LitElement {
     const opts = this.options ?? {};
     const themeName = resolveThemeName(opts.theme);
 
-    // ECharts bakes the theme into the instance at init() time — setOption()
-    // cannot change structural colors (background, text, grid, axes) after the
-    // fact.  Dispose and re-init whenever the active theme changes.
-    if (this.echartsInstance && this._activeTheme !== themeName) {
-      this.echartsInstance.dispose();
-      this.echartsInstance = null;
-    }
-
     if (!this.echartsInstance) {
       this._activeTheme = themeName;
       this.echartsInstance = echarts.init(container, themeName);
+    } else if (this._activeTheme !== themeName) {
+      // ECharts 6 supports live theme switching without dispose/re-init.
+      this._activeTheme = themeName;
+      this.echartsInstance.setTheme(themeName);
     }
 
     const { option: eOption, onInit } = resolveEChartsOption(this.type, this.data, opts);

@@ -1,6 +1,6 @@
 {
   "name": "@bndynet/icharts",
-  "version": "5.0.1",
+  "version": "6.0.0",
   "description": "A simplified ECharts wrapper providing an <i-chart> web component and createChart() API",
   "type": "module",
   "main": "dist/index.cjs",
@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@bndynet/color-hub": "^0.1.0",
-    "echarts": "^5.6.0",
+    "echarts": "^6.0.0",
     "lit": "^3.3.1"
   },
   "devDependencies": {

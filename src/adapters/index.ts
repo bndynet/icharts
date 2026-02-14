@@ -1,39 +1,12 @@
-import * as echarts from 'echarts';
-import {
-  ChartType,
-  type ChartData,
-  type ChartOptions,
-  type XYData,
-  type PieData,
-  type GaugeData,
-  type SankeyData,
-  type ChordData,
-  isXYData,
-  isPieData,
-  isGaugeData,
-  isSankeyData,
-  isChordData,
-} from '../types.js';
-import { resolveLineOptions, resolveAreaOptions } from './line.js';
-import { resolveBarOptions } from './bar.js';
-import { resolvePieOptions } from './pie.js';
-import { resolveGaugeOptions } from './gauge.js';
-import { resolveSankeyOptions } from './sankey.js';
-import { buildChordChart, initChordChart } from './chord.js';
-
-export type ResolverFn = (
-  data: ChartData,
-  options: ChartOptions,
-) => Record<string, unknown>;
+import type * as echarts from 'echarts';
+import type { ChartData, ChartOptions } from '../types.js';
 
 /**
- * Result returned by resolveEChartsOption.
+ * Result returned by an adapter's resolve method.
  *
- * `option` is the full ECharts option object ready for setOption().
- * `onInit` is an optional hook called once after the ECharts instance is
- * initialised and setOption() has been called. Chart adapters use this to
- * attach interactivity that requires a live ECharts instance (e.g. event
- * listeners, dispatchAction calls).
+ * `option`  -- full ECharts option ready for setOption().
+ * `onInit`  -- optional hook called once after the instance is initialised
+ *              and setOption() has been called (e.g. for event listeners).
  */
 export interface ChartSetupResult {
   option: Record<string, unknown>;
@@ -41,110 +14,108 @@ export interface ChartSetupResult {
 }
 
 /**
- * Per-type post-init hooks for chart types with simple, stateless setup.
- * Chart types that need closure state (like Chord) handle their own onInit
- * inline in the switch case below.
+ * Contract every chart adapter must satisfy.
+ *
+ * `validate` -- returns true when `data` has the shape this adapter expects.
+ * `resolve`  -- builds the ECharts option (and optional onInit hook).
  */
-const INIT_HOOKS: Partial<Record<string, (instance: echarts.ECharts) => void>> = {};
+export interface ChartAdapter {
+  validate(data: ChartData): boolean;
+  resolve(data: ChartData, options: ChartOptions): ChartSetupResult;
+}
+
+// ---------------------------------------------------------------------------
+// Adapter registry
+// ---------------------------------------------------------------------------
+
+const adapterRegistry = new Map<string, ChartAdapter>();
+
+/**
+ * Register a chart adapter for a given type string.
+ * Built-in adapters are registered at module load time.
+ * Users can call this to add custom chart types.
+ */
+export function registerAdapter(type: string, adapter: ChartAdapter): void {
+  adapterRegistry.set(type, adapter);
+}
 
 /**
  * Resolve chart data + options into a ChartSetupResult.
  */
 export function resolveEChartsOption(
-  type: ChartType | string,
+  type: string,
   data: ChartData,
   options: ChartOptions,
 ): ChartSetupResult {
-  let option: Record<string, unknown>;
-
-  switch (type) {
-    case ChartType.Line:
-      assertXY(data, type);
-      option = resolveLineOptions(data as XYData, options);
-      break;
-
-    case ChartType.Area:
-      assertXY(data, type);
-      option = resolveAreaOptions(data as XYData, options);
-      break;
-
-    case ChartType.Bar:
-      assertXY(data, type);
-      option = resolveBarOptions(data as XYData, options);
-      break;
-
-    case ChartType.Pie:
-      assertPie(data, type);
-      option = resolvePieOptions(data as PieData, options);
-      break;
-
-    case ChartType.Gauge:
-      assertGauge(data, type);
-      option = resolveGaugeOptions(data as GaugeData, options);
-      break;
-
-    case ChartType.Sankey:
-      assertSankey(data, type);
-      option = resolveSankeyOptions(data as SankeyData, options);
-      break;
-
-    case ChartType.Chord: {
-      assertChord(data, type);
-      const { option: chordOption, setup } = buildChordChart(data as ChordData, options);
-      return {
-        option: chordOption,
-        onInit: (inst) => initChordChart(inst, setup),
-      };
-    }
-
-    default:
-      throw new Error(`Unsupported chart type: "${type}"`);
+  const adapter = adapterRegistry.get(type);
+  if (!adapter) {
+    throw new Error(`Unsupported chart type: "${type}"`);
   }
-
-  return { option, onInit: INIT_HOOKS[type] };
-}
-
-function assertXY(data: ChartData, type: string): asserts data is XYData {
-  if (!isXYData(data)) {
+  if (!adapter.validate(data)) {
     throw new Error(
-      `Chart type "${type}" requires XYData ({ categories, series }), ` +
-      `but received ${JSON.stringify(data).slice(0, 100)}`,
+      `Invalid data for chart type "${type}": ` +
+        JSON.stringify(data).slice(0, 100),
     );
   }
+  return adapter.resolve(data, options);
 }
 
-function assertPie(data: ChartData, type: string): asserts data is PieData {
-  if (!isPieData(data)) {
-    throw new Error(
-      `Chart type "${type}" requires PieData ([{ name, value }]), ` +
-      `but received ${JSON.stringify(data).slice(0, 100)}`,
-    );
-  }
-}
+// ---------------------------------------------------------------------------
+// Register built-in adapters
+// ---------------------------------------------------------------------------
 
-function assertGauge(data: ChartData, type: string): asserts data is GaugeData {
-  if (!isGaugeData(data)) {
-    throw new Error(
-      `Chart type "${type}" requires GaugeData ({ value, max? }), ` +
-      `but received ${JSON.stringify(data).slice(0, 100)}`,
-    );
-  }
-}
+import { ChartType, isXYData, isPieData, isGaugeData, isSankeyData, isChordData } from '../types.js';
+import type { XYData, PieData, GaugeData, SankeyData, ChordData } from '../types.js';
+import { resolveLineOptions, resolveAreaOptions } from './line.js';
+import { resolveBarOptions } from './bar.js';
+import { resolvePieOptions } from './pie.js';
+import { resolveGaugeOptions } from './gauge.js';
+import { resolveSankeyOptions } from './sankey.js';
+import { resolveChordOptions } from './chord.js';
 
-function assertSankey(data: ChartData, type: string): asserts data is SankeyData {
-  if (!isSankeyData(data)) {
-    throw new Error(
-      `Chart type "${type}" requires SankeyData ({ nodes, links }), ` +
-      `but received ${JSON.stringify(data).slice(0, 100)}`,
-    );
-  }
-}
+registerAdapter(ChartType.Line, {
+  validate: isXYData,
+  resolve: (data, options) => ({
+    option: resolveLineOptions(data as XYData, options),
+  }),
+});
 
-function assertChord(data: ChartData, type: string): asserts data is ChordData {
-  if (!isChordData(data)) {
-    throw new Error(
-      `Chart type "${type}" requires ChordData ({ nodes, links }), ` +
-      `but received ${JSON.stringify(data).slice(0, 100)}`,
-    );
-  }
-}
+registerAdapter(ChartType.Area, {
+  validate: isXYData,
+  resolve: (data, options) => ({
+    option: resolveAreaOptions(data as XYData, options),
+  }),
+});
+
+registerAdapter(ChartType.Bar, {
+  validate: isXYData,
+  resolve: (data, options) => ({
+    option: resolveBarOptions(data as XYData, options),
+  }),
+});
+
+registerAdapter(ChartType.Pie, {
+  validate: isPieData,
+  resolve: (data, options) => ({
+    option: resolvePieOptions(data as PieData, options),
+  }),
+});
+
+registerAdapter(ChartType.Gauge, {
+  validate: isGaugeData,
+  resolve: (data, options) => ({
+    option: resolveGaugeOptions(data as GaugeData, options),
+  }),
+});
+
+registerAdapter(ChartType.Sankey, {
+  validate: isSankeyData,
+  resolve: (data, options) => ({
+    option: resolveSankeyOptions(data as SankeyData, options),
+  }),
+});
+
+registerAdapter(ChartType.Chord, {
+  validate: isChordData,
+  resolve: (data, options) => resolveChordOptions(data as ChordData, options),
+});

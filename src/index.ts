@@ -4,6 +4,9 @@ export { IChartElement } from './components/i-chart.js';
 // Imperative API
 export { createChart } from './api.js';
 
+// Adapter registry (extensibility)
+export { registerAdapter, type ChartAdapter, type ChartSetupResult } from './adapters/index.js';
+
 // Types
 export {
   ChartType,

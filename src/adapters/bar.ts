@@ -1,4 +1,4 @@
-import type { XYData, ChartOptions, SeriesOptions } from '../types.js';
+import type { XYData, ChartOptions } from '../types.js';
 import { deepMerge } from '../utils.js';
 import {
   buildTitle,
@@ -8,6 +8,7 @@ import {
   buildTooltip,
   isTimeCategories,
 } from './common.js';
+import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './series-utils.js';
 
 export function resolveBarOptions(
   data: XYData,
@@ -67,12 +68,6 @@ export function resolveBarOptions(
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
-
-function getSeriesOpts(name: string, options: ChartOptions): SeriesOptions {
-  const wildcard = options.series?.['*'] ?? {};
-  const named = options.series?.[name] ?? {};
-  return { ...wildcard, ...named };
-}
 
 function buildBarSeries(
   data: XYData,
@@ -176,24 +171,4 @@ function applyStackedRadius(
       };
     });
   }
-}
-
-function applyMarkLines(series: Record<string, unknown>, so: SeriesOptions): void {
-  if (!so.markLines || so.markLines.length === 0) return;
-  series.markLine = {
-    data: so.markLines.map((type) => ({
-      type,
-      name: type.charAt(0).toUpperCase() + type.slice(1),
-    })),
-  };
-}
-
-function applyMarkPoints(series: Record<string, unknown>, so: SeriesOptions): void {
-  if (!so.markPoints || so.markPoints.length === 0) return;
-  series.markPoint = {
-    data: so.markPoints.map((type) => ({
-      type,
-      name: type.charAt(0).toUpperCase() + type.slice(1),
-    })),
-  };
 }

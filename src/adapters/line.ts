@@ -1,4 +1,4 @@
-import type { XYData, ChartOptions, SeriesOptions } from '../types.js';
+import type { XYData, ChartOptions } from '../types.js';
 import { deepMerge } from '../utils.js';
 import {
   buildTitle,
@@ -9,6 +9,7 @@ import {
   buildTooltip,
   isTimeCategories,
 } from './common.js';
+import { getSeriesOpts, getYAxisCount, applyMarkLines, applyMarkPoints } from './series-utils.js';
 
 export function resolveLineOptions(
   data: XYData,
@@ -78,25 +79,6 @@ export function resolveAreaOptions(
 // Internals
 // ---------------------------------------------------------------------------
 
-function getYAxisCount(data: XYData, options: ChartOptions): number {
-  let count = 1;
-  if (options.series) {
-    for (const s of data.series) {
-      const so = getSeriesOpts(s.name, options);
-      if (so.yAxisIndex !== undefined && so.yAxisIndex + 1 > count) {
-        count = so.yAxisIndex + 1;
-      }
-    }
-  }
-  return count;
-}
-
-function getSeriesOpts(name: string, options: ChartOptions): SeriesOptions {
-  const wildcard = options.series?.['*'] ?? {};
-  const named = options.series?.[name] ?? {};
-  return { ...wildcard, ...named };
-}
-
 function buildLineSeries(
   data: XYData,
   options: ChartOptions,
@@ -127,8 +109,6 @@ function buildLineSeries(
       }
 
       if (isArea) {
-        // Spark area: gradient fill is injected by applyColors (which knows the resolved color).
-        // Non-spark area: flat semi-transparent fill as default.
         series.areaStyle = isSpark ? {} : { opacity: 0.8 };
       }
     }
@@ -166,22 +146,4 @@ function buildLineSeries(
 
     return series;
   });
-}
-
-function applyMarkLines(series: Record<string, unknown>, so: SeriesOptions): void {
-  if (!so.markLines || so.markLines.length === 0) return;
-  const markLineData = so.markLines.map((type) => ({
-    type,
-    name: type.charAt(0).toUpperCase() + type.slice(1),
-  }));
-  series.markLine = { data: markLineData };
-}
-
-function applyMarkPoints(series: Record<string, unknown>, so: SeriesOptions): void {
-  if (!so.markPoints || so.markPoints.length === 0) return;
-  const markPointData = so.markPoints.map((type) => ({
-    type,
-    name: type.charAt(0).toUpperCase() + type.slice(1),
-  }));
-  series.markPoint = { data: markPointData };
 }
