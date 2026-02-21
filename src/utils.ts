@@ -1,6 +1,7 @@
 import type { ChartData, ChartOptions, XYData, PieData, SankeyData } from './types.js';
 import { ChartType, isXYData, isPieData, isSankeyData } from './types.js';
-import { resolveSeriesColors, colorHub, resolveThemeName } from './themes/index.js';
+import { resolveSeriesColors, resolveColorsByPosition, syncColorHubTheme, resolveThemeName } from './themes/index.js';
+import { getConfig } from './config.js';
 
 // ---------------------------------------------------------------------------
 // Object helpers
@@ -143,12 +144,15 @@ export function applyChartColors(
   data: ChartData,
   options: ChartOptions,
 ): void {
-  colorHub.switchTheme(resolveThemeName(options.theme));
+  syncColorHubTheme(resolveThemeName(options.theme));
 
   const names = getSeriesNames(data);
   if (names.length === 0) return;
 
-  const colors = resolveSeriesColors(names, options.colors, options.colorMap);
+  const resolve = getConfig().consistentColors
+    ? resolveSeriesColors
+    : resolveColorsByPosition;
+  const colors = resolve(names, options.colors, options.colorMap);
   eOption.color = colors;
 
   if (type === ChartType.Area && options.variant === 'spark') {

@@ -3,10 +3,14 @@ import * as echarts from 'echarts';
 import { buildEChartsTheme } from './echarts-theme.js';
 import { darkTheme, lightTheme, chartThemes } from './presets.js';
 import type { ChartTheme, ChartThemeColors, ChartThemeConfig } from './types.js';
+import { chartRegistry } from '../registry.js';
 
 // ColorHub's sole responsibility here: assign palette colors to series by name.
 // UI / structural colors (background, text, grid, …) are managed by ChartThemeColors.
-const colorHub = new ColorHub<ChartThemeColors>(chartThemes);
+let colorHub = new ColorHub<ChartThemeColors>(chartThemes);
+
+const knownThemeNames = new Set<string>(chartThemes.map((t) => t.name));
+const allThemes: ChartTheme[] = [...chartThemes];
 
 let registered = false;
 
@@ -27,6 +31,9 @@ export function ensureThemesRegistered(): void {
 
 export function switchTheme(name: string): void {
   colorHub.switchTheme(name);
+  for (const chart of chartRegistry) {
+    chart.setTheme(name);
+  }
 }
 
 export function getSeriesColor(name: string): StateColors {
@@ -56,15 +63,18 @@ export function registerTheme(config: ChartThemeConfig): void {
     palette: config.palette ?? base.palette!,
   };
   colorHub.appendTheme(theme);
+  knownThemeNames.add(theme.name);
+  allThemes.push(theme);
   echarts.registerTheme(theme.name, buildEChartsTheme(theme.colors!, theme.palette!));
 }
 
 /**
  * Resolve the effective ECharts theme name.
- * Defaults to the built-in light theme when none is specified.
+ * When no explicit name is provided, falls back to the currently active
+ * ColorHub theme so charts created after a theme switch pick up the right theme.
  */
 export function resolveThemeName(name?: string): string {
-  return name || lightTheme.name;
+  return name || colorHub.getCurrentTheme().name;
 }
 
 /**
@@ -86,6 +96,82 @@ export function resolveSeriesColors(
   });
 }
 
-export { colorHub };
+/**
+ * Pre-register name → color mappings.
+ * When `themeName` is provided, applies only to that theme.
+ * When omitted, applies to every registered theme.
+ * Only meaningful when `consistentColors` is enabled.
+ */
+export function setColorMap(
+  map: Record<string, string>,
+  themeName?: string,
+): void {
+  const prevName = colorHub.getCurrentTheme().name;
+
+  const targets = themeName ? [themeName] : [...knownThemeNames];
+  for (const name of targets) {
+    colorHub.switchTheme(name);
+    const theme = colorHub.getCurrentTheme();
+    theme.colorMap = { ...theme.colorMap, ...map };
+  }
+
+  colorHub.switchTheme(prevName);
+}
+
+/**
+ * Clear all name → color assignments accumulated by ColorHub.
+ * Call this when navigating between dashboards to start fresh.
+ *
+ * When `themeName` is omitted (or not provided), rebuilds the entire ColorHub
+ * so the internal palette index resets to 0 — the next dashboard starts
+ * cleanly from `palette[0]`.
+ *
+ * When `themeName` is provided, only that theme's colorMap is cleared (the
+ * palette index is NOT reset since it is shared across themes).
+ */
+export function resetColorMap(themeName?: string): void {
+  if (themeName) {
+    const prevName = colorHub.getCurrentTheme().name;
+    colorHub.switchTheme(themeName);
+    colorHub.getCurrentTheme().colorMap = {};
+    colorHub.switchTheme(prevName);
+    return;
+  }
+
+  const prevThemeName = colorHub.getCurrentTheme().name;
+  const cleanThemes = allThemes.map((t) => ({ ...t, colorMap: {} }));
+  colorHub = new ColorHub<ChartThemeColors>(cleanThemes);
+  colorHub.switchTheme(prevThemeName);
+}
+
+/**
+ * Resolve colors by palette position (index 0, 1, 2, …) independent of series names.
+ * Each chart starts from palette[0], cycling if more names than palette entries.
+ */
+export function resolveColorsByPosition(
+  seriesNames: string[],
+  userColors?: string[],
+  userColorMap?: Record<string, string>,
+): string[] {
+  if (userColors && userColors.length >= seriesNames.length) {
+    return userColors.slice(0, seriesNames.length);
+  }
+
+  const palette = colorHub.getCurrentTheme().palette ?? [];
+  return seriesNames.map((name, i) => {
+    if (userColorMap?.[name]) return userColorMap[name];
+    return palette[i % palette.length] ?? '#888888';
+  });
+}
+
+/**
+ * Sync ColorHub to the given theme before resolving colors.
+ * Used internally by `applyChartColors` — avoids exporting the mutable
+ * `colorHub` reference, which would break when the instance is rebuilt.
+ */
+export function syncColorHubTheme(name: string): void {
+  colorHub.switchTheme(name);
+}
+
 export type { ChartTheme, ChartThemeColors, ChartThemeConfig };
 export { lightTheme as chartLightTheme, darkTheme as chartDarkTheme, chartThemes } from './presets.js';

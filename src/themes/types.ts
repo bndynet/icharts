@@ -56,6 +56,33 @@ export interface ChartThemeColors {
    */
   axisLine: string;
 
+  // ── Tooltip ────────────────────────────────────────────────────────────────
+
+  /**
+   * Tooltip popup background color.
+   * Falls back to `surface` when omitted.
+   */
+  tooltipBackground?: string;
+
+  /**
+   * Tooltip popup border color.
+   * Falls back to `axisLine` when omitted.
+   */
+  tooltipBorderColor?: string;
+
+  /**
+   * Tooltip body text color — series names and values.
+   * Falls back to `surfaceText` when omitted.
+   */
+  tooltipTextColor?: string;
+
+  /**
+   * Tooltip title text color — the category / date / x-axis label at the top.
+   * Typically slightly quieter than `tooltipTextColor`.
+   * Falls back to `tooltipTextColor` → `surfaceText` when omitted.
+   */
+  tooltipTitleColor?: string;
+
   // ── Semantic / status ─────────────────────────────────────────────────────
 
   /** Positive / healthy state indicator. */

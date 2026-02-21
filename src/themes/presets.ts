@@ -39,9 +39,9 @@ const DARK_PALETTE = [
 
 const LIGHT_COLORS: ChartThemeColors = {
   // Surfaces
-  background:   '#ffffff',
-  surface:      '#1f2937', // dark tooltip on light bg — high contrast
-  surfaceText:  '#f9fafb',
+  background:   'transparent',
+  surface:      '#ffffff', // axis-pointer callout — same light surface
+  surfaceText:  '#111827',
 
   // Text
   textPrimary:   '#111827',
@@ -50,6 +50,12 @@ const LIGHT_COLORS: ChartThemeColors = {
   // Structure
   gridLine: '#f3f4f6', // barely visible rules
   axisLine: '#d1d5db', // slightly more prominent frame
+
+  // Tooltip — light popup consistent with the light background
+  tooltipBackground: '#ffffff',
+  tooltipBorderColor: '#e5e7eb',
+  tooltipTextColor:   '#111827',
+  tooltipTitleColor:  '#6b7280', // slightly muted vs body text
 
   // Semantic
   success: '#22c55e',
@@ -60,7 +66,7 @@ const LIGHT_COLORS: ChartThemeColors = {
 
 const DARK_COLORS: ChartThemeColors = {
   // Surfaces
-  background:   '#0f172a',
+  background:   'transparent',
   surface:      '#1e293b', // elevated panel, tooltip
   surfaceText:  '#e2e8f0',
 
@@ -72,6 +78,12 @@ const DARK_COLORS: ChartThemeColors = {
   // axisLine is one step brighter so the axis spine is legible.
   gridLine: '#1e293b',
   axisLine: '#334155',
+
+  // Tooltip — slightly elevated surface to pop above the chart canvas
+  tooltipBackground: '#1e293b',
+  tooltipBorderColor: '#334155',
+  tooltipTextColor:   '#e2e8f0',
+  tooltipTitleColor:  '#94a3b8', // muted slate for title vs bright body text
 
   // Semantic — slightly lighter variants for dark backgrounds
   success: '#4ade80',

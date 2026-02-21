@@ -222,6 +222,8 @@ export interface ChartOptions {
 
 export interface IChartInstance {
   update(data?: ChartData, options?: ChartOptions): void;
+  /** Switch ECharts theme without disposing the instance (ECharts 6+). Updates series colors from the active palette. */
+  setTheme(theme: string): void;
   resize(): void;
   dispose(): void;
   getEChartsInstance(): echarts.ECharts;

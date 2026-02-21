@@ -5,8 +5,8 @@ import type { ChartThemeColors } from './types.js';
  * Registered via `echarts.registerTheme(name, buildEChartsTheme(colors, palette))`.
  *
  * Token mapping:
- *  background    → chart canvas background, pie-slice border
- *  surface       → tooltip bg, axis-pointer callout bg
+ *  background    → chart canvas background (transparent by default)
+ *  surface       → tooltip bg, axis-pointer callout bg, pie-slice border
  *  surfaceText   → tooltip text, axis-pointer callout text
  *  textPrimary   → chart title, legend, pie labels, gauge detail (value), markPoint labels
  *  textSecondary → axis tick labels, gauge title (label text e.g. "CPU")
@@ -31,15 +31,17 @@ export function buildEChartsTheme(
     },
 
     tooltip: {
-      backgroundColor: colors.surface,
-      borderColor: colors.axisLine,
-      textStyle: { color: colors.surfaceText },
+      backgroundColor: colors.tooltipBackground ?? colors.surface,
+      borderColor:     colors.tooltipBorderColor ?? colors.axisLine,
+      textStyle: {
+        color: colors.tooltipTextColor ?? colors.surfaceText,
+      },
       axisPointer: {
         lineStyle:  { color: colors.axisLine, width: 1 },
         crossStyle: { color: colors.axisLine, width: 1 },
         label: {
-          backgroundColor: colors.surface,
-          color:           colors.surfaceText,
+          backgroundColor: colors.tooltipBackground ?? colors.surface,
+          color:           colors.tooltipTitleColor ?? colors.tooltipTextColor ?? colors.surfaceText,
         },
       },
     },
@@ -61,7 +63,7 @@ export function buildEChartsTheme(
 
     pie: {
       label:     { color: colors.textPrimary },
-      itemStyle: { borderWidth: 1, borderColor: colors.background },
+      itemStyle: { borderWidth: 1, borderColor: colors.surface },
     },
 
     gauge: {

@@ -1,10 +1,7 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import * as echarts from 'echarts';
 import type { ChartData, ChartOptions, IChartInstance } from '../types.js';
-import { resolveEChartsOption } from '../adapters/index.js';
-import { ensureThemesRegistered, resolveThemeName } from '../themes/index.js';
-import { applyChartColors } from '../utils.js';
+import { IChart } from '../core.js';
 
 /**
  * `<i-chart>` web component backed by ECharts.
@@ -41,9 +38,8 @@ export class IChartElement extends LitElement {
   @property({ type: Object })
   options: ChartOptions = {};
 
-  private echartsInstance: echarts.ECharts | null = null;
+  private engine: IChart | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  private _activeTheme: string | undefined = undefined;
 
   override render() {
     return html`<div class="ichart-container"></div>`;
@@ -51,7 +47,7 @@ export class IChartElement extends LitElement {
 
   override firstUpdated(): void {
     this.resizeObserver = new ResizeObserver(() => {
-      this.echartsInstance?.resize();
+      this.engine?.resize();
     });
     this.resizeObserver.observe(this);
     this.renderChart();
@@ -64,7 +60,7 @@ export class IChartElement extends LitElement {
       changed.has('options')
     ) {
       // Skip the very first update — handled by firstUpdated
-      if (changed.has('type') && !changed.get('type') && this.echartsInstance === null) return;
+      if (changed.has('type') && !changed.get('type') && this.engine === null) return;
       this.renderChart();
     }
   }
@@ -73,55 +69,29 @@ export class IChartElement extends LitElement {
     super.disconnectedCallback();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
-    this.echartsInstance?.dispose();
-    this.echartsInstance = null;
+    this.engine?.dispose();
+    this.engine = null;
   }
 
   /** Expose the underlying chart instance for advanced usage. */
   getChartInstance(): IChartInstance | null {
-    if (!this.echartsInstance || !this.data) return null;
-
-    const instance = this.echartsInstance;
-    const { type, data, options } = this;
-
-    return {
-      update: (newData?: ChartData, newOptions?: ChartOptions) => {
-        const d = newData ?? data;
-        const o = newOptions ? { ...options, ...newOptions } : options;
-        const { option: eOption } = resolveEChartsOption(type, d, o);
-        applyChartColors(type, eOption, d, o);
-        instance.setOption(eOption, true);
-      },
-      resize: () => instance.resize(),
-      dispose: () => instance.dispose(),
-      getEChartsInstance: () => instance,
-    };
+    return this.engine;
   }
 
   private renderChart(): void {
     if (!this.data) return;
 
-    ensureThemesRegistered();
-
-    const container = this.shadowRoot?.querySelector('.ichart-container') as HTMLElement | null;
+    const container = this.shadowRoot?.querySelector(
+      '.ichart-container',
+    ) as HTMLElement | null;
     if (!container) return;
 
-    const opts = this.options ?? {};
-    const themeName = resolveThemeName(opts.theme);
-
-    if (!this.echartsInstance) {
-      this._activeTheme = themeName;
-      this.echartsInstance = echarts.init(container, themeName);
-    } else if (this._activeTheme !== themeName) {
-      // ECharts 6 supports live theme switching without dispose/re-init.
-      this._activeTheme = themeName;
-      this.echartsInstance.setTheme(themeName);
+    if (!this.engine) {
+      this.engine = new IChart(container, this.type, this.data, this.options);
+    } else {
+      this.engine.setType(this.type);
+      this.engine.update(this.data, this.options);
     }
-
-    const { option: eOption, onInit } = resolveEChartsOption(this.type, this.data, opts);
-    applyChartColors(this.type, eOption, this.data, opts);
-    this.echartsInstance.setOption(eOption, true);
-    onInit?.(this.echartsInstance);
   }
 }
 

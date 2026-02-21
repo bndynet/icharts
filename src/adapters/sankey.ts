@@ -46,6 +46,8 @@ export function resolveSankeyOptions(
     nodeWidth: 20,
   };
 
+  const fmt = options.tooltip?.formatValue;
+
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
     tooltip: {
@@ -54,7 +56,9 @@ export function resolveSankeyOptions(
       formatter: (params: Record<string, unknown>) => {
         if (params['dataType'] === 'edge') {
           const data = params['data'] as Record<string, unknown>;
-          return `${data['source']} → ${data['target']}: <strong>${data['value']}</strong>`;
+          const label = `${data['source']} → ${data['target']}`;
+          const v = fmt ? fmt(data['value'] as number, label) : data['value'];
+          return `${label}: ${v}`;
         }
         return `${params['name']}`;
       },

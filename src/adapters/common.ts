@@ -287,7 +287,7 @@ export function buildTooltip(
           const item = p as { marker?: string; seriesName?: string; value?: unknown };
           const val = Array.isArray(item.value) ? (item.value as [unknown, unknown])[1] : item.value;
           const displayVal = tooltip.formatValue ? tooltip.formatValue(val as number, item.seriesName ?? '') : val;
-          return `${item.marker ?? ''}${item.seriesName ?? ''}: <strong>${displayVal}</strong>`;
+          return `${item.marker ?? ''}${item.seriesName ?? ''}: ${displayVal}`;
         })
         .join('<br/>');
       return `${header}<br/>${rows}`;

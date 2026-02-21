@@ -1,6 +1,9 @@
 // Web component (registers <i-chart> custom element as side effect)
 export { IChartElement } from './components/i-chart.js';
 
+// Core chart class
+export { IChart } from './core.js';
+
 // Imperative API
 export { createChart } from './api.js';
 
@@ -41,11 +44,17 @@ export {
   isChordData,
 } from './types.js';
 
+// Configuration
+export { configure, type IChartsConfig } from './config.js';
+
 // Theme utilities
 export {
+  switchTheme,
   registerTheme,
   getSeriesColor,
   getCurrentTheme,
   getThemeColors,
+  setColorMap,
+  resetColorMap,
   type ChartThemeConfig,
 } from './themes/index.js';

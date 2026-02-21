@@ -72,7 +72,7 @@ export function resolveChordOptions(
           const d = params['data'] as Record<string, unknown>;
           const label = `${d['source']} → ${d['target']}`;
           const v = fmt ? fmt(d['value'] as number, label) : d['value'];
-          return `${label}: <strong>${v}</strong>`;
+          return `${label}: ${v}`;
         }
         return `${params['name']}`;
       },
