@@ -21,7 +21,7 @@
     "build": "tsup && npm run site",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "site": "vite build",
+    "site": "vite build --base=/icharts/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
