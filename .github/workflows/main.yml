@@ -1,16 +1,22 @@
-name: Publish Package
+name: Publish+Deploy
 
 on:
   release:
     types: [published]
   workflow_dispatch:
+     inputs:
+      publish_enabled:
+        description: 'Whether to publish to npm'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
-  publish:
+  build:
     uses: bndynet/gh.flows/.github/workflows/npm.yml@main
     with:
       node-version: '24'                           # default: '20'
@@ -19,11 +25,11 @@ jobs:
       lint-command: 'npm run lint'                 # default: 'npm run lint'
       test-command: 'npm test'                     # default: 'npm test'
       build-command: 'npm run build'               # default: 'npm run build'
-      publish-enabled: true                        # default: false
+      publish-enabled: ${{ github.event_name == 'release' || inputs.publish_enabled }}  # default: false
       publish-auth-method: 'token'                 # default: token (or oidc)
       publish-tag: 'latest'                        # default: 'latest'
       publish-provenance: true                     # default: true
-      artifact-paths: ''                           # default: '', e.g., 'dist,build,.next'
-      artifact-name: 'artifacts'                   # default: 'artifacts' 
+      deploy-folder: 'site-dist'                   # default: '' 
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}          # when publish-enabled=true and publish-auth-method=token
+  
