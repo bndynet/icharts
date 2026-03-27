@@ -17,11 +17,10 @@
     "dist"
   ],
   "scripts": {
-    "start": "vite",
-    "build": "tsup && npm run site",
+    "start": "cd site && npm i && npm run dev",
+    "build": "tsup && cd site && npm i && npm run build",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "site": "vite build --base=/icharts/",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -33,24 +32,15 @@
     "lit": "^3.3.1"
   },
   "devDependencies": {
-    "@element-plus/icons-vue": "^2.3.2",
     "@eslint/js": "^10.0.1",
-    "@fontsource-variable/inter": "^5.2.8",
     "@types/node": "^25.6.0",
-    "@vitejs/plugin-vue": "^6.0.5",
     "@vitest/coverage-v8": "^4.1.2",
     "concurrently": "^9.2.1",
-    "element-plus": "^2.13.6",
     "eslint": "^10.1.0",
-    "highlight.js": "^11.11.1",
-    "marked": "^18.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.0",
-    "vite": "^8.0.8",
-    "vitest": "^4.1.2",
-    "vue": "^3.5.32",
-    "vue-router": "^5.0.4"
+    "vitest": "^4.1.2"
   },
   "license": "MIT",
   "author": "Bendy Zhang",

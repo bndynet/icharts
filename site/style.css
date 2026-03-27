@@ -1,18 +1,3 @@
-/* ── Font stack ────────────────────────────────────────────────────────────── */
-:root {
-  --demo-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-    'Noto Sans SC', 'Helvetica Neue', Arial, sans-serif;
-
-  /* Override Element Plus font family */
-  --el-font-family: var(--demo-font);
-}
-
-/* ── Base reset ─────────────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
 /* ── Light theme ────────────────────────────────────────────────────────────── */
 html {
   color-scheme: light;
@@ -42,7 +27,7 @@ html {
 }
 
 /* ── Dark theme ─────────────────────────────────────────────────────────────── */
-html.dark {
+html[data-theme=dark] {
   color-scheme: dark;
 
   /* Page background: deep navy-slate (much more pleasant than near-black) */
@@ -75,41 +60,9 @@ html.dark {
   --el-menu-hover-bg-color:  #1f2d40;
 }
 
-body {
-  margin: 0;
-  font-family: var(--demo-font);
-  font-size: 14px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  background-color: var(--el-bg-color-page);
-  color: var(--el-text-color-primary);
-}
 
-/* ── Highlight.js dark mode override ───────────────────────────────────────── */
-/* github.css is imported for light; below overrides under html.dark */
-html.dark .hljs {
-  background: var(--el-bg-color);
-  color: #c9d1d9;
+/* override vue-site default styles */
+.site-content-inner {
+  max-width: 1200px;
+  margin: 0 auto;
 }
-html.dark .hljs-comment,
-html.dark .hljs-quote            { color: #8b949e; }
-html.dark .hljs-keyword,
-html.dark .hljs-selector-tag,
-html.dark .hljs-deletion         { color: #ff7b72; }
-html.dark .hljs-string,
-html.dark .hljs-addition,
-html.dark .hljs-attr             { color: #a5d6ff; }
-html.dark .hljs-number,
-html.dark .hljs-literal,
-html.dark .hljs-variable,
-html.dark .hljs-template-variable{ color: #79c0ff; }
-html.dark .hljs-title,
-html.dark .hljs-function         { color: #d2a8ff; }
-html.dark .hljs-type,
-html.dark .hljs-built_in,
-html.dark .hljs-class .hljs-title{ color: #ffa657; }
-html.dark .hljs-symbol,
-html.dark .hljs-bullet,
-html.dark .hljs-link             { color: #79c0ff; }

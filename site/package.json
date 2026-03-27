@@ -1,0 +1,25 @@
+{
+  "name": "icharts-site",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vue-site dev",
+    "build": "vue-site build --base /icharts/",
+    "preview": "vue-site preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "resolutions": {
+    "vue": "^3.5.0",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@bndynet/vue-site": "^0.1.4"
+  },
+  "dependencies": {
+    "element-plus": "^2.13.7"
+  }
+}

@@ -564,7 +564,9 @@ chart.options = { title: 'Performance Score', variant: 'percentage' };
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { createChart, configure, switchTheme } from '@bndynet/icharts'
-import { appTheme } from '../useAppTheme'
+import { useTheme } from '@bndynet/vue-site'
+
+const { theme } = useTheme()
 
 // ── Template refs ────────────────────────────────────────────────────────────
 const chartLineEl         = ref<HTMLElement>()
@@ -812,7 +814,7 @@ onMounted(() => {
   }
 
   // Apply the currently active theme to all freshly created charts.
-  switchTheme(appTheme.value)
+  switchTheme(theme.value)
 })
 
 onUnmounted(() => {
