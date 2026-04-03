@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/bndynet/icharts/compare/v1.1.0...v1.2.0) (2026-04-03)
+
+
+### Features
+
+* web component for chart ([11a5777](https://github.com/bndynet/icharts/commit/11a5777066604a1b1c93fc1c04de4a5932481fef))
+
 # [1.1.0](https://github.com/bndynet/icharts/compare/v1.0.0...v1.1.0) (2025-01-06)
 
 
