@@ -147,6 +147,73 @@ export interface AxisOptions {
   cursorFormat?: string;
 }
 
+/**
+ * Normalized context for {@link TooltipOptions.customHtml} across chart types.
+ * Narrow with `ctx.kind` (`'axis'` | `'item'` | `'edge'`).
+ */
+export interface TooltipContextAxis {
+  kind: 'axis';
+  /**
+   * Same label shown in the tooltip header — formatted with `dateFormat` when
+   * the x-axis is time-based and `dateFormat` is set; otherwise the raw category.
+   */
+  axisValueLabel: string;
+  /** Index along the x-axis for this hover. */
+  dataIndex: number;
+  /** Raw axis value (timestamp number, ISO string, etc.). */
+  rawAxisValue: string | number | undefined;
+  /** One entry per series at this axis position. */
+  series: Array<{
+    name: string;
+    value: number | string;
+    marker?: string;
+  }>;
+}
+
+/** Pie slice, Sankey/Chord node, and other single-item hovers. */
+export interface TooltipContextItem {
+  kind: 'item';
+  dataIndex: number;
+  name: string;
+  value: number | string;
+  /** Pie: ECharts percent of total. */
+  percent?: number;
+  marker?: string;
+}
+
+/** Sankey or Chord link / edge hover. */
+export interface TooltipContextEdge {
+  kind: 'edge';
+  dataIndex: number;
+  source: string;
+  target: string;
+  value: number | string;
+}
+
+export type TooltipContext =
+  | TooltipContextAxis
+  | TooltipContextItem
+  | TooltipContextEdge;
+
+/**
+ * Options for `createAsyncTooltipFormatter` — chart-agnostic async tooltip
+ * built on ECharts’ `(params, ticket, callback)` protocol.
+ */
+export interface CreateAsyncTooltipFormatterOptions {
+  /** Synchronous tooltip body from raw ECharts `params` (axis array or single item). */
+  formatSync: (params: unknown) => string;
+  /**
+   * Returns extra HTML appended below `formatSync` output (after a separator).
+   * Receives the same `params` as ECharts passed to the formatter.
+   */
+  customHtml: (params: unknown) => Promise<string>;
+  /**
+   * Shown while `customHtml` is pending. Plain text; HTML special characters are escaped.
+   * @default 'Loading…'
+   */
+  placeholder?: string;
+}
+
 export interface TooltipOptions {
   enabled?: boolean;
   formatValue?: (value: number | string, name: string) => string;
@@ -159,6 +226,22 @@ export interface TooltipOptions {
    * If omitted, ECharts auto-selects a format based on data granularity.
    */
   dateFormat?: string;
+  /**
+   * Append asynchronously loaded HTML after the chart’s default tooltip body.
+   * Receives a normalized {@link TooltipContext} — use `ctx.kind` to
+   * distinguish axis (`line` / `bar` / `area`), item (`pie`, node in `sankey` /
+   * `chord`), or edge (link in `sankey` / `chord`).
+   *
+   * Not applied to spark charts or when `tooltip.enabled` is false. If
+   * `echarts.tooltip.formatter` is merged later and replaces `formatter`, this
+   * hook has no effect.
+   */
+  customHtml?: (ctx: TooltipContext) => Promise<string>;
+  /**
+   * Shown while `customHtml` is pending.
+   * @default 'Loading…'
+   */
+  placeholder?: string;
 }
 
 export interface SeriesOptions {

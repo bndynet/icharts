@@ -7,6 +7,23 @@ export { IChart } from './core.js';
 // Imperative API
 export { createChart } from './api.js';
 
+// Tooltip helpers (any chart type via echarts.tooltip.formatter)
+export {
+  createAsyncTooltipFormatter,
+  escapeTooltipHtml,
+} from './async-tooltip.js';
+
+export {
+  pieParamsToTooltipContext,
+  sankeyChordParamsToTooltipContext,
+  formatPieTooltipSyncHtml,
+} from './tooltip-context.js';
+
+export {
+  formatAxisTooltipSyncHtml,
+  buildAxisTooltipContext,
+} from './adapters/common.js';
+
 // Adapter registry (extensibility)
 export { registerAdapter, type ChartAdapter, type ChartSetupResult } from './adapters/index.js';
 
@@ -32,6 +49,11 @@ export {
   type GridOptions,
   type AxisOptions,
   type TooltipOptions,
+  type TooltipContext,
+  type TooltipContextAxis,
+  type TooltipContextItem,
+  type TooltipContextEdge,
+  type CreateAsyncTooltipFormatterOptions,
   type PieSliceOptions,
   type ChartVariant,
   type LineVariant,

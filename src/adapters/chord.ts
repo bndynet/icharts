@@ -1,7 +1,21 @@
 import type { ChordData, ChartOptions } from '../types.js';
 import type { ChartSetupResult } from './index.js';
+import { createAsyncTooltipFormatter } from '../async-tooltip.js';
+import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge } from '../utils.js';
 import { buildTitle } from './common.js';
+
+function chordTooltipSyncHtml(params: unknown, options: ChartOptions): string {
+  const fmt = options.tooltip?.formatValue;
+  const pr = params as Record<string, unknown>;
+  if (pr.dataType === 'edge') {
+    const d = pr.data as Record<string, unknown>;
+    const label = `${d.source} → ${d.target}`;
+    const v = fmt ? fmt(d.value as number, label) : d.value;
+    return `${label}: ${v}`;
+  }
+  return `${pr.name}`;
+}
 
 /**
  * Build an ECharts option using the native chord series introduced in v6.
@@ -24,8 +38,6 @@ export function resolveChordOptions(
     }
     return node;
   });
-
-  const fmt = options.tooltip?.formatValue;
 
   const series: Record<string, unknown> = {
     type: 'chord',
@@ -61,22 +73,26 @@ export function resolveChordOptions(
     },
   };
 
+  const tooltip: Record<string, unknown> = {
+    trigger: 'item',
+    confine: true,
+    show: options.tooltip?.enabled !== false,
+  };
+  if (options.tooltip?.customHtml) {
+    const customHtml = options.tooltip.customHtml;
+    tooltip.formatter = createAsyncTooltipFormatter({
+      formatSync: (params) => chordTooltipSyncHtml(params, options),
+      customHtml: (params) =>
+        Promise.resolve(customHtml(sankeyChordParamsToTooltipContext(params))),
+      placeholder: options.tooltip.placeholder,
+    });
+  } else {
+    tooltip.formatter = (params: unknown) => chordTooltipSyncHtml(params, options);
+  }
+
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
-    tooltip: {
-      trigger: 'item',
-      confine: true,
-      show: options.tooltip?.enabled !== false,
-      formatter: (params: Record<string, unknown>) => {
-        if (params['dataType'] === 'edge') {
-          const d = params['data'] as Record<string, unknown>;
-          const label = `${d['source']} → ${d['target']}`;
-          const v = fmt ? fmt(d['value'] as number, label) : d['value'];
-          return `${label}: ${v}`;
-        }
-        return `${params['name']}`;
-      },
-    },
+    tooltip,
     series: [series],
   };
 

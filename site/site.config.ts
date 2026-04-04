@@ -17,6 +17,11 @@ export default defineConfig({
       icon: 'layout-dashboard',
       page: () => import('./views/DashboardView.vue'),
     },
+    {
+      label: 'Tooltip',
+      icon: 'message-square-text',
+      page: () => import('./views/TooltipView.vue'),
+    },
   ],
   env: {
     port: 3000,

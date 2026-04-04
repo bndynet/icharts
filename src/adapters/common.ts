@@ -5,7 +5,10 @@ import type {
   GridOptions,
   AxisOptions,
   XYData,
+  TooltipOptions,
+  TooltipContextAxis,
 } from '../types.js';
+import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { deepMerge } from '../utils.js';
 
 // ---------------------------------------------------------------------------
@@ -237,6 +240,92 @@ export function buildYAxis(options: ChartOptions, count = 1): Record<string, unk
   return axes;
 }
 
+/**
+ * Builds the same HTML as icharts’ default axis tooltip for line/bar/area,
+ * including `formatValue` and time `dateFormat` when applicable.
+ */
+export function formatAxisTooltipSyncHtml(
+  params: unknown,
+  tooltip: TooltipOptions,
+  isTimeAxis: boolean,
+): string {
+  const items = Array.isArray(params) ? params : [params];
+  if (!items.length) return '';
+  const firstItem = items[0] as {
+    axisValue?: number | string;
+    value?: unknown;
+    seriesName?: string;
+    marker?: string;
+  };
+  const rawTs =
+    firstItem.axisValue ??
+    (Array.isArray(firstItem.value) ? (firstItem.value as [unknown, unknown])[0] : undefined);
+
+  let header: string;
+  if (isTimeAxis && tooltip.dateFormat && rawTs !== undefined) {
+    const ts = typeof rawTs === 'number' ? rawTs : Date.parse(String(rawTs));
+    header = !isNaN(ts) ? formatDateByPattern(new Date(ts), tooltip.dateFormat) : String(rawTs ?? '');
+  } else {
+    header = String(firstItem.axisValue ?? '');
+  }
+
+  const rows = items
+    .map((p: unknown) => {
+      const item = p as { marker?: string; seriesName?: string; value?: unknown };
+      const val = Array.isArray(item.value) ? (item.value as [unknown, unknown])[1] : item.value;
+      const displayVal = tooltip.formatValue
+        ? tooltip.formatValue(val as number, item.seriesName ?? '')
+        : val;
+      return `${item.marker ?? ''}${item.seriesName ?? ''}: ${displayVal}`;
+    })
+    .join('<br/>');
+  return `${header}<br/>${rows}`;
+}
+
+export function buildAxisTooltipContext(
+  params: unknown,
+  tooltip: TooltipOptions,
+  isTimeAxis: boolean,
+): TooltipContextAxis {
+  const items = Array.isArray(params) ? params : [params];
+  const first = items[0] as {
+    axisValue?: number | string;
+    value?: unknown;
+    dataIndex?: number;
+  };
+  const rawTs =
+    first.axisValue ??
+    (Array.isArray(first.value) ? (first.value as [unknown, unknown])[0] : undefined);
+
+  let axisValueLabel: string;
+  if (isTimeAxis && tooltip.dateFormat && rawTs !== undefined) {
+    const ts = typeof rawTs === 'number' ? rawTs : Date.parse(String(rawTs));
+    axisValueLabel = !isNaN(ts)
+      ? formatDateByPattern(new Date(ts), tooltip.dateFormat)
+      : String(rawTs ?? '');
+  } else {
+    axisValueLabel = String(first.axisValue ?? '');
+  }
+
+  const series = items.map((p: unknown) => {
+    const item = p as { marker?: string; seriesName?: string; value?: unknown };
+    const val = Array.isArray(item.value) ? (item.value as [unknown, unknown])[1] : item.value;
+    return {
+      name: item.seriesName ?? '',
+      value: val as number | string,
+      marker: item.marker,
+    };
+  });
+
+  return {
+    kind: 'axis',
+    axisValueLabel,
+    dataIndex: first.dataIndex ?? 0,
+    rawAxisValue: first.axisValue,
+    series,
+  };
+}
+
 export function buildTooltip(
   options: ChartOptions,
   trigger: 'axis' | 'item' = 'axis',
@@ -259,6 +348,18 @@ export function buildTooltip(
     result.show = false;
   }
 
+  // Async extra — delegates to chart-agnostic createAsyncTooltipFormatter.
+  if (tooltip.customHtml && trigger === 'axis') {
+    const customHtml = tooltip.customHtml;
+    result.formatter = createAsyncTooltipFormatter({
+      formatSync: (params) => formatAxisTooltipSyncHtml(params, tooltip, isTimeAxis),
+      customHtml: (params) =>
+        Promise.resolve(customHtml(buildAxisTooltipContext(params, tooltip, isTimeAxis))),
+      placeholder: tooltip.placeholder,
+    });
+    return result;
+  }
+
   if (tooltip.formatValue) {
     const fn = tooltip.formatValue;
     result.valueFormatter = (value: number | string) =>
@@ -269,29 +370,7 @@ export function buildTooltip(
   // When dateFormat is provided it is used directly; otherwise ECharts
   // auto-selects a format based on data granularity.
   if (isTimeAxis && tooltip.dateFormat) {
-    const fmt = tooltip.dateFormat;
-    result.formatter = (params: unknown) => {
-      const items = Array.isArray(params) ? params : [params];
-      if (!items.length) return '';
-      const firstItem = items[0] as { axisValue?: number | string; value?: unknown; seriesName?: string; marker?: string };
-      const rawTs = firstItem.axisValue ?? (Array.isArray(firstItem.value) ? (firstItem.value as [unknown, unknown])[0] : undefined);
-      let header = String(rawTs ?? '');
-      if (rawTs !== undefined) {
-        const ts = typeof rawTs === 'number' ? rawTs : Date.parse(String(rawTs));
-        if (!isNaN(ts)) {
-          header = formatDateByPattern(new Date(ts), fmt);
-        }
-      }
-      const rows = items
-        .map((p: unknown) => {
-          const item = p as { marker?: string; seriesName?: string; value?: unknown };
-          const val = Array.isArray(item.value) ? (item.value as [unknown, unknown])[1] : item.value;
-          const displayVal = tooltip.formatValue ? tooltip.formatValue(val as number, item.seriesName ?? '') : val;
-          return `${item.marker ?? ''}${item.seriesName ?? ''}: ${displayVal}`;
-        })
-        .join('<br/>');
-      return `${header}<br/>${rows}`;
-    };
+    result.formatter = (params: unknown) => formatAxisTooltipSyncHtml(params, tooltip, true);
   }
 
   return result;

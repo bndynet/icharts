@@ -1,4 +1,9 @@
 import type { PieData, ChartOptions, PieVariant } from '../types.js';
+import { createAsyncTooltipFormatter } from '../async-tooltip.js';
+import {
+  formatPieTooltipSyncHtml,
+  pieParamsToTooltipContext,
+} from '../tooltip-context.js';
 import { deepMerge } from '../utils.js';
 import { buildTitle, buildLegend, getTitleHeight } from './common.js';
 
@@ -16,13 +21,24 @@ export function resolvePieOptions(
     ? [...data].sort((a, b) => b.value - a.value)
     : data;
 
+  const tooltip: Record<string, unknown> = {
+    trigger: 'item',
+    confine: true,
+  };
+  if (options.tooltip?.customHtml) {
+    const customHtml = options.tooltip.customHtml;
+    tooltip.formatter = createAsyncTooltipFormatter({
+      formatSync: (params) => formatPieTooltipSyncHtml(params, options),
+      customHtml: (params) =>
+        Promise.resolve(customHtml(pieParamsToTooltipContext(params))),
+      placeholder: options.tooltip.placeholder,
+    });
+  }
+
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
     legend: buildLegend(names, { ...options, legend: { ...options.legend, show: showLegend } }),
-    tooltip: {
-      trigger: 'item',
-      confine: true,
-    },
+    tooltip,
     series: buildPieSeries(sorted, options, variant),
   };
 
