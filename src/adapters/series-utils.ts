@@ -32,6 +32,7 @@ export function applyMarkLines(series: Record<string, unknown>, so: SeriesOption
     data: so.markLines.map((type) => ({
       type,
       name: type.charAt(0).toUpperCase() + type.slice(1),
+      label: { position: 'insideEndTop' },
     })),
   };
 }

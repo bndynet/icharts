@@ -17,9 +17,6 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
-    "@bndynet/vue-site": "^0.1.5"
-  },
-  "dependencies": {
-    "element-plus": "^2.13.7"
+    "@bndynet/vue-site": "^0.1.8"
   }
 }

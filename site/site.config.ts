@@ -1,4 +1,3 @@
-import ElementPlus from 'element-plus';
 import { watch } from 'vue';
 
 import { defineConfig, useTheme } from '@bndynet/vue-site';
@@ -36,8 +35,7 @@ export default defineConfig({
   },
   bootstrap: './bootstrap.ts',
   configureApp: async (app) => {
-    // Register global components, directives, plugins, etc. here.
-    app.use(ElementPlus);
+    //TODO: Register global components, directives, plugins, etc. here.
 
     // Dynamically import packages which is in watchPackages.
     const icharts = await import('@bndynet/icharts')

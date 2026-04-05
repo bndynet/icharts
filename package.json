@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@bndynet/color-hub": "^0.1.0",
+    "@bndynet/vue-site": "^0.1.7",
     "echarts": "^6.0.0",
     "lit": "^3.3.1"
   },
