@@ -69,6 +69,11 @@ export {
 // Configuration
 export { configure, type IChartsConfig } from './config.js';
 
+// Color resolver — single entry point for "name → color".
+// Adapters call these directly to obtain colors; the result is then attached
+// to whichever ECharts option field makes sense for the chart type.
+export { resolveColors, resolveColorsForNodes } from './utils.js';
+
 // Theme utilities
 export {
   switchTheme,

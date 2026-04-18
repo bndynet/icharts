@@ -2,8 +2,9 @@ import type { ChordData, ChartOptions } from '../types.js';
 import type { ChartSetupResult } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
-import { deepMerge } from '../utils.js';
+import { deepMerge, resolveColorsForNodes } from '../utils.js';
 import { buildTitle } from './common.js';
+import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
 function chordTooltipSyncHtml(params: unknown, options: ChartOptions): string {
   const fmt = options.tooltip?.formatValue;
@@ -28,16 +29,7 @@ export function resolveChordOptions(
 ): ChartSetupResult {
   const p = options.padding ?? 12;
 
-  const nodes = data.nodes.map((n) => {
-    const node: Record<string, unknown> = { name: n.name };
-    if (n.value !== undefined) node.value = n.value;
-
-    const color = n.color ?? options.colorMap?.[n.name];
-    if (color) {
-      node.itemStyle = { color };
-    }
-    return node;
-  });
+  const nodes = mapGraphNodesForECharts(data.nodes);
 
   const series: Record<string, unknown> = {
     type: 'chord',
@@ -96,7 +88,15 @@ export function resolveChordOptions(
     series: [series],
   };
 
-  return {
-    option: deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>),
-  };
+  const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+
+  const colors = resolveColorsForNodes(data.nodes, options);
+  merged.color = colors;
+  paintGraphNodes(
+    merged,
+    'chord',
+    new Map(data.nodes.map((n, i) => [n.name, colors[i]])),
+  );
+
+  return { option: merged };
 }

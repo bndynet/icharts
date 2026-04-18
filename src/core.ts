@@ -2,7 +2,6 @@ import * as echarts from 'echarts';
 import type { ChartData, ChartOptions, IChartInstance } from './types.js';
 import { resolveEChartsOption } from './adapters/index.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
-import { applyChartColors } from './utils.js';
 import { chartRegistry } from './registry.js';
 
 /**
@@ -73,7 +72,6 @@ export class IChart implements IChartInstance {
       this._data,
       this._options,
     );
-    applyChartColors(this._type, option, this._data, this._options);
     this.ecInstance.setOption(option, true);
     onInit?.(this.ecInstance);
   }

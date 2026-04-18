@@ -1,5 +1,5 @@
 import type { XYData, ChartOptions } from '../types.js';
-import { deepMerge } from '../utils.js';
+import { deepMerge, resolveColors } from '../utils.js';
 import {
   buildTitle,
   buildLegend,
@@ -62,7 +62,9 @@ export function resolveBarOptions(
   const series = buildBarSeries(data, options, isTime, isHorizontal);
   eOption.series = series;
 
-  return deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  merged.color = resolveColors(seriesNames, options);
+  return merged;
 }
 
 // ---------------------------------------------------------------------------

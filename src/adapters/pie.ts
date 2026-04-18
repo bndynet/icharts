@@ -4,7 +4,7 @@ import {
   formatPieTooltipSyncHtml,
   pieParamsToTooltipContext,
 } from '../tooltip-context.js';
-import { deepMerge } from '../utils.js';
+import { deepMerge, resolveColors } from '../utils.js';
 import { buildTitle, buildLegend, getTitleHeight } from './common.js';
 
 const DEFAULT_OUTER_RADIUS = '75%';
@@ -42,7 +42,9 @@ export function resolvePieOptions(
     series: buildPieSeries(sorted, options, variant),
   };
 
-  return deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  merged.color = resolveColors(names, options);
+  return merged;
 }
 
 // ---------------------------------------------------------------------------

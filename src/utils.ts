@@ -1,6 +1,10 @@
-import type { ChartData, ChartOptions, XYData, PieData, SankeyData } from './types.js';
-import { ChartType, isXYData, isPieData, isSankeyData } from './types.js';
-import { resolveSeriesColors, resolveColorsByPosition, syncColorHubTheme, resolveThemeName } from './themes/index.js';
+import type { ChartOptions } from './types.js';
+import {
+  resolveSeriesColors,
+  resolveColorsByPosition,
+  syncColorHubTheme,
+  resolveThemeName,
+} from './themes/index.js';
 import { getConfig } from './config.js';
 
 // ---------------------------------------------------------------------------
@@ -113,55 +117,57 @@ export function buildSparkAreaGradient(hex: string): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Chart data helpers
+// Palette resolution
+// ---------------------------------------------------------------------------
+//
+// Single, central entry point for "given a list of names + chart options,
+// give me the colors to use".  Adapters call this to obtain colors; they
+// are then free to attach the result to whichever ECharts option field
+// makes sense for their chart type.
+//
+// Resolution priority (highest first):
+//   1. options.colors[i]               -- positional override (must cover all names)
+//   2. options.colorMap[name]          -- per-name override
+//   3. configure({ consistentColors }) -- if true, ColorHub by name; else palette[i]
+//   4. fallback '#888888'              -- only inside resolveColorsForNodes
+//
+// `resolveColorsForNodes` adds one extra rule above (1): a node-level
+// `color` field always wins, so per-row data overrides can pin a single
+// node without affecting the rest.
 // ---------------------------------------------------------------------------
 
 /**
- * Extract the ordered list of series names from any ChartData shape.
- * Returns an empty array for data types that have no named series (e.g. GaugeData).
+ * Resolve a color for each name using the active theme, `options.colors`,
+ * `options.colorMap`, and `configure({ consistentColors })`.
+ *
+ * Returns an array of the same length as `names`. Returns an empty array
+ * when `names` is empty (used by chart types without named series, e.g. gauge).
  */
-export function getSeriesNames(data: ChartData): string[] {
-  if (isXYData(data)) return (data as XYData).series.map((s) => s.name);
-  if (isPieData(data)) return (data as PieData).map((d) => d.name);
-  if (isSankeyData(data)) return (data as SankeyData).nodes.map((n) => n.name);
-  return [];
-}
-
-// ---------------------------------------------------------------------------
-// ECharts option post-processing
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve and apply series colors to a built ECharts option object.
- * Automatically syncs ColorHub to the active theme so callers never need
- * to call switchTheme() manually.
- * For spark area charts, also injects a vertical opacity gradient into each
- * series' areaStyle so the fill adapts to the assigned series color automatically.
- */
-export function applyChartColors(
-  type: string,
-  eOption: Record<string, unknown>,
-  data: ChartData,
+export function resolveColors(
+  names: ReadonlyArray<string>,
   options: ChartOptions,
-): void {
+): string[] {
+  if (names.length === 0) return [];
   syncColorHubTheme(resolveThemeName(options.theme));
-
-  const names = getSeriesNames(data);
-  if (names.length === 0) return;
-
   const resolve = getConfig().consistentColors
     ? resolveSeriesColors
     : resolveColorsByPosition;
-  const colors = resolve(names, options.colors, options.colorMap);
-  eOption.color = colors;
+  return resolve(names as string[], options.colors, options.colorMap);
+}
 
-  if (type === ChartType.Area && options.variant === 'spark') {
-    const series = eOption.series as Record<string, unknown>[] | undefined;
-    if (Array.isArray(series)) {
-      series.forEach((s, i) => {
-        const hex = colors[i] ?? colors[0];
-        if (hex) s.areaStyle = { color: buildSparkAreaGradient(hex) };
-      });
-    }
-  }
+/**
+ * Resolve colors for graph nodes (sankey, chord, or any custom graph type).
+ * Honors `node.color` first, then falls through to the same rules as
+ * {@link resolveColors}. Always returns a non-empty hex string per node
+ * (`'#888888'` as the final fallback when the palette is empty).
+ */
+export function resolveColorsForNodes(
+  nodes: ReadonlyArray<{ name: string; color?: string }>,
+  options: ChartOptions,
+): string[] {
+  const names = nodes.map((n) => n.name);
+  const palette = resolveColors(names, options);
+  return nodes.map(
+    (node, i) => node.color ?? palette[i] ?? palette[0] ?? '#888888',
+  );
 }

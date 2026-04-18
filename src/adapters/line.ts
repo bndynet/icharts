@@ -1,5 +1,5 @@
 import type { XYData, ChartOptions } from '../types.js';
-import { deepMerge } from '../utils.js';
+import { buildSparkAreaGradient, deepMerge, resolveColors } from '../utils.js';
 import {
   buildTitle,
   buildLegend,
@@ -40,7 +40,9 @@ export function resolveLineOptions(
     series: buildLineSeries(data, options, isTime, false),
   };
 
-  return deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  merged.color = resolveColors(seriesNames, options);
+  return merged;
 }
 
 export function resolveAreaOptions(
@@ -72,7 +74,30 @@ export function resolveAreaOptions(
     series: buildLineSeries(data, options, isTime, true),
   };
 
-  return deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  const colors = resolveColors(seriesNames, options);
+  merged.color = colors;
+
+  // Spark area fill is a per-series gradient derived from each series color;
+  // the gradient lives on the series, so we apply it after merge to ensure
+  // user-provided `echarts.series` (if any) still receives the fill.
+  if (isSpark) {
+    applySparkAreaGradient(merged, colors);
+  }
+
+  return merged;
+}
+
+function applySparkAreaGradient(
+  option: Record<string, unknown>,
+  colors: ReadonlyArray<string>,
+): void {
+  const series = option.series as Record<string, unknown>[] | undefined;
+  if (!Array.isArray(series)) return;
+  series.forEach((s, i) => {
+    const hex = colors[i] ?? colors[0];
+    if (hex) s.areaStyle = { color: buildSparkAreaGradient(hex) };
+  });
 }
 
 // ---------------------------------------------------------------------------

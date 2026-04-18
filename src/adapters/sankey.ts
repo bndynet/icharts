@@ -1,8 +1,9 @@
 import type { SankeyData, ChartOptions, SankeyVariant } from '../types.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
-import { deepMerge } from '../utils.js';
+import { deepMerge, resolveColorsForNodes } from '../utils.js';
 import { buildTitle, getTitleHeight } from './common.js';
+import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
 function sankeyTooltipSyncHtml(params: unknown, options: ChartOptions): string {
   const fmt = options.tooltip?.formatValue;
@@ -34,17 +35,9 @@ export function resolveSankeyOptions(
   const withOutgoing =
     orient === 'horizontal' ? namesWithoutOutgoingLinks(data.links) : null;
 
-  const nodes = data.nodes.map((node) => {
-    const n: Record<string, unknown> = { name: node.name };
-    const color = node.color ?? options.colorMap?.[node.name];
-    if (color) {
-      n.itemStyle = { color };
-    }
-    if (withOutgoing && !withOutgoing.has(node.name)) {
-      n.label = { position: 'left' };
-    }
-    return n;
-  });
+  const nodes = mapGraphNodesForECharts(data.nodes, (node) =>
+    withOutgoing && !withOutgoing.has(node.name) ? { label: { position: 'left' } } : {},
+  );
 
   const p = options.padding ?? 12;
   const titleOffset = getTitleHeight(options);
@@ -96,5 +89,15 @@ export function resolveSankeyOptions(
     series: [series],
   };
 
-  return deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+  const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
+
+  const colors = resolveColorsForNodes(data.nodes, options);
+  merged.color = colors;
+  paintGraphNodes(
+    merged,
+    'sankey',
+    new Map(data.nodes.map((n, i) => [n.name, colors[i]])),
+  );
+
+  return merged;
 }
