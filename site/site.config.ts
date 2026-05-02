@@ -17,6 +17,11 @@ export default defineConfig({
       page: () => import('./views/DashboardView.vue'),
     },
     {
+      label: 'Dynamic Data',
+      icon: 'activity',
+      page: () => import('./views/DynamicDataView.vue'),
+    },
+    {
       label: 'Tooltip',
       icon: 'message-square-text',
       page: () => import('./views/TooltipView.vue'),

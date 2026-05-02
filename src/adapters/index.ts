@@ -4,13 +4,20 @@ import type { ChartData, ChartOptions } from '../types.js';
 /**
  * Result returned by an adapter's resolve method.
  *
- * `option`  -- full ECharts option ready for setOption().
- * `onInit`  -- optional hook called once after the instance is initialised
- *              and setOption() has been called (e.g. for event listeners).
+ * `option`    -- full ECharts option ready for setOption().
+ * `onInit`    -- optional hook called once after the instance is initialised
+ *                and setOption() has been called (e.g. for event listeners).
+ * `notMerge`  -- forwarded to ECharts `setOption(option, notMerge)`. Defaults
+ *                to `true` (full replace). Adapters that depend on cross-call
+ *                state transitions (e.g. bar `race` needs ECharts to animate
+ *                value/position changes between successive `chart.update()`
+ *                calls) set this to `false` so ECharts merges with the
+ *                previous option instead of replacing it.
  */
 export interface ChartSetupResult {
   option: Record<string, unknown>;
   onInit?: (instance: echarts.ECharts) => void;
+  notMerge?: boolean;
 }
 
 /**
@@ -89,9 +96,7 @@ registerAdapter(ChartType.Area, {
 
 registerAdapter(ChartType.Bar, {
   validate: isXYData,
-  resolve: (data, options) => ({
-    option: resolveBarOptions(data as XYData, options),
-  }),
+  resolve: (data, options) => resolveBarOptions(data as XYData, options),
 });
 
 registerAdapter(ChartType.Pie, {

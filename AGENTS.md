@@ -67,7 +67,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Architecture rules
 
-1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit? }`). Do not call `echarts.init` inside adapters.
+1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace.
 2. **Reuse shared builders** — `src/adapters/common.ts` provides `buildTitle`, `buildLegend`, `buildGrid`, `buildXAxis`, `buildYAxis`, `buildTooltip`, etc. XY charts should use `src/adapters/series-utils.ts` for per-series options, mark lines/points, and y-axis index handling. Do **not** call `getCommonDefaults()` unless it is wired into the adapter pipeline (currently unused by built-in adapters).
 3. **Merge user overrides, then apply the resolved palette** — end adapter functions with:
    ```ts
@@ -174,16 +174,17 @@ Use this checklist. Do **not** skip steps.
 - [ ] Build the option *without* any color literals or theme lookups — call `resolveColors` / `resolveColorsForNodes` for that.
 - [ ] End with: `deepMerge(eOption, options.echarts ?? {})` → assign `merged.color = resolveColors(names, options)` → (graph types only) `paintGraphNodes(merged, '<seriesType>', nameToColor)` → return `merged`.
 
-**Optional `onInit` hook:**
+**Optional `onInit` hook / `notMerge` flag:**
 
 ```ts
 import type { ChartSetupResult } from './index.js';
 
 export function resolveXxxOptions(data: XxxData, options: ChartOptions): ChartSetupResult {
-  return {
-    option: { /* ... */ },
-    onInit: (instance) => { /* event listeners */ },
-  };
+ return {
+ option: { /* ... */ },
+ onInit: (instance) => { /* event listeners */ },
+ notMerge: false, // optional — set to false when ECharts needs to animate state across successive setOption calls
+ };
 }
 ```
 
@@ -196,6 +197,10 @@ Reference implementations:
 | Item tooltips + variants | `src/adapters/pie.ts` |
 | Graph nodes/links | `src/adapters/sankey.ts`, `src/adapters/chord.ts` |
 | Single-metric | `src/adapters/gauge.ts` |
+| Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` (`race` branch) |
+| Chart-type options namespace (`options.bar`, `options.race`) | `src/types.ts` (`BarOptions`, `BarRaceOptions`) |
+
+**Chart-type options namespaces.** When an adapter has more than a couple of dedicated knobs, group them under a typed namespace on `ChartOptions` instead of polluting the root. The bar adapter follows this with `options.bar: BarOptions` (sizing + `colorByCategory`) and `options.race: BarRaceOptions` (race-only `topN` / `frameDuration` / `showValueLabel`). Existing single-field knobs like `options.gaugeWidth` and `options.innerRadius` predate this convention; new options should prefer the namespaced pattern.
 
 ### 3. Colors (`src/utils.ts` + `src/adapters/graph-colors.ts` for graph types)
 

@@ -214,6 +214,32 @@
         </details>
       </el-card>
 
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Distinct Colors per Category</span>
+            <el-tag type="info" size="small" effect="plain">bar.colorByCategory</el-tag>
+          </div>
+        </template>
+        <div ref="chartColorByCategoryEl" class="chart-box"></div>
+        <details>
+          <summary>Show code</summary>
+          <pre v-pre class="code-block">createChart(el, 'bar', {
+  categories: ['Chrome', 'Firefox', 'Safari', 'Edge'],
+  series: [{ name: 'Share', data: [65, 15, 12, 8] }],
+}, {
+  title: 'Browser Share',
+  bar: { colorByCategory: true },
+  colorMap: {
+    Chrome:  '#4285F4',
+    Firefox: '#FF7139',
+    Safari:  '#1B88CA',
+    Edge:    '#0078D7',
+  },
+});</pre>
+        </details>
+      </el-card>
+
     </div>
 
     <!-- ── PIE ─────────────────────────────────────────────────── -->
@@ -580,6 +606,7 @@ const chartTimeTsEl       = ref<HTMLElement>()
 const chartBarEl          = ref<HTMLElement>()
 const chartStackedBarEl   = ref<HTMLElement>()
 const chartHbarEl         = ref<HTMLElement>()
+const chartColorByCategoryEl = ref<HTMLElement>()
 const chartPieEl          = ref<HTMLElement>()
 const chartDoughnutEl     = ref<HTMLElement>()
 const chartRoseEl         = ref<HTMLElement>()
@@ -766,6 +793,19 @@ onMounted(() => {
   createChart(chartBarEl.value!, 'bar', barData, { title: 'Quarterly Sales' })
   createChart(chartStackedBarEl.value!, 'bar', barData, { stacked: true, title: 'Stacked Revenue' })
   createChart(chartHbarEl.value!, 'bar', hbarData, { variant: 'horizontal', title: 'Browser Share' })
+  createChart(chartColorByCategoryEl.value!, 'bar', {
+    categories: ['Chrome', 'Firefox', 'Safari', 'Edge'],
+    series: [{ name: 'Share', data: [65, 15, 12, 8] }],
+  }, {
+    title: 'Browser Share',
+    bar: { colorByCategory: true },
+    colorMap: {
+      Chrome:  '#4285F4',
+      Firefox: '#FF7139',
+      Safari:  '#1B88CA',
+      Edge:    '#0078D7',
+    },
+  })
   createChart(chartPieEl.value!, 'pie', pieData, { title: 'Browser Market Share' })
   createChart(chartDoughnutEl.value!, 'pie', pieData, {
     title: 'Browser Market Share',

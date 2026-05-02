@@ -55,6 +55,8 @@ export {
   type TooltipContextEdge,
   type CreateAsyncTooltipFormatterOptions,
   type PieSliceOptions,
+  type BarOptions,
+  type BarRaceOptions,
   type ChartVariant,
   type LineVariant,
   type BarVariant,

@@ -67,12 +67,12 @@ export class IChart implements IChartInstance {
   }
 
   private _apply(): void {
-    const { option, onInit } = resolveEChartsOption(
+    const { option, onInit, notMerge } = resolveEChartsOption(
       this._type,
       this._data,
       this._options,
     );
-    this.ecInstance.setOption(option, true);
+    this.ecInstance.setOption(option, notMerge ?? true);
     onInit?.(this.ecInstance);
   }
 }

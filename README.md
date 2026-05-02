@@ -78,7 +78,7 @@ chart.dispose();
 | Type   | `type` value | Variants |
 |--------|-------------|----------|
 | Line   | `line`   | `default`, `spark` |
-| Bar    | `bar`    | `default`, `horizontal`, `spark` |
+| Bar    | `bar`    | `default`, `horizontal`, `spark`, `race` |
 | Area   | `area`   | `default`, `spark` |
 | Pie    | `pie`    | `default`, `doughnut`, `half-doughnut`, `nightingale` |
 | Gauge  | `gauge`  | `default`, `percentage` |
@@ -160,6 +160,27 @@ Each node accepts optional `color` and `value` fields. When `value` is omitted, 
 
 ## Common Examples
 
+### Bar with Distinct Colors per Category
+
+Single-series bar chart where each bar gets its own palette color (resolved from the category name via `colorMap` → theme palette → `consistentColors`, exactly like every other "name → color" lookup in the library). The legend is auto-hidden because the series marker would conflict with the per-bar colors drawn on the plot.
+
+```ts
+createChart(el, 'bar', {
+  categories: ['Chrome', 'Firefox', 'Safari', 'Edge'],
+  series: [{ name: 'Share', data: [65, 15, 12, 8] }],
+}, {
+  bar: { colorByCategory: true },
+  colorMap: {
+    Chrome:  '#4285F4',
+    Firefox: '#FF7139',
+    Safari:  '#1B88CA',
+    Edge:    '#0078D7',
+  },
+});
+```
+
+Silently falls back to a single series color when `stacked: true` or when the chart has more than one series — per-category colors only make visual sense for single-series bars.
+
 ### Stacked Bar
 
 ```ts
@@ -226,6 +247,60 @@ createChart(el, 'line', {
 ```
 
 Supported time formats: `YYYY-MM-DD`, `YYYY/MM/DD`, `YYYY-MM-DD HH:mm`, ISO 8601, Unix timestamps (ms or s).
+
+### Bar Race (Dynamic Sorting Bar Chart)
+
+`variant: 'race'` renders one ranked snapshot per call. You drive the animation by calling `chart.update(nextFrame)` on your own interval — the library handles the smooth value/position transitions in between.
+
+```ts
+const racers = ['USA', 'China', 'India', 'Brazil', 'Japan'];
+
+function frameFor(year: number) {
+  return {
+    categories: racers,                       // stable across frames — defines bar identity
+    series: [{
+      name: 'Population (M)',
+      data: populationLookup[year],           // current values, unsorted
+    }],
+  };
+}
+
+const chart = createChart(el, 'bar', frameFor(1950), {
+  variant: 'race',
+  race: { topN: 10, frameDuration: 1000 },
+  title: 'Population — 1950',
+});
+
+let year = 1950;
+const timer = setInterval(() => {
+  year++;
+  if (year > 2023) { clearInterval(timer); return; }
+  chart.update(frameFor(year), { title: `Population — ${year}` });
+}, 1000);
+```
+
+Rules for the data you feed each frame:
+
+- `categories` defines the racer set — keep its **order and contents stable** across frames. ECharts uses the index to match bars between frames, so any reorder will scramble the animation.
+- Do **not** pre-sort. `realtimeSort: true` is on by default; just supply raw values for each racer in their registered order.
+- For racers that are absent in a given frame, use `0` (or `null`) rather than removing them from `categories`.
+- Use only `series[0]` — bar race shows a single ranked metric. Additional series are ignored.
+- Match your `setInterval` cadence to `race.frameDuration` (default 3000 ms) so the previous frame's animation finishes before the next one starts.
+
+Race-specific options live under `race`:
+
+```ts
+{
+  variant: 'race',
+  race: {
+    topN?: number;            // visible bars (omit to show all); maps to yAxis.max = topN - 1
+    frameDuration?: number;   // ms between frames (default: 3000)
+    showValueLabel?: boolean; // animated value label at bar end (default: true)
+  },
+}
+```
+
+Add `bar: { colorByCategory: true }` to give every racer its own color (matches the look of the official ECharts country-race demo). The library auto-hides the legend in that mode.
 
 ### Sankey Chart
 
@@ -328,6 +403,23 @@ All options are optional.
 
   // Gauge
   gaugeWidth?: number;
+
+  // Bar (all variants)
+  bar?: {
+    barWidth?: number | string;       // bar thickness, e.g. 24 or '60%'
+    barMaxWidth?: number | string;    // cap on bar thickness
+    barMinWidth?: number | string;    // floor on bar thickness
+    barGap?: number | string;         // gap between bars of different series, default: '30%'
+    barCategoryGap?: number | string; // gap between bar groups, default: '20%'
+    colorByCategory?: boolean;        // color each bar by category name (auto-hides legend)
+  };
+
+  // Bar race (variant: 'race')
+  race?: {
+    topN?: number;            // visible bars; maps to yAxis.max = topN - 1
+    frameDuration?: number;   // ms between frames, default: 3000
+    showValueLabel?: boolean; // animated value label at bar end, default: true
+  };
 
   // Tooltip
   tooltip?: {
