@@ -121,9 +121,17 @@ export function buildLegend(
   };
 }
 
-export function buildGrid(options: XYChartOptions): Record<string, unknown> {
+export interface BuildGridOverrides {
+  /** When the adapter hides the legend (e.g. bar `colorByCategory`), pass `false` so grid padding matches. */
+  legendShow?: boolean;
+}
+
+export function buildGrid(
+  options: XYChartOptions,
+  overrides?: BuildGridOverrides,
+): Record<string, unknown> {
   const grid: GridOptions = options.grid ?? {};
-  const legendArea = getLegendGridAdjustment(options);
+  const legendArea = getLegendGridAdjustment(options, overrides?.legendShow);
   const titleHeight = getTitleHeight(options);
   const p = getChartPadding(options);
   return deepMerge(
@@ -143,9 +151,13 @@ export function buildGrid(options: XYChartOptions): Record<string, unknown> {
 // Space reserved in the grid for the legend component (legend height + gap to plot area).
 const LEGEND_RESERVE = 36;
 
-function getLegendGridAdjustment(options: XYChartOptions): Record<string, unknown> {
+function getLegendGridAdjustment(
+  options: XYChartOptions,
+  legendShow?: boolean,
+): Record<string, unknown> {
   const legend = options.legend ?? {};
-  if (legend.show === false) return {};
+  const show = legendShow ?? legend.show ?? true;
+  if (!show) return {};
 
   const pos = legend.position ?? 'bottom';
   const p = getChartPadding(options);

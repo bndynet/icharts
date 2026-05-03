@@ -5,10 +5,43 @@ export type BarVariant = 'default' | 'horizontal' | 'spark' | 'race';
 export type BarData = XYData;
 
 /**
- * Bar-chart-specific options. Lives at `BarChartOptions.bar`.
- * Applies to all bar variants (`default`, `horizontal`, `spark`, `race`).
+ * Options for the bar `race` variant.
+ *
+ * Kept as a separate named type — not flattened — because these fields only
+ * apply when `variant === 'race'`. Bar chart's own general options (sizing,
+ * `colorByCategory`) live flat on {@link BarChartOptions}.
+ *
+ * The library renders a single frame per call; the consumer drives the
+ * animation by calling `chart.update(nextFrame)` on their own interval.
+ * Each frame is a regular {@link BarData} whose `categories` (racer names)
+ * must stay stable across frames — only `series[0].data` (values) changes.
  */
-export interface BarOptions {
+export interface BarRaceOptions {
+  /**
+   * Show only the top N racers. Maps to `yAxis.max = topN - 1`.
+   * Omit to show every racer in the dataset.
+   */
+  topN?: number;
+  /**
+   * Transition duration (ms) between consecutive frames. Should match the
+   * interval at which the consumer calls `chart.update(frame)`.
+   * Default: 3000.
+   */
+  frameDuration?: number;
+  /**
+   * Show an animated value label at the end of each bar. Default: true.
+   */
+  showValueLabel?: boolean;
+}
+
+export interface BarChartOptions extends XYChartOptions {
+  variant?: BarVariant;
+
+  // ---------------------------------------------------------------------------
+  // Bar chart's own general options — flat on the subtype because the field
+  // names already carry the `bar` prefix and the values apply to every variant.
+  // ---------------------------------------------------------------------------
+
   /** Bar thickness, e.g. `24` or `'60%'`. Maps to ECharts `series.barWidth`. */
   barWidth?: number | string;
   /** Cap on bar thickness. Maps to ECharts `series.barMaxWidth`. */
@@ -38,43 +71,10 @@ export interface BarOptions {
    * ignored when `stacked: true` or when the chart has more than one series.
    */
   colorByCategory?: boolean;
-}
 
-/**
- * Options for the bar `race` variant.
- *
- * The library renders a single frame per call; the consumer drives the
- * animation by calling `chart.update(nextFrame)` on their own interval.
- * Each frame is a regular {@link BarData} whose `categories` (racer names)
- * must stay stable across frames — only `series[0].data` (values) changes.
- */
-export interface BarRaceOptions {
-  /**
-   * Show only the top N racers. Maps to `yAxis.max = topN - 1`.
-   * Omit to show every racer in the dataset.
-   */
-  topN?: number;
-  /**
-   * Transition duration (ms) between consecutive frames. Should match the
-   * interval at which the consumer calls `chart.update(frame)`.
-   * Default: 3000.
-   */
-  frameDuration?: number;
-  /**
-   * Show an animated value label at the end of each bar. Default: true.
-   */
-  showValueLabel?: boolean;
-}
-
-export interface BarChartOptions extends XYChartOptions {
-  variant?: BarVariant;
-  /**
-   * Bar-chart-specific options (sizing + per-bar coloring). Applies to all
-   * bar variants. See {@link BarOptions}.
-   */
-  bar?: BarOptions;
   /**
    * Bar `race` variant options. Only consulted when `variant === 'race'`.
+   * Kept as a sub-object because the fields are variant-specific.
    * See {@link BarRaceOptions}.
    */
   race?: BarRaceOptions;

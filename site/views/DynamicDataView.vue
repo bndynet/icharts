@@ -57,7 +57,7 @@ function frameFor(year: number) {
 const chart = createChart(el, 'bar', frameFor(1960), {
   variant: 'race',
   race: { topN: 10, frameDuration: 500 },
-  bar: { colorByCategory: true },  // distinct color per racer (legend auto-hides)
+  colorByCategory: true,  // distinct color per racer (legend auto-hides)
   title: 'Population by Country — 1960',
 });
 
@@ -203,7 +203,7 @@ onMounted(() => {
   chart = createChart(chartRaceEl.value!, 'bar', frameFor(START_YEAR), {
     variant: 'race',
     race: { topN, frameDuration: FRAME_MS },
-    bar: { colorByCategory: true },
+    colorByCategory: true,
     title: titleFor(START_YEAR),
   });
 

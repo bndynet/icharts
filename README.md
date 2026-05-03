@@ -171,7 +171,7 @@ createChart(el, 'bar', {
   categories: ['Chrome', 'Firefox', 'Safari', 'Edge'],
   series: [{ name: 'Share', data: [65, 15, 12, 8] }],
 }, {
-  bar: { colorByCategory: true },
+  colorByCategory: true,
   colorMap: {
     Chrome:  '#4285F4',
     Firefox: '#FF7139',
@@ -302,7 +302,7 @@ Race-specific options live under `race`:
 }
 ```
 
-Add `bar: { colorByCategory: true }` to give every racer its own color (matches the look of the official ECharts country-race demo). The library auto-hides the legend in that mode.
+Add `colorByCategory: true` to give every racer its own color (matches the look of the official ECharts country-race demo). The library auto-hides the legend in that mode.
 
 ### Sankey Chart
 
@@ -389,21 +389,35 @@ Each chart type has its own options interface that extends the base `ChartOption
   colors?: string[];                 // override color palette
   colorMap?: Record<string, string>; // pin series/node names to specific colors
 
-  // Layout
-  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
-  grid?: { top?: number; right?: number; bottom?: number; left?: number };
-
   // Tooltip
   tooltip?: {
     enabled?: boolean;
+    /** Format the tooltip header when using a time x-axis (line/bar/area). */
     dateFormat?: string;
+    /** Format each rendered value (axis-mode, pie slice, sankey/chord node/edge). */
     formatValue?: (value: number | string, name: string) => string;
+    /**
+     * Append asynchronously loaded HTML below the chart's default tooltip body.
+     * Receives a normalized TooltipContext — narrow with `ctx.kind`:
+     *   - 'axis' for line / bar / area
+     *   - 'item' for pie slice, sankey/chord node
+     *   - 'edge' for sankey/chord link
+     * Not applied to spark variants or when `tooltip.enabled === false`.
+     */
+    customHtml?: (ctx: TooltipContext) => Promise<string>;
+    /** Shown while `customHtml` is pending. Default: 'Loading…' */
+    placeholder?: string;
   };
 
   // Advanced passthrough — for anything not covered above
   echarts?: Record<string, unknown>;
 }
 ```
+
+> `legend` and `grid` are intentionally **not** on the base — only chart types
+> that actually render them expose the field. `legend` lives on `XYChartOptions`
+> and `PieChartOptions`; `grid` lives on `XYChartOptions`. Gauge, sankey, and
+> chord render neither.
 
 ### `XYChartOptions` (shared by line / bar / area, extends `ChartOptions`)
 
@@ -452,17 +466,15 @@ Each chart type has its own options interface that extends the base `ChartOption
 {
   variant?: 'default' | 'horizontal' | 'spark' | 'race';
 
-  // Bar sizing + per-bar coloring (all variants)
-  bar?: {
-    barWidth?: number | string;       // bar thickness, e.g. 24 or '60%'
-    barMaxWidth?: number | string;    // cap on bar thickness
-    barMinWidth?: number | string;    // floor on bar thickness
-    barGap?: number | string;         // gap between bars of different series, default: '30%'
-    barCategoryGap?: number | string; // gap between bar groups, default: '20%'
-    colorByCategory?: boolean;        // color each bar by category name (auto-hides legend)
-  };
+  // Bar sizing + per-bar coloring — apply to every variant, flat on the subtype.
+  barWidth?: number | string;       // bar thickness, e.g. 24 or '60%'
+  barMaxWidth?: number | string;    // cap on bar thickness
+  barMinWidth?: number | string;    // floor on bar thickness
+  barGap?: number | string;         // gap between bars of different series, default: '30%'
+  barCategoryGap?: number | string; // gap between bar groups, default: '20%'
+  colorByCategory?: boolean;        // color each bar by category name (auto-hides legend)
 
-  // Bar race (variant: 'race')
+  // Variant-specific sub-namespace — only consulted when `variant === 'race'`.
   race?: {
     topN?: number;            // visible bars; maps to yAxis.max = topN - 1
     frameDuration?: number;   // ms between frames, default: 3000
@@ -487,11 +499,15 @@ Each chart type has its own options interface that extends the base `ChartOption
   innerRadius?: string | number;
   outerRadius?: string | number;
   autoSort?: boolean;                 // default: true (sort slices by value desc)
-  slice?: {
-    borderRadius?: number;
-    borderColor?: string;
-    gap?: number;                     // gap between slices in px
-  };
+
+  // Slice styling — flat on the subtype, `slice` prefix disambiguates the
+  // otherwise-generic field names at the top level.
+  sliceBorderRadius?: number;
+  sliceBorderColor?: string;
+  sliceGap?: number;                  // gap between slices, in degrees
+
+  // Pie is the only non-XY chart that renders a legend.
+  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
 }
 ```
 

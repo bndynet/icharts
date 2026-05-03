@@ -218,7 +218,7 @@
         <template #header>
           <div class="card-head">
             <span>Distinct Colors per Category</span>
-            <el-tag type="info" size="small" effect="plain">bar.colorByCategory</el-tag>
+            <el-tag type="info" size="small" effect="plain">colorByCategory</el-tag>
           </div>
         </template>
         <div ref="chartColorByCategoryEl" class="chart-box"></div>
@@ -229,7 +229,7 @@
   series: [{ name: 'Share', data: [65, 15, 12, 8] }],
 }, {
   title: 'Browser Share',
-  bar: { colorByCategory: true },
+  colorByCategory: true,
   colorMap: {
     Chrome:  '#4285F4',
     Firefox: '#FF7139',
@@ -798,7 +798,7 @@ onMounted(() => {
     series: [{ name: 'Share', data: [65, 15, 12, 8] }],
   }, {
     title: 'Browser Share',
-    bar: { colorByCategory: true },
+    colorByCategory: true,
     colorMap: {
       Chrome:  '#4285F4',
       Firefox: '#FF7139',

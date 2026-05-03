@@ -31,18 +31,20 @@ export function resolveBarOptions(
   // elsewhere). It only makes visual sense for a single-series, non-stacked
   // chart — silently ignore otherwise.
   const enableColorByCategory =
-    options.bar?.colorByCategory === true &&
+    options.colorByCategory === true &&
     !options.stacked &&
     data.series.length === 1;
 
   const baseLegend = isSpark ? { show: false } : buildLegend(seriesNames, options);
+  const legendVisible =
+    !isSpark && !enableColorByCategory && (options.legend?.show ?? true);
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
     legend: enableColorByCategory ? { show: false } : baseLegend,
     grid: isSpark
       ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
-      : buildGrid(options),
+      : buildGrid(options, { legendShow: legendVisible }),
     tooltip: isSpark
       ? { show: true, trigger: 'axis', axisPointer: { type: 'none' } }
       : buildTooltip(options, 'axis', 'shadow', isTime),
@@ -122,13 +124,14 @@ function resolveBarRaceOptions(
   // Race is always single-series, so no extra guards needed beyond reading
   // the flag — the stacked / multi-series checks from the non-race path
   // don't apply here.
-  const enableColorByCategory = options.bar?.colorByCategory === true;
+  const enableColorByCategory = options.colorByCategory === true;
+  const legendVisible = !enableColorByCategory && (options.legend?.show ?? true);
 
   // Race labels sit *outside* the right end of each bar (position: 'right' +
   // valueAnimation). The default grid only reserves `padding` (≈12px) on the
   // right which clips the digits. Reserve label headroom unless the user has
   // explicitly set `grid.right` themselves.
-  const grid = buildGrid(options);
+  const grid = buildGrid(options, { legendShow: legendVisible });
   if (options.grid?.right === undefined) {
     grid.right = RACE_LABEL_HEADROOM;
   }
@@ -255,7 +258,7 @@ function buildBarSeries(
 }
 
 /**
- * Propagates the sizing fields from {@link BarChartOptions.bar} into a single
+ * Propagates the bar-sizing fields from {@link BarChartOptions} into a single
  * ECharts series object. Shared by every bar variant (default, horizontal,
  * spark, race) so authors get a consistent API.
  */
@@ -263,13 +266,11 @@ function applyBarOptionsSizing(
   series: Record<string, unknown>,
   options: BarChartOptions,
 ): void {
-  const bar = options.bar;
-  if (!bar) return;
-  if (bar.barWidth !== undefined) series.barWidth = bar.barWidth;
-  if (bar.barMaxWidth !== undefined) series.barMaxWidth = bar.barMaxWidth;
-  if (bar.barMinWidth !== undefined) series.barMinWidth = bar.barMinWidth;
-  if (bar.barGap !== undefined) series.barGap = bar.barGap;
-  if (bar.barCategoryGap !== undefined) series.barCategoryGap = bar.barCategoryGap;
+  if (options.barWidth !== undefined) series.barWidth = options.barWidth;
+  if (options.barMaxWidth !== undefined) series.barMaxWidth = options.barMaxWidth;
+  if (options.barMinWidth !== undefined) series.barMinWidth = options.barMinWidth;
+  if (options.barGap !== undefined) series.barGap = options.barGap;
+  if (options.barCategoryGap !== undefined) series.barCategoryGap = options.barCategoryGap;
 }
 
 function applyNonStackedRadius(

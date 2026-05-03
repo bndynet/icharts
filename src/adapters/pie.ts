@@ -81,16 +81,13 @@ function buildPieSeries(
 }
 
 function applySliceStyle(series: Record<string, unknown>, options: PieChartOptions): void {
-  const slice = options.slice;
-  if (!slice) return;
-
-  if (slice.gap !== undefined) {
-    series.padAngle = slice.gap;
+  if (options.sliceGap !== undefined) {
+    series.padAngle = options.sliceGap;
   }
 
   const itemStyle: Record<string, unknown> = {};
-  if (slice.borderRadius !== undefined) itemStyle.borderRadius = slice.borderRadius;
-  if (slice.borderColor !== undefined) itemStyle.borderColor = slice.borderColor;
+  if (options.sliceBorderRadius !== undefined) itemStyle.borderRadius = options.sliceBorderRadius;
+  if (options.sliceBorderColor !== undefined) itemStyle.borderColor = options.sliceBorderColor;
   if (Object.keys(itemStyle).length > 0) {
     series.itemStyle = itemStyle;
   }

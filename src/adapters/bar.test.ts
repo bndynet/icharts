@@ -18,6 +18,17 @@ const singleSeriesData: XYData = {
 
 describe('bar adapter', () => {
   describe('default variant', () => {
+    it('reserves bottom grid space only when the legend is shown', () => {
+      const hidden = resolveBarOptions(singleSeriesData, {
+        legend: { show: false },
+      }).option.grid as Record<string, unknown>;
+      const shown = resolveBarOptions(singleSeriesData, {
+        legend: { show: true, position: 'bottom' },
+      }).option.grid as Record<string, unknown>;
+      expect(hidden.bottom).toBe(12);
+      expect(shown.bottom).toBe(48);
+    });
+
     it('returns a ChartSetupResult with notMerge undefined', () => {
       const result = resolveBarOptions(
         { categories: ['Q1', 'Q2'], series: [{ name: 'Sales', data: [10, 20] }] },
@@ -28,10 +39,12 @@ describe('bar adapter', () => {
     });
   });
 
-  describe('BarOptions sizing', () => {
+  describe('bar sizing options', () => {
     it('propagates barWidth / barMaxWidth / barMinWidth to each series', () => {
       const { option } = resolveBarOptions(singleSeriesData, {
-        bar: { barWidth: 24, barMaxWidth: '60%', barMinWidth: 4 },
+        barWidth: 24,
+        barMaxWidth: '60%',
+        barMinWidth: 4,
       });
       const series = (option.series as Record<string, unknown>[])[0];
       expect(series.barWidth).toBe(24);
@@ -48,7 +61,8 @@ describe('bar adapter', () => {
         ],
       };
       const { option } = resolveBarOptions(data, {
-        bar: { barGap: '10%', barCategoryGap: '40%' },
+        barGap: '10%',
+        barCategoryGap: '40%',
       });
       const seriesArr = option.series as Record<string, unknown>[];
       for (const s of seriesArr) {
@@ -68,7 +82,8 @@ describe('bar adapter', () => {
     it('propagates sizing fields to the race variant series', () => {
       const result = resolveBarOptions(singleSeriesData, {
         variant: 'race',
-        bar: { barWidth: '60%', barCategoryGap: '20%' },
+        barWidth: '60%',
+        barCategoryGap: '20%',
       });
       const series = (result.option.series as Record<string, unknown>[])[0];
       expect(series.barWidth).toBe('60%');
@@ -76,10 +91,10 @@ describe('bar adapter', () => {
     });
   });
 
-  describe('BarOptions.colorByCategory (single-series, non-race)', () => {
+  describe('colorByCategory (single-series, non-race)', () => {
     it('emits one color per category drawn from the resolver', () => {
       const { option } = resolveBarOptions(singleSeriesData, {
-        bar: { colorByCategory: true },
+        colorByCategory: true,
       });
       const color = option.color as string[];
       expect(color).toHaveLength(singleSeriesData.categories.length);
@@ -88,7 +103,7 @@ describe('bar adapter', () => {
 
     it('marks the series with colorBy: "data" so ECharts cycles option.color', () => {
       const { option } = resolveBarOptions(singleSeriesData, {
-        bar: { colorByCategory: true },
+        colorByCategory: true,
       });
       const series = (option.series as Record<string, unknown>[])[0];
       expect(series.colorBy).toBe('data');
@@ -96,15 +111,23 @@ describe('bar adapter', () => {
 
     it('hides the legend (its series-color marker would mislead)', () => {
       const { option } = resolveBarOptions(singleSeriesData, {
-        bar: { colorByCategory: true },
+        colorByCategory: true,
       });
       const legend = option.legend as Record<string, unknown>;
       expect(legend.show).toBe(false);
     });
 
+    it('does not reserve bottom legend space when the legend is hidden', () => {
+      const { option } = resolveBarOptions(singleSeriesData, {
+        colorByCategory: true,
+      });
+      const grid = option.grid as Record<string, unknown>;
+      expect(grid.bottom).toBe(12);
+    });
+
     it('honors colorMap keyed by category name', () => {
       const { option } = resolveBarOptions(singleSeriesData, {
-        bar: { colorByCategory: true },
+        colorByCategory: true,
         colorMap: { Chrome: '#4285F4', Firefox: '#FF7139' },
       });
       const color = option.color as string[];
@@ -122,7 +145,7 @@ describe('bar adapter', () => {
       };
       const { option } = resolveBarOptions(data, {
         stacked: true,
-        bar: { colorByCategory: true },
+        colorByCategory: true,
       });
       const color = option.color as string[];
       expect(color).toHaveLength(2); // one per series, not per category
@@ -141,7 +164,7 @@ describe('bar adapter', () => {
         ],
       };
       const { option } = resolveBarOptions(data, {
-        bar: { colorByCategory: true },
+        colorByCategory: true,
       });
       const color = option.color as string[];
       expect(color).toHaveLength(2); // one per series
@@ -271,11 +294,11 @@ describe('bar adapter', () => {
       expect(color[0]).toBe('#abcdef');
     });
 
-    describe('with bar.colorByCategory', () => {
+    describe('with colorByCategory', () => {
       it('emits one color per racer (categories palette)', () => {
         const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
           variant: 'race',
-          bar: { colorByCategory: true },
+          colorByCategory: true,
         });
         const color = option.color as string[];
         expect(color).toHaveLength(racers.length);
@@ -284,7 +307,7 @@ describe('bar adapter', () => {
       it('sets series[0].colorBy to "data" so each racer is painted distinctly', () => {
         const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
           variant: 'race',
-          bar: { colorByCategory: true },
+          colorByCategory: true,
         });
         const series = (option.series as Record<string, unknown>[])[0];
         expect(series.colorBy).toBe('data');
@@ -293,7 +316,7 @@ describe('bar adapter', () => {
       it('hides the legend in race mode too', () => {
         const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
           variant: 'race',
-          bar: { colorByCategory: true },
+          colorByCategory: true,
         });
         const legend = option.legend as Record<string, unknown>;
         expect(legend.show).toBe(false);
@@ -302,7 +325,7 @@ describe('bar adapter', () => {
       it('preserves notMerge: false (frame-to-frame animation still works)', () => {
         const result = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
           variant: 'race',
-          bar: { colorByCategory: true },
+          colorByCategory: true,
         });
         expect(result.notMerge).toBe(false);
       });
@@ -310,7 +333,7 @@ describe('bar adapter', () => {
       it('honors colorMap keyed by racer name', () => {
         const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
           variant: 'race',
-          bar: { colorByCategory: true },
+          colorByCategory: true,
           colorMap: { USA: '#3c3b6e', China: '#de2910' },
         });
         const color = option.color as string[];

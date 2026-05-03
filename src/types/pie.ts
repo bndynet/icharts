@@ -20,20 +20,26 @@ export function isPieData(data: ChartData): data is PieData {
   );
 }
 
-/** Per-slice styling. Lives at `PieChartOptions.slice`. */
-export interface PieSliceOptions {
-  borderRadius?: number;
-  borderColor?: string;
-  gap?: number;
-}
-
 export interface PieChartOptions extends ChartOptions {
   variant?: PieVariant;
   innerRadius?: string | number;
   outerRadius?: string | number;
   /** When false, slices keep their data order; otherwise sorted by value desc. Default: true. */
   autoSort?: boolean;
-  slice?: PieSliceOptions;
+
+  // ---------------------------------------------------------------------------
+  // Slice styling — pie chart's own options, flat on the subtype. Field names
+  // are prefixed with `slice` so generic names like `borderRadius` / `gap` are
+  // unambiguous at the top level.
+  // ---------------------------------------------------------------------------
+
+  /** Border radius of every slice in px. Maps to ECharts `series.itemStyle.borderRadius`. */
+  sliceBorderRadius?: number;
+  /** Border color of every slice. Maps to ECharts `series.itemStyle.borderColor`. */
+  sliceBorderColor?: string;
+  /** Gap between adjacent slices in degrees. Maps to ECharts `series.padAngle`. */
+  sliceGap?: number;
+
   /**
    * Pie is the only non-XY chart that renders a legend, so the field lives
    * here rather than on the base {@link ChartOptions}. Gauge / sankey / chord

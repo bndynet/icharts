@@ -36,9 +36,9 @@ src/
                       #   line.ts / bar.ts /
                       #   area.ts            → LineData/BarData/AreaData aliases of XYData,
                       #                        per-chart variants and *ChartOptions
-                      #                        (bar.ts also holds BarOptions / BarRaceOptions)
-                      #   pie.ts             → PieData, PieVariant, PieSliceOptions,
-                      #                        PieChartOptions, isPieData
+                      #                        (bar.ts also holds BarRaceOptions for the
+                      #                        variant-specific race namespace)
+                      #   pie.ts             → PieData, PieVariant, PieChartOptions, isPieData
                       #   gauge.ts           → GaugeData, GaugeVariant, GaugeChartOptions,
                       #                        isGaugeData
                       #   sankey.ts          → SankeyNode/Link/Data, SankeyVariant,
@@ -184,7 +184,7 @@ Every new chart type MUST add **both** a named `Data` type and a named `*ChartOp
 
 Type declarations are organized one file per chart family under `src/types/` (mirroring `src/adapters/<chart>.ts`):
 
-- Per-chart declarations live in `src/types/<chart>.ts` (e.g. `pie.ts` holds `PieData`, `PieVariant`, `PieSliceOptions`, `PieChartOptions`, `isPieData`).
+- Per-chart declarations live in `src/types/<chart>.ts` (e.g. `pie.ts` holds `PieData`, `PieVariant`, `PieChartOptions`, `isPieData`).
 - `src/types/instance.ts` composes the `ChartData` / `ChartVariant` / `AnyChartOptions` unions and declares `IChartInstance`.
 - `src/types/base.ts` holds `ChartType` enum + base `ChartOptions`. `src/types/shared.ts` holds cross-cutting shared option types (`TitleOptions`, `LegendOptions`, `GridOptions`, `AxisOptions`, `SeriesOptions`, `TooltipOptions`, `TooltipContext*`).
 - `src/types.ts` is a backwards-compat barrel; do not put new declarations there.
@@ -233,9 +233,13 @@ Reference implementations:
 | Graph nodes/links | `src/adapters/sankey.ts` (`SankeyChartOptions`), `src/adapters/chord.ts` (`ChordChartOptions`) |
 | Single-metric | `src/adapters/gauge.ts` (`GaugeChartOptions`) |
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` (`race` branch) |
-| Grouping multiple knobs into a sub-object (`bar.barWidth`, `race.topN`) | `src/types/bar.ts` (`BarOptions`, `BarRaceOptions` → `BarChartOptions`) |
+| Variant-specific sub-object (`race.topN`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`) |
 
-**Chart-type options namespaces.** Each chart's options live on its own `XxxChartOptions extends ChartOptions` subtype (see step 1) — that is the primary form of separation. When a single chart needs more than a couple of dedicated knobs, additionally group them under a typed sub-object on the subtype: e.g. `BarChartOptions` exposes both `bar?: BarOptions` (sizing + `colorByCategory`) and `race?: BarRaceOptions` (race-only `topN` / `frameDuration` / `showValueLabel`). Single-field knobs like `gaugeWidth` (on `GaugeChartOptions`) and `innerRadius` (on `PieChartOptions`) can stay flat on the subtype. **Never** add a chart-specific field to base `ChartOptions`.
+**Chart-type options layout.** Each chart's options live on its own `XxxChartOptions extends ChartOptions` subtype (see step 1). The chart's **own general options** (those that always apply, regardless of variant) belong **flat** on the subtype — no separate named type, no wrapping sub-object. Examples: `BarChartOptions.barWidth` / `colorByCategory`, `PieChartOptions.sliceBorderRadius` / `innerRadius`, `GaugeChartOptions.gaugeWidth`. Prefix the field name when a generic word (`borderRadius`, `gap`, …) would be ambiguous at the top level — that's why pie's slice fields read `sliceBorderRadius` / `sliceGap` rather than bare `borderRadius` / `gap`.
+
+Only **variant-bound or otherwise scoped sub-features** get their own named sub-type and live under a sub-object. Bar's `race?: BarRaceOptions` is the canonical example: those fields are meaningless unless `variant === 'race'`, so grouping them under `race` both communicates intent and lets adapters short-circuit by checking the namespace. Do not invent new sub-objects for fields that apply to every variant.
+
+**Never** add a chart-specific field to base `ChartOptions`.
 
 ### 3. Colors (`src/utils.ts` + `src/adapters/graph-colors.ts` for graph types)
 
@@ -308,7 +312,8 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Resolve colors anywhere except via `resolveColors` / `resolveColorsForNodes` — do not read `colorHub` directly, do not duplicate the priority rules (`options.colors` / `options.colorMap` / `consistentColors` / `node.color`).
 - Hardcode hex/rgb palette colors in `src/adapters/**` — use the color pipeline above (see **Do not hardcode chart colors**).
 - Re-introduce a central `applyChartColors` / `core.ts` color post-processing step — adapters now own color assembly end-to-end.
-- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice/gauge/race namespaces, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions` and `PieChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
+- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions` and `PieChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
+- Wrap a chart's own general options inside a sub-object/named type when they could be flat. `BarChartOptions.barWidth` / `colorByCategory` / `PieChartOptions.sliceBorderRadius` live directly on the subtype — no `bar?: BarOptions` or `slice?: PieSliceOptions` wrappers. Reserve sub-objects (`race?: BarRaceOptions`, …) for **variant-bound or scoped sub-features** only.
 - Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.
 
 ## Git and PR expectations
