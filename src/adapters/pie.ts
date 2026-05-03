@@ -1,4 +1,4 @@
-import type { PieData, ChartOptions, PieVariant } from '../types.js';
+import type { PieData, PieChartOptions, PieVariant } from '../types.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import {
   formatPieTooltipSyncHtml,
@@ -11,7 +11,7 @@ const DEFAULT_OUTER_RADIUS = '75%';
 
 export function resolvePieOptions(
   data: PieData,
-  options: ChartOptions,
+  options: PieChartOptions,
 ): Record<string, unknown> {
   const variant = (options.variant ?? 'default') as PieVariant;
   const names = data.map((d) => d.name);
@@ -53,7 +53,7 @@ export function resolvePieOptions(
 
 function buildPieSeries(
   data: PieData,
-  options: ChartOptions,
+  options: PieChartOptions,
   variant: PieVariant,
 ): Record<string, unknown>[] {
   const innerRadius = options.innerRadius ?? 0;
@@ -80,7 +80,7 @@ function buildPieSeries(
   return [series];
 }
 
-function applySliceStyle(series: Record<string, unknown>, options: ChartOptions): void {
+function applySliceStyle(series: Record<string, unknown>, options: PieChartOptions): void {
   const slice = options.slice;
   if (!slice) return;
 
@@ -99,7 +99,7 @@ function applySliceStyle(series: Record<string, unknown>, options: ChartOptions)
 function applyVariant(
   series: Record<string, unknown>,
   variant: PieVariant,
-  options: ChartOptions,
+  options: PieChartOptions,
 ): void {
   const radius = series.radius as [string | number, string | number];
 

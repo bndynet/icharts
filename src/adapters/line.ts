@@ -1,4 +1,4 @@
-import type { XYData, ChartOptions } from '../types.js';
+import type { LineData, AreaData, LineChartOptions, AreaChartOptions } from '../types.js';
 import { buildSparkAreaGradient, deepMerge, resolveColors } from '../utils.js';
 import {
   buildTitle,
@@ -12,8 +12,8 @@ import {
 import { getSeriesOpts, getYAxisCount, applyMarkLines, applyMarkPoints } from './series-utils.js';
 
 export function resolveLineOptions(
-  data: XYData,
-  options: ChartOptions,
+  data: LineData,
+  options: LineChartOptions,
 ): Record<string, unknown> {
   const isTime = isTimeCategories(data.categories);
   const seriesNames = data.series.map((s) => s.name);
@@ -46,8 +46,8 @@ export function resolveLineOptions(
 }
 
 export function resolveAreaOptions(
-  data: XYData,
-  options: ChartOptions,
+  data: AreaData,
+  options: AreaChartOptions,
 ): Record<string, unknown> {
   const isTime = isTimeCategories(data.categories);
   const seriesNames = data.series.map((s) => s.name);
@@ -105,8 +105,8 @@ function applySparkAreaGradient(
 // ---------------------------------------------------------------------------
 
 function buildLineSeries(
-  data: XYData,
-  options: ChartOptions,
+  data: LineData,
+  options: LineChartOptions | AreaChartOptions,
   isTime: boolean,
   isArea: boolean,
 ): Record<string, unknown>[] {

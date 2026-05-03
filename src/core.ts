@@ -1,5 +1,5 @@
 import * as echarts from 'echarts';
-import type { ChartData, ChartOptions, IChartInstance } from './types.js';
+import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
 import { resolveEChartsOption } from './adapters/index.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
 import { chartRegistry } from './registry.js';
@@ -13,14 +13,14 @@ export class IChart implements IChartInstance {
   private ecInstance: echarts.ECharts;
   private _type: string;
   private _data: ChartData;
-  private _options: ChartOptions;
+  private _options: AnyChartOptions;
   private _activeTheme: string;
 
   constructor(
     container: HTMLElement,
     type: string,
     data: ChartData,
-    options: ChartOptions = {},
+    options: AnyChartOptions = {},
   ) {
     ensureThemesRegistered();
     this._type = type;
@@ -32,7 +32,7 @@ export class IChart implements IChartInstance {
     this._apply();
   }
 
-  update(newData?: ChartData, newOptions?: ChartOptions): void {
+  update(newData?: ChartData, newOptions?: AnyChartOptions): void {
     if (newData !== undefined) this._data = newData;
     if (newOptions) this._options = { ...this._options, ...newOptions };
     this._apply();

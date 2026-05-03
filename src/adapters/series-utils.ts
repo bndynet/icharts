@@ -1,10 +1,10 @@
-import type { XYData, ChartOptions, SeriesOptions } from '../types.js';
+import type { XYData, XYChartOptions, SeriesOptions } from '../types.js';
 
 /**
  * Merge wildcard ('*') and per-series options into a single SeriesOptions.
  * Wildcard options apply to all series; named options override wildcards.
  */
-export function getSeriesOpts(name: string, options: ChartOptions): SeriesOptions {
+export function getSeriesOpts(name: string, options: XYChartOptions): SeriesOptions {
   const wildcard = options.series?.['*'] ?? {};
   const named = options.series?.[name] ?? {};
   return { ...wildcard, ...named };
@@ -13,7 +13,7 @@ export function getSeriesOpts(name: string, options: ChartOptions): SeriesOption
 /**
  * Count the number of distinct y-axes required by the series configuration.
  */
-export function getYAxisCount(data: XYData, options: ChartOptions): number {
+export function getYAxisCount(data: XYData, options: XYChartOptions): number {
   let count = 1;
   if (options.series) {
     for (const s of data.series) {

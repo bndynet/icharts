@@ -1,4 +1,4 @@
-import type { XYData, ChartOptions } from '../types.js';
+import type { BarData, BarChartOptions } from '../types.js';
 import type { ChartSetupResult } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
@@ -12,8 +12,8 @@ import {
 import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './series-utils.js';
 
 export function resolveBarOptions(
-  data: XYData,
-  options: ChartOptions,
+  data: BarData,
+  options: BarChartOptions,
 ): ChartSetupResult {
   const variant = options.variant ?? 'default';
 
@@ -110,8 +110,8 @@ const RACE_LABEL_HEADROOM = 80;
  * value/position transitions.
  */
 function resolveBarRaceOptions(
-  data: XYData,
-  options: ChartOptions,
+  data: BarData,
+  options: BarChartOptions,
 ): ChartSetupResult {
   const race = options.race ?? {};
   const frameDuration = race.frameDuration ?? 3000;
@@ -194,8 +194,8 @@ function resolveBarRaceOptions(
 // ---------------------------------------------------------------------------
 
 function buildBarSeries(
-  data: XYData,
-  options: ChartOptions,
+  data: BarData,
+  options: BarChartOptions,
   isTime: boolean,
   isHorizontal: boolean,
   enableColorByCategory: boolean,
@@ -255,13 +255,13 @@ function buildBarSeries(
 }
 
 /**
- * Propagates the sizing fields from {@link ChartOptions.bar} into a single
+ * Propagates the sizing fields from {@link BarChartOptions.bar} into a single
  * ECharts series object. Shared by every bar variant (default, horizontal,
  * spark, race) so authors get a consistent API.
  */
 function applyBarOptionsSizing(
   series: Record<string, unknown>,
-  options: ChartOptions,
+  options: BarChartOptions,
 ): void {
   const bar = options.bar;
   if (!bar) return;

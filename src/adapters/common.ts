@@ -1,5 +1,6 @@
 import type {
   ChartOptions,
+  XYChartOptions,
   TitleOptions,
   LegendOptions,
   GridOptions,
@@ -8,6 +9,17 @@ import type {
   TooltipOptions,
   TooltipContextAxis,
 } from '../types.js';
+
+/**
+ * Structural shape consumed by {@link buildLegend} and its grid offset helper.
+ *
+ * `legend` no longer lives on the base `ChartOptions` — it sits on the
+ * subtypes that actually render a legend (`XYChartOptions` for line/bar/area
+ * and `PieChartOptions` for pie). Giving the helper an intersection rather
+ * than the union of subtypes keeps the call sites concise without re-adding
+ * `legend` to charts that ignore it (gauge / sankey / chord).
+ */
+type WithLegend = ChartOptions & { legend?: LegendOptions };
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { deepMerge } from '../utils.js';
 
@@ -86,7 +98,7 @@ export function buildTitle(options: ChartOptions): Record<string, unknown> | und
 
 export function buildLegend(
   names: string[],
-  options: ChartOptions,
+  options: WithLegend,
 ): Record<string, unknown> {
   const legend: LegendOptions = options.legend ?? {};
   const show = legend.show ?? true;
@@ -109,7 +121,7 @@ export function buildLegend(
   };
 }
 
-export function buildGrid(options: ChartOptions): Record<string, unknown> {
+export function buildGrid(options: XYChartOptions): Record<string, unknown> {
   const grid: GridOptions = options.grid ?? {};
   const legendArea = getLegendGridAdjustment(options);
   const titleHeight = getTitleHeight(options);
@@ -131,7 +143,7 @@ export function buildGrid(options: ChartOptions): Record<string, unknown> {
 // Space reserved in the grid for the legend component (legend height + gap to plot area).
 const LEGEND_RESERVE = 36;
 
-function getLegendGridAdjustment(options: ChartOptions): Record<string, unknown> {
+function getLegendGridAdjustment(options: XYChartOptions): Record<string, unknown> {
   const legend = options.legend ?? {};
   if (legend.show === false) return {};
 
@@ -155,7 +167,7 @@ function getLegendGridAdjustment(options: ChartOptions): Record<string, unknown>
 
 export function buildXAxis(
   data: XYData,
-  options: ChartOptions,
+  options: XYChartOptions,
   isTimeAxis: boolean,
 ): Record<string, unknown>[] {
   const userAxis: AxisOptions = options.xAxis ?? {};
@@ -207,7 +219,7 @@ export function buildXAxis(
   return [axis];
 }
 
-export function buildYAxis(options: ChartOptions, count = 1): Record<string, unknown>[] {
+export function buildYAxis(options: XYChartOptions, count = 1): Record<string, unknown>[] {
   const userAxis: AxisOptions = options.yAxis ?? {};
   const axes: Record<string, unknown>[] = [];
 

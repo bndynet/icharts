@@ -27,7 +27,28 @@ src/
     line.ts           # line + area (two adapters in index.ts)
   components/         # <i-chart> web component (Lit)
   themes/             # registerTheme, switchTheme, palette / ColorHub
-  types.ts            # ChartType, data shapes, ChartOptions, type guards
+  types/              # One file per chart family (mirrors src/adapters/<chart>.ts).
+                      #   shared.ts          → TitleOptions, LegendOptions, GridOptions,
+                      #                        AxisOptions, SeriesOptions, TooltipOptions,
+                      #                        TooltipContext*
+                      #   base.ts            → ChartType, ChartOptions (cross-cutting only)
+                      #   xy.ts              → XYData, XYDataSeries, XYChartOptions, isXYData
+                      #   line.ts / bar.ts /
+                      #   area.ts            → LineData/BarData/AreaData aliases of XYData,
+                      #                        per-chart variants and *ChartOptions
+                      #                        (bar.ts also holds BarOptions / BarRaceOptions)
+                      #   pie.ts             → PieData, PieVariant, PieSliceOptions,
+                      #                        PieChartOptions, isPieData
+                      #   gauge.ts           → GaugeData, GaugeVariant, GaugeChartOptions,
+                      #                        isGaugeData
+                      #   sankey.ts          → SankeyNode/Link/Data, SankeyVariant,
+                      #                        SankeyChartOptions, isSankeyData
+                      #   chord.ts           → ChordNode/Link/Data, ChordChartOptions,
+                      #                        isChordData
+                      #   instance.ts        → ChartData / ChartVariant / AnyChartOptions
+                      #                        unions and IChartInstance
+                      #   index.ts           → barrel re-exporting every file above
+  types.ts            # Backwards-compat barrel: `export * from './types/index.js';`
   core.ts             # IChart engine: resolve → applyChartColors → setOption
   utils.ts            # deepMerge, getSeriesNames, applyChartColors
   config.ts           # configure({ consistentColors })
@@ -76,7 +97,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
    return merged;
    ```
    Graph adapters additionally call `paintGraphNodes(merged, '<seriesType>', nameToColor)` after merge so per-node colors survive any user `echarts.series` override.
-4. **Variants** — use `options.variant ?? 'default'` and branch layout/behavior (see `bar.ts` for `horizontal` / `spark`, `pie.ts` for `doughnut`, etc.). Add new variant literals to `src/types.ts` and document them in README.
+4. **Variants** — use `options.variant ?? 'default'` and branch layout/behavior (see `bar.ts` for `horizontal` / `spark`, `pie.ts` for `doughnut`, etc.). Add new variant literals to the matching per-chart file under `src/types/` (e.g. `src/types/bar.ts`) and document them in README.
 5. **Colors (two-layer pipeline)** — strict separation between *resolving* a color and *placing* it into an ECharts option:
    - **Resolver layer** — `resolveColors(names, options)` and `resolveColorsForNodes(nodes, options)` in `src/utils.ts` are the single entry point for "name → color". They respect theme palette, `options.colors`, `options.colorMap`, `configure({ consistentColors })`, and (for nodes) `node.color`. Adapters must call these; never reach into `colorHub` or read theme palettes directly.
    - **Assembly layer** — every adapter assembles colors into whichever ECharts fields suit the chart type:
@@ -157,19 +178,33 @@ In **`src/adapters/**`** (and other chart option builders), **do not** assign li
 
 Use this checklist. Do **not** skip steps.
 
-### 1. Types (`src/types.ts`)
+### 1. Types (`src/types/<type>.ts`)
 
-- [ ] Add value to `ChartType` enum (string literal must match the `type` argument users pass).
-- [ ] Define data interface(s) (e.g. `ScatterData`).
-- [ ] Extend `ChartData` union.
-- [ ] Add `isXxxData(data: ChartData): data is XxxData` type guard with precise structural checks.
-- [ ] If the type has sub-styles, add `XxxVariant` and extend `ChartVariant`.
-- [ ] Extend `ChartOptions` only when new cross-cutting options are required.
+Every new chart type MUST add **both** a named `Data` type and a named `*ChartOptions` type extending `ChartOptions` (or `XYChartOptions` for an XY-family chart). Chart-specific knobs live on the subtype — **never** add them to the base `ChartOptions`.
+
+Type declarations are organized one file per chart family under `src/types/` (mirroring `src/adapters/<chart>.ts`):
+
+- Per-chart declarations live in `src/types/<chart>.ts` (e.g. `pie.ts` holds `PieData`, `PieVariant`, `PieSliceOptions`, `PieChartOptions`, `isPieData`).
+- `src/types/instance.ts` composes the `ChartData` / `ChartVariant` / `AnyChartOptions` unions and declares `IChartInstance`.
+- `src/types/base.ts` holds `ChartType` enum + base `ChartOptions`. `src/types/shared.ts` holds cross-cutting shared option types (`TitleOptions`, `LegendOptions`, `GridOptions`, `AxisOptions`, `SeriesOptions`, `TooltipOptions`, `TooltipContext*`).
+- `src/types.ts` is a backwards-compat barrel; do not put new declarations there.
+
+Checklist:
+
+- [ ] Create `src/types/<type>.ts` and declare all chart-specific types there.
+- [ ] Add value to `ChartType` enum in `src/types/base.ts` (string literal must match the `type` argument users pass).
+- [ ] Define / alias a `XxxData` type in `src/types/<type>.ts` and extend the `ChartData` union in `src/types/instance.ts` (alias when the runtime shape is shared, e.g. `export type ScatterData = XYData`).
+- [ ] Add `isXxxData(data: ChartData): data is XxxData` type guard with precise structural checks (colocated in `src/types/<type>.ts`).
+- [ ] If the type has sub-styles, add `XxxVariant` and extend `ChartVariant` in `src/types/instance.ts`.
+- [ ] Define `XxxChartOptions extends ChartOptions` (or `extends XYChartOptions` for XY-family). Put every chart-specific knob (including the narrowed `variant?: XxxVariant`) on the subtype.
+- [ ] Add the new `XxxChartOptions` to the `AnyChartOptions` union in `src/types/instance.ts` so callers can pass a chart-specific literal to `createChart` without an explicit cast.
+- [ ] Add the new file to `src/types/index.ts`'s re-export list.
+- [ ] Do **NOT** add chart-specific fields to base `ChartOptions`. Base `ChartOptions` is reserved for truly cross-cutting concerns: `theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`. Note: `grid` lives on `XYChartOptions` only, and `legend` lives on `XYChartOptions` and `PieChartOptions` — gauge/sankey/chord do not render either.
 
 ### 2. Adapter module (`src/adapters/<type>.ts`)
 
-- [ ] Implement `resolveXxxOptions` (return type: `Record<string, unknown>` or `ChartSetupResult`).
-- [ ] Use shared builders from `common.ts` where applicable.
+- [ ] Implement `resolveXxxOptions(data: XxxData, options: XxxChartOptions)` (return type: `Record<string, unknown>` or `ChartSetupResult`). Always type the parameters as the chart's own `XxxData` and `XxxChartOptions`, never the base `ChartData` / `ChartOptions`.
+- [ ] Use shared builders from `common.ts` where applicable. XY-family adapters must pass their `XxxChartOptions` (which extends `XYChartOptions`) into `buildXAxis` / `buildYAxis` / `series-utils` helpers.
 - [ ] Handle `options.variant`, `options.title`, `options.legend`, `options.padding`, `options.tooltip`, etc. consistently with sibling adapters.
 - [ ] Build the option *without* any color literals or theme lookups — call `resolveColors` / `resolveColorsForNodes` for that.
 - [ ] End with: `deepMerge(eOption, options.echarts ?? {})` → assign `merged.color = resolveColors(names, options)` → (graph types only) `paintGraphNodes(merged, '<seriesType>', nameToColor)` → return `merged`.
@@ -192,15 +227,15 @@ Reference implementations:
 
 | Pattern | Reference file |
 |---------|----------------|
-| XY + variants + stacked | `src/adapters/bar.ts` |
-| XY + time axis; line **and** area | `src/adapters/line.ts` |
-| Item tooltips + variants | `src/adapters/pie.ts` |
-| Graph nodes/links | `src/adapters/sankey.ts`, `src/adapters/chord.ts` |
-| Single-metric | `src/adapters/gauge.ts` |
+| XY + variants + stacked | `src/adapters/bar.ts` (`BarChartOptions`) |
+| XY + time axis; line **and** area | `src/adapters/line.ts` (`LineChartOptions` / `AreaChartOptions`) |
+| Item tooltips + variants | `src/adapters/pie.ts` (`PieChartOptions`) |
+| Graph nodes/links | `src/adapters/sankey.ts` (`SankeyChartOptions`), `src/adapters/chord.ts` (`ChordChartOptions`) |
+| Single-metric | `src/adapters/gauge.ts` (`GaugeChartOptions`) |
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` (`race` branch) |
-| Chart-type options namespace (`options.bar`, `options.race`) | `src/types.ts` (`BarOptions`, `BarRaceOptions`) |
+| Grouping multiple knobs into a sub-object (`bar.barWidth`, `race.topN`) | `src/types/bar.ts` (`BarOptions`, `BarRaceOptions` → `BarChartOptions`) |
 
-**Chart-type options namespaces.** When an adapter has more than a couple of dedicated knobs, group them under a typed namespace on `ChartOptions` instead of polluting the root. The bar adapter follows this with `options.bar: BarOptions` (sizing + `colorByCategory`) and `options.race: BarRaceOptions` (race-only `topN` / `frameDuration` / `showValueLabel`). Existing single-field knobs like `options.gaugeWidth` and `options.innerRadius` predate this convention; new options should prefer the namespaced pattern.
+**Chart-type options namespaces.** Each chart's options live on its own `XxxChartOptions extends ChartOptions` subtype (see step 1) — that is the primary form of separation. When a single chart needs more than a couple of dedicated knobs, additionally group them under a typed sub-object on the subtype: e.g. `BarChartOptions` exposes both `bar?: BarOptions` (sizing + `colorByCategory`) and `race?: BarRaceOptions` (race-only `topN` / `frameDuration` / `showValueLabel`). Single-field knobs like `gaugeWidth` (on `GaugeChartOptions`) and `innerRadius` (on `PieChartOptions`) can stay flat on the subtype. **Never** add a chart-specific field to base `ChartOptions`.
 
 ### 3. Colors (`src/utils.ts` + `src/adapters/graph-colors.ts` for graph types)
 
@@ -235,7 +270,7 @@ registerAdapter(ChartType.Chord, {
 
 ### 5. Public exports (`src/index.ts`)
 
-- [ ] Export new types and guards if they are part of the public API.
+- [ ] Export the new `XxxData` and `XxxChartOptions` types (both are part of the public API), along with the `isXxxData` guard and any new variant union.
 
 ### 6. README.md
 
@@ -273,6 +308,8 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Resolve colors anywhere except via `resolveColors` / `resolveColorsForNodes` — do not read `colorHub` directly, do not duplicate the priority rules (`options.colors` / `options.colorMap` / `consistentColors` / `node.color`).
 - Hardcode hex/rgb palette colors in `src/adapters/**` — use the color pipeline above (see **Do not hardcode chart colors**).
 - Re-introduce a central `applyChartColors` / `core.ts` color post-processing step — adapters now own color assembly end-to-end.
+- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice/gauge/race namespaces, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions` and `PieChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
+- Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.
 
 ## Git and PR expectations
 

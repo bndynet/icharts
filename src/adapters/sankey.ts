@@ -1,11 +1,11 @@
-import type { SankeyData, ChartOptions, SankeyVariant } from '../types.js';
+import type { SankeyData, SankeyChartOptions, SankeyVariant } from '../types.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
 import { buildTitle, getTitleHeight } from './common.js';
 import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
-function sankeyTooltipSyncHtml(params: unknown, options: ChartOptions): string {
+function sankeyTooltipSyncHtml(params: unknown, options: SankeyChartOptions): string {
   const fmt = options.tooltip?.formatValue;
   const pr = params as Record<string, unknown>;
   if (pr.dataType === 'edge') {
@@ -28,7 +28,7 @@ function namesWithoutOutgoingLinks(links: SankeyData['links']): Set<string> {
 
 export function resolveSankeyOptions(
   data: SankeyData,
-  options: ChartOptions,
+  options: SankeyChartOptions,
 ): Record<string, unknown> {
   const variant = (options.variant ?? 'default') as SankeyVariant;
   const orient = variant === 'vertical' ? 'vertical' : 'horizontal';

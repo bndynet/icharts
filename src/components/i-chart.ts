@@ -1,6 +1,6 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import type { ChartData, ChartOptions, IChartInstance } from '../types.js';
+import type { ChartData, AnyChartOptions, IChartInstance } from '../types.js';
 import { IChart } from '../core.js';
 
 /**
@@ -36,7 +36,7 @@ export class IChartElement extends LitElement {
   data: ChartData | null = null;
 
   @property({ type: Object })
-  options: ChartOptions = {};
+  options: AnyChartOptions = {};
 
   private engine: IChart | null = null;
   private resizeObserver: ResizeObserver | null = null;

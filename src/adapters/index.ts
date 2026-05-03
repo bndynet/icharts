@@ -72,7 +72,22 @@ export function resolveEChartsOption(
 // ---------------------------------------------------------------------------
 
 import { ChartType, isXYData, isPieData, isGaugeData, isSankeyData, isChordData } from '../types.js';
-import type { XYData, PieData, GaugeData, SankeyData, ChordData } from '../types.js';
+import type {
+  LineData,
+  BarData,
+  AreaData,
+  PieData,
+  GaugeData,
+  SankeyData,
+  ChordData,
+  LineChartOptions,
+  BarChartOptions,
+  AreaChartOptions,
+  PieChartOptions,
+  GaugeChartOptions,
+  SankeyChartOptions,
+  ChordChartOptions,
+} from '../types.js';
 import { resolveLineOptions, resolveAreaOptions } from './line.js';
 import { resolveBarOptions } from './bar.js';
 import { resolvePieOptions } from './pie.js';
@@ -80,47 +95,53 @@ import { resolveGaugeOptions } from './gauge.js';
 import { resolveSankeyOptions } from './sankey.js';
 import { resolveChordOptions } from './chord.js';
 
+// Each built-in adapter narrows the generic `ChartData` / `ChartOptions` it
+// receives from the registry to its declared per-chart Data + Options pair.
+// `validate` has already verified the data shape at this point.
+
 registerAdapter(ChartType.Line, {
   validate: isXYData,
   resolve: (data, options) => ({
-    option: resolveLineOptions(data as XYData, options),
+    option: resolveLineOptions(data as LineData, options as LineChartOptions),
   }),
 });
 
 registerAdapter(ChartType.Area, {
   validate: isXYData,
   resolve: (data, options) => ({
-    option: resolveAreaOptions(data as XYData, options),
+    option: resolveAreaOptions(data as AreaData, options as AreaChartOptions),
   }),
 });
 
 registerAdapter(ChartType.Bar, {
   validate: isXYData,
-  resolve: (data, options) => resolveBarOptions(data as XYData, options),
+  resolve: (data, options) =>
+    resolveBarOptions(data as BarData, options as BarChartOptions),
 });
 
 registerAdapter(ChartType.Pie, {
   validate: isPieData,
   resolve: (data, options) => ({
-    option: resolvePieOptions(data as PieData, options),
+    option: resolvePieOptions(data as PieData, options as PieChartOptions),
   }),
 });
 
 registerAdapter(ChartType.Gauge, {
   validate: isGaugeData,
   resolve: (data, options) => ({
-    option: resolveGaugeOptions(data as GaugeData, options),
+    option: resolveGaugeOptions(data as GaugeData, options as GaugeChartOptions),
   }),
 });
 
 registerAdapter(ChartType.Sankey, {
   validate: isSankeyData,
   resolve: (data, options) => ({
-    option: resolveSankeyOptions(data as SankeyData, options),
+    option: resolveSankeyOptions(data as SankeyData, options as SankeyChartOptions),
   }),
 });
 
 registerAdapter(ChartType.Chord, {
   validate: isChordData,
-  resolve: (data, options) => resolveChordOptions(data as ChordData, options),
+  resolve: (data, options) =>
+    resolveChordOptions(data as ChordData, options as ChordChartOptions),
 });

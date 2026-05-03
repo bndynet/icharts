@@ -89,7 +89,7 @@ chart.dispose();
 
 ## Data Formats
 
-### Line / Bar / Area — `XYData`
+### Line / Bar / Area — `XYData` (aliased as `LineData` / `BarData` / `AreaData`)
 
 ```ts
 {
@@ -100,6 +100,8 @@ chart.dispose();
   ],
 }
 ```
+
+Line, bar, and area share the same runtime shape. The library exports `LineData`, `BarData`, and `AreaData` aliases for `XYData` so call sites and adapters can declare intent explicitly.
 
 ### Pie — `PieData`
 
@@ -349,7 +351,21 @@ createChart(el, 'chord', {
 
 ## Options Reference
 
-All options are optional.
+Each chart type has its own options interface that extends the base `ChartOptions`. All fields are optional.
+
+| Chart type | Options interface | Extends |
+|------------|-------------------|---------|
+| `line`     | `LineChartOptions`   | `XYChartOptions` |
+| `bar`      | `BarChartOptions`    | `XYChartOptions` |
+| `area`     | `AreaChartOptions`   | `XYChartOptions` |
+| `pie`      | `PieChartOptions`    | `ChartOptions`   |
+| `gauge`    | `GaugeChartOptions`  | `ChartOptions`   |
+| `sankey`   | `SankeyChartOptions` | `ChartOptions`   |
+| `chord`    | `ChordChartOptions`  | `ChartOptions`   |
+
+`createChart` accepts an `AnyChartOptions` union — a chart-specific literal like `{ innerRadius: '50%' }` type-checks as `PieChartOptions` without importing the subtype. For stricter validation, import the matching `XxxChartOptions` and annotate explicitly.
+
+### `ChartOptions` (cross-cutting, base for every chart)
 
 ```ts
 {
@@ -374,12 +390,27 @@ All options are optional.
   colorMap?: Record<string, string>; // pin series/node names to specific colors
 
   // Layout
-  variant?: string;                  // chart-type variant (see table above)
-  stacked?: boolean;                 // stack series (line / bar / area)
   legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
   grid?: { top?: number; right?: number; bottom?: number; left?: number };
 
-  // Axis (line / bar / area)
+  // Tooltip
+  tooltip?: {
+    enabled?: boolean;
+    dateFormat?: string;
+    formatValue?: (value: number | string, name: string) => string;
+  };
+
+  // Advanced passthrough — for anything not covered above
+  echarts?: Record<string, unknown>;
+}
+```
+
+### `XYChartOptions` (shared by line / bar / area, extends `ChartOptions`)
+
+```ts
+{
+  stacked?: boolean;                 // stack series (line / bar / area)
+
   xAxis?: {
     name?: string;
     dateFormat?: string;              // e.g. 'MM/DD', 'YYYY-MM-DD'
@@ -391,20 +422,37 @@ All options are optional.
     formatLabel?: (value: string | number, index: number) => string;
   };
 
-  // Pie
-  innerRadius?: string | number;
-  outerRadius?: string | number;
-  autoSort?: boolean;
-  slice?: {
-    borderRadius?: number;
-    borderColor?: string;
-    gap?: number;                     // gap between slices in px
-  };
+  // Per-series overrides (keyed by series name, '*' applies to all)
+  series?: Record<string, {
+    type?: 'line' | 'bar';
+    smooth?: boolean | number;        // true, false, or 0–1 curveness
+    lineWidth?: number;
+    lineStyle?: 'solid' | 'dashed' | 'dotted';
+    showLabel?: boolean;
+    labelPosition?: 'inside' | 'outside' | 'center';
+    showPoints?: boolean;
+    yAxisIndex?: number;              // dual-axis: 0 (left) or 1 (right)
+    markLines?: ('average' | 'max' | 'min')[];
+    markPoints?: ('max' | 'min')[];
+  }>;
+}
+```
 
-  // Gauge
-  gaugeWidth?: number;
+### `LineChartOptions` (extends `XYChartOptions`)
 
-  // Bar (all variants)
+```ts
+{
+  variant?: 'default' | 'spark';
+}
+```
+
+### `BarChartOptions` (extends `XYChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'horizontal' | 'spark' | 'race';
+
+  // Bar sizing + per-bar coloring (all variants)
   bar?: {
     barWidth?: number | string;       // bar thickness, e.g. 24 or '60%'
     barMaxWidth?: number | string;    // cap on bar thickness
@@ -420,32 +468,53 @@ All options are optional.
     frameDuration?: number;   // ms between frames, default: 3000
     showValueLabel?: boolean; // animated value label at bar end, default: true
   };
-
-  // Tooltip
-  tooltip?: {
-    enabled?: boolean;
-    dateFormat?: string;
-    formatValue?: (value: number | string, name: string) => string;
-  };
-
-  // Per-series overrides (keyed by series/node name, '*' applies to all)
-  series?: Record<string, {
-    type?: 'line' | 'bar';
-    smooth?: boolean | number;        // true, false, or 0–1 curveness
-    lineWidth?: number;
-    lineStyle?: 'solid' | 'dashed' | 'dotted';
-    showLabel?: boolean;
-    labelPosition?: 'inside' | 'outside' | 'center';
-    showPoints?: boolean;
-    yAxisIndex?: number;              // dual-axis: 0 (left) or 1 (right)
-    markLines?: ('average' | 'max' | 'min')[];
-    markPoints?: ('max' | 'min')[];
-  }>;
-
-  // Advanced passthrough — for anything not covered above
-  echarts?: Record<string, unknown>;
 }
 ```
+
+### `AreaChartOptions` (extends `XYChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'spark';
+}
+```
+
+### `PieChartOptions` (extends `ChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'doughnut' | 'half-doughnut' | 'nightingale';
+  innerRadius?: string | number;
+  outerRadius?: string | number;
+  autoSort?: boolean;                 // default: true (sort slices by value desc)
+  slice?: {
+    borderRadius?: number;
+    borderColor?: string;
+    gap?: number;                     // gap between slices in px
+  };
+}
+```
+
+### `GaugeChartOptions` (extends `ChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'percentage';
+  gaugeWidth?: number;                // arc thickness in px
+}
+```
+
+### `SankeyChartOptions` (extends `ChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'vertical';
+}
+```
+
+### `ChordChartOptions` (extends `ChartOptions`)
+
+No chord-specific knobs today; reuses every field on the base `ChartOptions`.
 
 ---
 

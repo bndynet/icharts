@@ -1,4 +1,4 @@
-import type { ChordData, ChartOptions } from '../types.js';
+import type { ChordData, ChordChartOptions } from '../types.js';
 import type { ChartSetupResult } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
@@ -6,7 +6,7 @@ import { deepMerge, resolveColorsForNodes } from '../utils.js';
 import { buildTitle } from './common.js';
 import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
-function chordTooltipSyncHtml(params: unknown, options: ChartOptions): string {
+function chordTooltipSyncHtml(params: unknown, options: ChordChartOptions): string {
   const fmt = options.tooltip?.formatValue;
   const pr = params as Record<string, unknown>;
   if (pr.dataType === 'edge') {
@@ -25,7 +25,7 @@ function chordTooltipSyncHtml(params: unknown, options: ChartOptions): string {
  */
 export function resolveChordOptions(
   data: ChordData,
-  options: ChartOptions,
+  options: ChordChartOptions,
 ): ChartSetupResult {
   const p = options.padding ?? 12;
 

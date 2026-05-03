@@ -1,4 +1,4 @@
-import type { GaugeData, ChartOptions, GaugeVariant } from '../types.js';
+import type { GaugeData, GaugeChartOptions, GaugeVariant } from '../types.js';
 import { deepMerge } from '../utils.js';
 import { buildTitle, getTitleHeight } from './common.js';
 
@@ -14,7 +14,7 @@ const GAUGE_REFERENCE_HEIGHT = 320;
  * is shifted downward so the arc is visually centred in the space below the
  * title rather than in the full canvas.
  */
-function buildGaugeCenter(options: ChartOptions): (string | number)[] {
+function buildGaugeCenter(options: GaugeChartOptions): (string | number)[] {
   const p = options.padding ?? 12;
   const titleOffset = getTitleHeight(options);
   if (titleOffset === 0) return ['50%', '50%'];
@@ -29,7 +29,7 @@ function buildGaugeCenter(options: ChartOptions): (string | number)[] {
 
 export function resolveGaugeOptions(
   data: GaugeData,
-  options: ChartOptions,
+  options: GaugeChartOptions,
 ): Record<string, unknown> {
   const variant = (options.variant ?? 'default') as GaugeVariant;
 
@@ -50,7 +50,7 @@ export function resolveGaugeOptions(
 
 function buildDefaultSeries(
   data: GaugeData,
-  options: ChartOptions,
+  options: GaugeChartOptions,
 ): Record<string, unknown>[] {
   const max = data.max ?? 100;
   const width = options.gaugeWidth ?? 18;
@@ -96,7 +96,7 @@ function buildDefaultSeries(
 
 function buildPercentageSeries(
   data: GaugeData,
-  options: ChartOptions,
+  options: GaugeChartOptions,
 ): Record<string, unknown>[] {
   const max = data.max ?? 100;
   const percent = Math.round((data.value / max) * 100);
