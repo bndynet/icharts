@@ -302,6 +302,59 @@
 
     </div>
 
+    <!-- ── RADAR ───────────────────────────────────────────────── -->
+    <el-divider content-position="left">
+      <el-text type="info" size="small" style="font-weight:600;letter-spacing:.06em;text-transform:uppercase;">Radar Charts</el-text>
+    </el-divider>
+    <div class="demo-grid">
+
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Radar Chart</span>
+            <el-tag type="info" size="small" effect="plain">type="radar"</el-tag>
+          </div>
+        </template>
+        <div ref="chartRadarEl" class="chart-box"></div>
+        <details>
+          <summary>Show code</summary>
+          <pre v-pre class="code-block">createChart(el, 'radar', {
+  indicators: [
+    { name: 'Sales',          max: 6500 },
+    { name: 'Administration', max: 16000 },
+    { name: 'IT',             max: 30000 },
+    { name: 'Support',        max: 38000 },
+    { name: 'Development',    max: 52000 },
+    { name: 'Marketing',      max: 25000 },
+  ],
+  series: [
+    { name: 'Allocated Budget', values: [4200, 3000, 20000, 35000, 50000, 18000] },
+    { name: 'Actual Spending',  values: [5000, 14000, 28000, 26000, 42000, 21000] },
+  ],
+}, { title: 'Budget vs Spending' });</pre>
+        </details>
+      </el-card>
+
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Circular Radar</span>
+            <el-tag type="info" size="small" effect="plain">variant="circle"</el-tag>
+          </div>
+        </template>
+        <div ref="chartRadarCircleEl" class="chart-box"></div>
+        <details>
+          <summary>Show code</summary>
+          <pre v-pre class="code-block">createChart(el, 'radar', radarData, {
+  title: 'Player Skill Profile',
+  variant: 'circle',
+  filled: false,
+});</pre>
+        </details>
+      </el-card>
+
+    </div>
+
     <!-- ── GAUGE ───────────────────────────────────────────────── -->
     <el-divider content-position="left">
       <el-text type="info" size="small" style="font-weight:600;letter-spacing:.06em;text-transform:uppercase;">Gauge Charts</el-text>
@@ -612,6 +665,8 @@ const chartDoughnutEl     = ref<HTMLElement>()
 const chartRoseEl         = ref<HTMLElement>()
 const chartGaugeEl        = ref<HTMLElement>()
 const chartGaugePctEl     = ref<HTMLElement>()
+const chartRadarEl        = ref<HTMLElement>()
+const chartRadarCircleEl  = ref<HTMLElement>()
 const chartChordEl        = ref<HTMLElement>()
 const chartSankeyEl       = ref<HTMLElement>()
 const chartSankeyVerticalEl = ref<HTMLElement>()
@@ -665,6 +720,37 @@ const pieData = [
   { name: 'Safari',  value: 12 },
   { name: 'Edge',    value: 8  },
 ]
+
+const radarData = {
+  indicators: [
+    { name: 'Sales',          max: 6500 },
+    { name: 'Administration', max: 16000 },
+    { name: 'IT',             max: 30000 },
+    { name: 'Support',        max: 38000 },
+    { name: 'Development',    max: 52000 },
+    { name: 'Marketing',      max: 25000 },
+  ],
+  series: [
+    { name: 'Allocated Budget', values: [4200, 3000, 20000, 35000, 50000, 18000] },
+    { name: 'Actual Spending',  values: [5000, 14000, 28000, 26000, 42000, 21000] },
+  ],
+}
+
+const radarSkillsData = {
+  indicators: [
+    { name: 'Speed',     max: 100 },
+    { name: 'Strength',  max: 100 },
+    { name: 'Agility',   max: 100 },
+    { name: 'Stamina',   max: 100 },
+    { name: 'Accuracy',  max: 100 },
+    { name: 'Strategy',  max: 100 },
+  ],
+  series: [
+    { name: 'Player A', values: [90, 70, 85, 80, 75, 65] },
+    { name: 'Player B', values: [70, 90, 65, 75, 80, 85] },
+    { name: 'Player C', values: [80, 75, 90, 70, 85, 78] },
+  ],
+}
 
 const sparkData = {
   categories: [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20],
@@ -815,6 +901,12 @@ onMounted(() => {
   createChart(chartRoseEl.value!, 'pie', pieData, { title: 'Nightingale Rose', variant: 'nightingale' })
   createChart(chartGaugeEl.value!, 'gauge', { value: 72, max: 100, label: 'Score' }, { title: 'Performance Score' })
   createChart(chartGaugePctEl.value!, 'gauge', { value: 85, max: 100, label: 'CPU' }, { title: 'CPU Usage', variant: 'percentage' })
+  createChart(chartRadarEl.value!, 'radar', radarData, { title: 'Budget vs Spending' })
+  createChart(chartRadarCircleEl.value!, 'radar', radarSkillsData, {
+    title: 'Player Skill Profile',
+    variant: 'circle',
+    filled: false,
+  })
   createChart(chartChordEl.value!, 'chord', chordData, {
     title: 'Team Collaboration',
     tooltip: { formatValue: (v: number) => v + ' interactions' },

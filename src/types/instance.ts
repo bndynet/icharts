@@ -8,6 +8,7 @@ import type { PieVariant, PieData, PieChartOptions } from './pie.js';
 import type { GaugeVariant, GaugeData, GaugeChartOptions } from './gauge.js';
 import type { SankeyVariant, SankeyData, SankeyChartOptions } from './sankey.js';
 import type { ChordData, ChordChartOptions } from './chord.js';
+import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
 
 // ---------------------------------------------------------------------------
 // Aggregate unions
@@ -22,9 +23,16 @@ export type ChartVariant =
   | AreaVariant
   | PieVariant
   | GaugeVariant
-  | SankeyVariant;
+  | SankeyVariant
+  | RadarVariant;
 
-export type ChartData = XYData | PieData | GaugeData | SankeyData | ChordData;
+export type ChartData =
+  | XYData
+  | PieData
+  | GaugeData
+  | SankeyData
+  | ChordData
+  | RadarData;
 
 /**
  * Discriminated union of every built-in chart's options type.
@@ -44,7 +52,8 @@ export type AnyChartOptions =
   | PieChartOptions
   | GaugeChartOptions
   | SankeyChartOptions
-  | ChordChartOptions;
+  | ChordChartOptions
+  | RadarChartOptions;
 
 // ---------------------------------------------------------------------------
 // Chart instance interface (returned by createChart)

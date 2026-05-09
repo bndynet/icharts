@@ -84,6 +84,7 @@ chart.dispose();
 | Gauge  | `gauge`  | `default`, `percentage` |
 | Sankey | `sankey` | `default`, `vertical` |
 | Chord  | `chord`  | `default` |
+| Radar  | `radar`  | `default`, `circle` |
 
 ---
 
@@ -157,6 +158,27 @@ Each node accepts an optional `color` field to pin it to a specific color. The `
 ```
 
 Each node accepts optional `color` and `value` fields. When `value` is omitted, the arc size is derived from the sum of connected link values.
+
+### Radar — `RadarData`
+
+```ts
+{
+  indicators: [
+    { name: 'Sales',          max: 6500 },
+    { name: 'Administration', max: 16000 },
+    { name: 'IT',             max: 30000 },
+    { name: 'Support',        max: 38000 },
+    { name: 'Development',    max: 52000 },
+    { name: 'Marketing',      max: 25000 },
+  ],
+  series: [
+    { name: 'Allocated Budget', values: [4200, 3000, 20000, 35000, 50000, 18000] },
+    { name: 'Actual Spending',  values: [5000, 14000, 28000, 26000, 42000, 21000] },
+  ],
+}
+```
+
+`series[i].values[j]` is plotted on `indicators[j]`, so both arrays must line up by index. `max` / `min` are optional — omit them to let ECharts auto-scale each axis to the data range.
 
 ---
 
@@ -400,6 +422,30 @@ createChart(el, 'sankey', {
 
 Use `variant: 'vertical'` to orient the flow top-to-bottom instead of left-to-right.
 
+### Radar Chart
+
+```ts
+createChart(el, 'radar', {
+  indicators: [
+    { name: 'Sales',          max: 6500 },
+    { name: 'Administration', max: 16000 },
+    { name: 'IT',             max: 30000 },
+    { name: 'Support',        max: 38000 },
+    { name: 'Development',    max: 52000 },
+    { name: 'Marketing',      max: 25000 },
+  ],
+  series: [
+    { name: 'Allocated Budget', values: [4200, 3000, 20000, 35000, 50000, 18000] },
+    { name: 'Actual Spending',  values: [5000, 14000, 28000, 26000, 42000, 21000] },
+  ],
+}, {
+  title: 'Budget vs Spending',
+  filled: true,
+});
+```
+
+Use `variant: 'circle'` to render circular grid rings instead of a polygon outline. Each series gets its own palette color (resolved through the same `colors` / `colorMap` / theme pipeline as every other chart type).
+
 ### Chord Chart
 
 ```ts
@@ -437,6 +483,7 @@ Each chart type has its own options interface that extends the base `ChartOption
 | `gauge`    | `GaugeChartOptions`  | `ChartOptions`   |
 | `sankey`   | `SankeyChartOptions` | `ChartOptions`   |
 | `chord`    | `ChordChartOptions`  | `ChartOptions`   |
+| `radar`    | `RadarChartOptions`  | `ChartOptions`   |
 
 `createChart` accepts an `AnyChartOptions` union — a chart-specific literal like `{ innerRadius: '50%' }` type-checks as `PieChartOptions` without importing the subtype. For stricter validation, import the matching `XxxChartOptions` and annotate explicitly.
 
@@ -616,6 +663,19 @@ Each chart type has its own options interface that extends the base `ChartOption
 ### `ChordChartOptions` (extends `ChartOptions`)
 
 No chord-specific knobs today; reuses every field on the base `ChartOptions`.
+
+### `RadarChartOptions` (extends `ChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'circle';   // polygon outline (default) or circular rings
+  filled?: boolean;                  // fill polygon area, default: true
+  radius?: string | number;          // radar.radius, default: '65%'
+
+  // Radar is a non-XY chart that still renders a legend (one entry per polygon).
+  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
+}
+```
 
 ---
 

@@ -160,33 +160,91 @@ export function buildGrid(
   );
 }
 
-// Space reserved in the grid for the legend component (legend height + gap to plot area).
-const LEGEND_RESERVE = 36;
+/**
+ * Pixel slot reserved for the legend component (legend height + gap to
+ * the plot area). Adapters compose this with their own layout — see
+ * {@link getLegendReserve} for the helper that turns it into per-edge
+ * reserves, and {@link buildGrid} for the XY-chart consumer.
+ */
+export const LEGEND_RESERVE = 36;
+
+/**
+ * Pixel reserves at each canvas edge. Empty edges are `0`.
+ *
+ * Returned by {@link getLegendReserve}; consumed by chart-body
+ * positioning math (radar.center + radius, pie.center, gauge.center)
+ * and by {@link buildGrid} for grid-based charts.
+ */
+export interface EdgeReserves {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+const EMPTY_EDGES: EdgeReserves = Object.freeze({ top: 0, bottom: 0, left: 0, right: 0 });
+
+/**
+ * Pixel reserve the legend occupies on each canvas edge.
+ *
+ * Returns zeros on every edge when the legend is hidden. Non-zero on
+ * exactly one edge — whichever {@link LegendOptions.position} selects —
+ * when shown. Charts subtract these reserves from the available canvas
+ * when positioning a body that doesn't live on the XY grid (radar
+ * polygon, pie/gauge ring) so the body and the legend row don't
+ * collide.
+ *
+ * Reserves do NOT include the chart's outer `padding`; that's a
+ * separate uniform offset that callers add when their coordinate
+ * system needs it (e.g. {@link buildGrid} adds `padding + reserve`
+ * because grid edges are absolute pixels, while radar's percent-based
+ * center math doesn't need it because padding cancels symmetrically).
+ *
+ * @param showLegend pass `legend.show` after applying any adapter-side
+ *   default (some charts default the legend off — see pie / radar).
+ * @param extraGap optional pixel padding stacked onto the legend's own
+ *   edge, for charts whose body extends past its nominal radius (e.g.
+ *   radar.axisName labels overflow the polygon by ~15 px).
+ */
+export function getLegendReserve(
+  options: WithLegend,
+  showLegend: boolean,
+  extraGap = 0,
+): EdgeReserves {
+  if (!showLegend) return { ...EMPTY_EDGES };
+  const slot = LEGEND_RESERVE + extraGap;
+  const position = options.legend?.position ?? 'bottom';
+  switch (position) {
+    case 'top':
+      return { ...EMPTY_EDGES, top: slot };
+    case 'bottom':
+      return { ...EMPTY_EDGES, bottom: slot };
+    case 'left':
+      return { ...EMPTY_EDGES, left: slot };
+    case 'right':
+      return { ...EMPTY_EDGES, right: slot };
+    default:
+      return { ...EMPTY_EDGES };
+  }
+}
 
 function getLegendGridAdjustment(
   options: XYChartOptions,
   legendShow?: boolean,
 ): Record<string, unknown> {
-  const legend = options.legend ?? {};
-  const show = legendShow ?? legend.show ?? true;
-  if (!show) return {};
-
-  const pos = legend.position ?? 'bottom';
+  const show = legendShow ?? options.legend?.show ?? true;
+  const reserves = getLegendReserve(options, show);
+  // Grid bottom/top etc. are absolute pixel coordinates from the
+  // canvas edge, so the grid must pull back by `padding + reserve`
+  // (the radar/pie path doesn't add `padding` because their percent
+  // center math against the full canvas already absorbs it).
   const p = getChartPadding(options);
-  // Grid must pull back far enough for: outer padding + legend items + gap.
-  const total = p + LEGEND_RESERVE;
-  switch (pos) {
-    case 'top':
-      return { top: total };
-    case 'bottom':
-      return { bottom: total };
-    case 'left':
-      return { left: total };
-    case 'right':
-      return { right: total };
-    default:
-      return {};
-  }
+  const out: Record<string, unknown> = {};
+  if (reserves.top > 0) out.top = p + reserves.top;
+  if (reserves.bottom > 0) out.bottom = p + reserves.bottom;
+  if (reserves.left > 0) out.left = p + reserves.left;
+  if (reserves.right > 0) out.right = p + reserves.right;
+  return out;
 }
 
 export function buildXAxis(

@@ -57,8 +57,39 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.bar.label.color).toBe('#aaaaaa');
     expect(a.line.label.color).toBe('#aaaaaa');
     expect(a.line.endLabel.color).toBe('#aaaaaa');
+    expect(a.radar.axisName.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
     expect(b.line.endLabel.color).toBe('#bbbbbb');
+    expect(b.radar.axisName.color).toBe('#bbbbbb');
+  });
+
+  it('radar.axisName.color follows textPrimary so indicator labels stay legible on dark themes', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.radar.axisName.color).toBe(COLORS.textPrimary);
+  });
+
+  it('radar.axisLine + splitLine follow the structural-line tokens', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.radar.axisLine.lineStyle.color).toBe(COLORS.axisLine);
+    expect(theme.radar.splitLine.lineStyle.color).toBe(COLORS.gridLine);
+  });
+
+  it('radar grid lines stay in lockstep with XY axis grid lines (shared tokens)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    // Spokes / frame line — same `axisLine` token both places.
+    expect(theme.radar.axisLine.lineStyle.color).toBe(
+      theme.categoryAxis.axisLine.lineStyle.color,
+    );
+    expect(theme.radar.axisLine.lineStyle.color).toBe(
+      theme.valueAxis.axisLine.lineStyle.color,
+    );
+    // Grid rules / concentric rings — same `gridLine` token both places.
+    expect(theme.radar.splitLine.lineStyle.color).toBe(
+      theme.categoryAxis.splitLine.lineStyle.color,
+    );
+    expect(theme.radar.splitLine.lineStyle.color).toBe(
+      theme.valueAxis.splitLine.lineStyle.color,
+    );
   });
 });

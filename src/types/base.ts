@@ -12,6 +12,7 @@ export enum ChartType {
   Gauge = 'gauge',
   Sankey = 'sankey',
   Chord = 'chord',
+  Radar = 'radar',
 }
 
 // ---------------------------------------------------------------------------

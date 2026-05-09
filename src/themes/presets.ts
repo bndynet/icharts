@@ -74,10 +74,17 @@ const DARK_COLORS: ChartThemeColors = {
   textPrimary:   '#f1f5f9',
   textSecondary: '#94a3b8',
 
-  // Structure — gridLine shares surface level so grid "frames" the space;
-  // axisLine is one step brighter so the axis spine is legible.
-  gridLine: '#1e293b',
-  axisLine: '#334155',
+  // Structure — same visual hierarchy as the light theme, walked one
+  // step up the slate scale per token so each rule stays visible
+  // against a slate-800 surface:
+  //   surface  (#1e293b, slate-800)
+  //   gridLine (#334155, slate-700) — subtle but legible rules
+  //   axisLine (#475569, slate-600) — clearly more prominent frame
+  // Earlier versions used `gridLine: '#1e293b'` (= surface), which made
+  // every XY splitLine and radar ring disappear on the default dark
+  // dashboard background.
+  gridLine: '#334155',
+  axisLine: '#475569',
 
   // Tooltip — slightly elevated surface to pop above the chart canvas
   tooltipBackground: '#1e293b',

@@ -22,6 +22,9 @@ export {
 export {
   formatAxisTooltipSyncHtml,
   buildAxisTooltipContext,
+  getLegendReserve,
+  LEGEND_RESERVE,
+  type EdgeReserves,
 } from './adapters/common.js';
 
 // Adapter registry (extensibility)
@@ -49,6 +52,9 @@ export {
   type ChordData,
   type ChordNode,
   type ChordLink,
+  type RadarData,
+  type RadarIndicator,
+  type RadarDataSeries,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
   type XYChartOptions,
   type LineChartOptions,
@@ -58,6 +64,7 @@ export {
   type GaugeChartOptions,
   type SankeyChartOptions,
   type ChordChartOptions,
+  type RadarChartOptions,
   // Shared option building blocks
   type SeriesOptions,
   type LegendOptions,
@@ -78,8 +85,10 @@ export {
   type PieVariant,
   type GaugeVariant,
   type SankeyVariant,
+  type RadarVariant,
   isSankeyData,
   isChordData,
+  isRadarData,
 } from './types.js';
 
 // Configuration

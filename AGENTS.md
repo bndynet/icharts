@@ -119,6 +119,8 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 - **README.md** — user-facing API, data formats, chart type table, variants.
 - **AGENTS.md** — agent workflow (this file). Keep in sync with structural changes.
+- **docs/COLORS.md** — internal design guide for the color pipeline (resolver layer, assembly layer, theme tokens, per-chart placement rules). Read before adding a new chart type or touching `src/utils.ts` color helpers.
+- **docs/LEGEND.md** — internal design guide for legend rendering and layout (`buildLegend` for appearance, `getLegendReserve` for per-edge pixel slots, grid vs body-centered consumer patterns). Read when adding a chart that renders a legend or extending the legend API.
 
 ### Demo site
 
@@ -154,6 +156,57 @@ adapter.resolve(data, options) ─── builds option ───  deepMerge(echa
 | gauge | _(none)_ | ECharts registered theme only (no resolver call) |
 
 **Sankey vs Chord data:** both use `{ nodes, links }`. Type guards `isSankeyData` / `isChordData` are structurally identical — the chart **`type`** string selects the adapter.
+
+## Legend layout pipeline (read before adding charts with a legend)
+
+Same two-layer pattern as colors. One **appearance** builder, one **reserve** helper, two consumer paths — full design rationale and examples in [docs/LEGEND.md](docs/LEGEND.md).
+
+```
+                ┌────────────────────────────────────────┐
+                │  RESERVE LAYER  (src/adapters/common)  │
+                │   getLegendReserve(options, show,      │
+                │                    extraGap?)          │
+                │   → EdgeReserves {top,bottom,left,right}│
+                └─────────────────┬──────────────────────┘
+                                  │
+              ┌───────────────────┼──────────────────────┐
+              ▼                   ▼                      ▼
+         buildGrid           buildRadarLayout       <new chart>
+         (XY: grid edges)    (radar: center +       (body-centered
+                              radius shrink)         positioning)
+```
+
+`buildLegend(names, options)` is the orthogonal **appearance** helper — emits the ECharts `legend` block (icon, itemGap, position-driven `top`/`bottom`/`left`/`right`). Adapters never hand-author a `legend: { ... }` literal.
+
+| Consumer | Chart types | What it does with `EdgeReserves` |
+|---|---|---|
+| `buildGrid` (XY grid path) | line, bar, area | Pulls grid edge back by `padding + reserve`. Adapters call `buildGrid` (which uses the helper internally), not the helper directly. |
+| Body-centered path | radar (today), pie / gauge (potential) | Shifts component `center` and shrinks `radius` via percent math against a reference card size. Sees the reserve as raw pixels, no `padding` added. |
+
+### Rules
+
+1. **`LegendOptions` only on subtypes that render a legend.** `XYChartOptions` (line/bar/area), `PieChartOptions`, `RadarChartOptions`. **Never** on base `ChartOptions` — gauge / sankey / chord deliberately don't expose it.
+2. **One source of truth for the slot.** `LEGEND_RESERVE` is defined once in `src/adapters/common.ts` and exported. Do not redeclare in any adapter.
+3. **Use `getLegendReserve(options, showLegend, extraGap?)` whenever a non-XY chart needs to react to legend position.** Returns `EdgeReserves` (`{top,bottom,left,right}`) with the slot on exactly the active edge, zero elsewhere.
+4. **`extraGap` is for body-overflow only.** Use it when chart-body decorations extend past the nominal radius (radar.axisName overflows ~15 px → `RADAR_EDGE_GAP = 24`). Don't use it to "make the legend bigger" — adjust spacing inside `echarts.legend` instead.
+5. **Compute `showLegend` once, forward it twice.** The adapter picks a chart-appropriate default (e.g. radar: `options.legend?.show ?? names.length > 1`) and passes the same value to both `buildLegend` and `getLegendReserve`. Don't let them disagree.
+6. **Theme owns the text color.** Legend text follows `colors.textPrimary` via `src/themes/echarts-theme.ts`. Adapters don't set `legend.textStyle.color`.
+
+### Public surface for `registerAdapter()` users
+
+Custom chart types written outside this repo can import the same helpers:
+
+```ts
+import {
+  buildLegend,
+  getLegendReserve,
+  LEGEND_RESERVE,
+  type EdgeReserves,
+  type LegendOptions,
+} from '@bndynet/icharts';
+```
+
+See [docs/LEGEND.md §6](docs/LEGEND.md) for a full custom-adapter example.
 
 ### Do not hardcode chart colors in adapters
 
@@ -199,7 +252,7 @@ Checklist:
 - [ ] Define `XxxChartOptions extends ChartOptions` (or `extends XYChartOptions` for XY-family). Put every chart-specific knob (including the narrowed `variant?: XxxVariant`) on the subtype.
 - [ ] Add the new `XxxChartOptions` to the `AnyChartOptions` union in `src/types/instance.ts` so callers can pass a chart-specific literal to `createChart` without an explicit cast.
 - [ ] Add the new file to `src/types/index.ts`'s re-export list.
-- [ ] Do **NOT** add chart-specific fields to base `ChartOptions`. Base `ChartOptions` is reserved for truly cross-cutting concerns: `theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`. Note: `grid` lives on `XYChartOptions` only, and `legend` lives on `XYChartOptions` and `PieChartOptions` — gauge/sankey/chord do not render either.
+- [ ] Do **NOT** add chart-specific fields to base `ChartOptions`. Base `ChartOptions` is reserved for truly cross-cutting concerns: `theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`. Note: `grid` lives on `XYChartOptions` only, and `legend` lives on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions` — gauge/sankey/chord do not render either.
 
 ### 2. Adapter module (`src/adapters/<type>.ts`)
 
@@ -232,6 +285,7 @@ Reference implementations:
 | Item tooltips + variants | `src/adapters/pie.ts` (`PieChartOptions`) |
 | Graph nodes/links | `src/adapters/sankey.ts` (`SankeyChartOptions`), `src/adapters/chord.ts` (`ChordChartOptions`) |
 | Single-metric | `src/adapters/gauge.ts` (`GaugeChartOptions`) |
+| Body-centered chart with legend reservation | `src/adapters/radar.ts` (`RadarChartOptions`) — uses `getLegendReserve(..., RADAR_EDGE_GAP)` to shift `center` and shrink `radius` based on `legend.position`. See [docs/LEGEND.md §4.2](docs/LEGEND.md). |
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` and `src/adapters/line.ts` (`race` branches) |
 | Variant-specific sub-object (`race.topN` / `race.frameDuration`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`), `src/types/line.ts` (`LineRaceOptions` → `LineChartOptions.race`) |
 | Streaming axis pinning (race) | `src/adapters/line.ts` auto-pins `xAxis.min` to `categories[0]` for time-axis race; users pin `max` themselves via `xAxis.max`. Without this, axis re-layout each frame compresses the line. |
@@ -254,6 +308,21 @@ The adapter is responsible for both *resolving* (one call to the resolver) and *
 - [ ] **Graph types** (`{ nodes, links }`): build entries with `mapGraphNodesForECharts(nodes, extra?)` (pure shape mapper, no colors), then after `deepMerge` call `paintGraphNodes(merged, '<seriesType>', new Map(nodes.map((n, i) => [n.name, colors[i]])))`.
 - [ ] **Area + spark**: also apply `buildSparkAreaGradient(colors[i])` to each `series[i].areaStyle`.
 - [ ] **No-name types** (e.g. gauge): skip the resolver entirely; rely on the registered ECharts theme.
+
+### 3.5 Legend (only when the chart renders a legend)
+
+Skip this section entirely when your chart has no legend (gauge / sankey / chord — none of them expose `legend?` on the subtype). Full design reference: [docs/LEGEND.md](docs/LEGEND.md).
+
+- [ ] Add `legend?: LegendOptions` to your `XxxChartOptions` subtype. Never add it to base `ChartOptions`.
+- [ ] In the adapter, compute the show flag with a chart-appropriate default and forward it consistently:
+  ```ts
+  const showLegend = options.legend?.show ?? names.length > 1;
+  const legend = buildLegend(names, { ...options, legend: { ...options.legend, show: showLegend } });
+  ```
+- [ ] **Grid charts** (chart extends `XYChartOptions`): just call `buildGrid(options)`. The helper already consumes `getLegendReserve` internally. Use `buildGrid(options, { legendShow: false })` when the adapter forcibly hides the legend (see bar's `colorByCategory` mode).
+- [ ] **Body-centered charts** (radar, future pie/gauge improvements): call `getLegendReserve(options, showLegend, extraGap?)`, combine with title reserves into edge reserves, derive `center` / `radius` via percent math. See `src/adapters/radar.ts` `buildRadarLayout`.
+- [ ] Pass an `extraGap` only when your chart body has decorations that extend past its nominal radius (radar.axisName labels overflow by ~15 px → `RADAR_EDGE_GAP = 24`).
+- [ ] Tests assert layout reacts to each `legend.position` value (top/bottom/left/right) and collapses when `show: false`. See `src/adapters/radar.test.ts` for the canonical pattern.
 
 ### 4. Registry (`src/adapters/index.ts`)
 
@@ -315,7 +384,8 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Resolve colors anywhere except via `resolveColors` / `resolveColorsForNodes` — do not read `colorHub` directly, do not duplicate the priority rules (`options.colors` / `options.colorMap` / `consistentColors` / `node.color`).
 - Hardcode hex/rgb palette colors in `src/adapters/**` — use the color pipeline above (see **Do not hardcode chart colors**).
 - Re-introduce a central `applyChartColors` / `core.ts` color post-processing step — adapters now own color assembly end-to-end.
-- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions` and `PieChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
+- Redeclare `LEGEND_RESERVE` (or any legend-slot magic number) inside an adapter, or hand-author a `legend: { ... }` literal. Import `LEGEND_RESERVE` / `getLegendReserve` / `buildLegend` from `src/adapters/common.ts` — see [docs/LEGEND.md](docs/LEGEND.md) and the **Legend layout pipeline** section above.
+- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
 - Wrap a chart's own general options inside a sub-object/named type when they could be flat. `BarChartOptions.barWidth` / `colorByCategory` / `PieChartOptions.sliceBorderRadius` live directly on the subtype — no `bar?: BarOptions` or `slice?: PieSliceOptions` wrappers. Reserve sub-objects (`race?: BarRaceOptions`, …) for **variant-bound or scoped sub-features** only.
 - Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.
 

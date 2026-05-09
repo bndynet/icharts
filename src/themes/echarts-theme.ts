@@ -9,11 +9,13 @@ import type { ChartThemeColors } from './types.js';
  *  surface       → tooltip bg, axis-pointer callout bg, pie-slice border
  *  surfaceText   → tooltip text, axis-pointer callout text
  *  textPrimary   → chart title, legend, pie labels, gauge detail (value),
- *                  markPoint labels, bar/line value labels (incl. race value
- *                  labels and line-race endLabels)
+ *                  radar indicator names (axisName), markPoint labels,
+ *                  bar/line value labels (incl. race value labels and
+ *                  line-race endLabels)
  *  textSecondary → axis tick labels, gauge title (label text e.g. "CPU")
- *  gridLine      → splitLine (grid rules)
- *  axisLine      → axis spine, tick marks, cursor crosshair
+ *  gridLine      → splitLine (grid rules), radar splitLine + alternating
+ *                  splitArea bands
+ *  axisLine      → axis spine, tick marks, cursor crosshair, radar axisLine
  *
  * Note on label colors: bar/line adapters intentionally do NOT set
  * `series.label.color` / `series.endLabel.color`. ECharts deep-merges the
@@ -99,15 +101,54 @@ export function buildEChartsTheme(
     markPoint: {
       label: { color: colors.textPrimary },
     },
+
+    radar: {
+      // Indicator names ("Sales", "Marketing", …) are the only readable
+      // labels on the chart — treat them like pie/legend text rather than
+      // axis ticks so they stay legible against both light and dark
+      // backgrounds. Without this entry they fall back to ECharts'
+      // built-in grey and become hard to read on dark themes.
+      axisName: { color: colors.textPrimary },
+      // Spokes (axisLine) and concentric rings (splitLine) reuse the
+      // same `axisLine` / `gridLine` tokens as XY axes so a radar
+      // sitting beside a bar chart agrees on grid color.
+      ...buildStructuralLineDefaults(colors),
+      // Subtle alternating bands — half-strength gridLine so they hint at
+      // the polygon's structure without competing with the data series.
+      splitArea: {
+        show: true,
+        areaStyle: { color: ['transparent', colors.gridLine], opacity: 0.3 },
+      },
+    },
+  };
+}
+
+/**
+ * Themed defaults for "structural lines" — the axis spine plus the
+ * split-line grid rules — shared between XY axes (categoryAxis,
+ * valueAxis, …) and the radar component.
+ *
+ * Both visual roles map back to the same tokens:
+ *   - {@link ChartThemeColors.axisLine}  → XY axis spine / radar spokes
+ *     (the "frame" rule, intentionally more prominent than gridLine).
+ *   - {@link ChartThemeColors.gridLine}  → XY splitLine / radar's
+ *     concentric polygon rings (the "subtle reading aid" rules).
+ *
+ * Built once so a token change repaints every chart type in lockstep.
+ * Adapters and `buildAxisStyle` consume this via spread; never
+ * redeclare the inner `{ lineStyle: { color: ... } }` shape elsewhere
+ * in the theme.
+ */
+function buildStructuralLineDefaults(colors: ChartThemeColors) {
+  return {
+    axisLine: { show: true, lineStyle: { color: colors.axisLine } },
+    splitLine: { show: true, lineStyle: { color: colors.gridLine } },
   };
 }
 
 function buildAxisStyle(colors: ChartThemeColors) {
   return {
-    axisLine: {
-      show: true,
-      lineStyle: { color: colors.axisLine },
-    },
+    ...buildStructuralLineDefaults(colors),
     axisTick: {
       show: true,
       lineStyle: { color: colors.axisLine },
@@ -115,10 +156,6 @@ function buildAxisStyle(colors: ChartThemeColors) {
     axisLabel: {
       show: true,
       color: colors.textSecondary,
-    },
-    splitLine: {
-      show: true,
-      lineStyle: { color: colors.gridLine },
     },
     splitArea: { show: false },
   };
