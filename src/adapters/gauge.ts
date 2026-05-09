@@ -1,6 +1,6 @@
 import type { GaugeData, GaugeChartOptions, GaugeVariant } from '../types.js';
 import { deepMerge } from '../utils.js';
-import { buildTitle, getTitleHeight } from './common.js';
+import { buildTitle, getTitleReserve } from './common.js';
 
 /**
  * Reference chart height (px) used to convert the title area into a
@@ -16,7 +16,7 @@ const GAUGE_REFERENCE_HEIGHT = 320;
  */
 function buildGaugeCenter(options: GaugeChartOptions): (string | number)[] {
   const p = options.padding ?? 12;
-  const titleOffset = getTitleHeight(options);
+  const titleOffset = getTitleReserve(options).top;
   if (titleOffset === 0) return ['50%', '50%'];
 
   // Compute how much of the chart height the title area occupies and shift

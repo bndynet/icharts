@@ -120,7 +120,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 - **README.md** — user-facing API, data formats, chart type table, variants.
 - **AGENTS.md** — agent workflow (this file). Keep in sync with structural changes.
 - **docs/COLORS.md** — internal design guide for the color pipeline (resolver layer, assembly layer, theme tokens, per-chart placement rules). Read before adding a new chart type or touching `src/utils.ts` color helpers.
-- **docs/LEGEND.md** — internal design guide for legend rendering and layout (`buildLegend` for appearance, `getLegendReserve` for per-edge pixel slots, grid vs body-centered consumer patterns). Read when adding a chart that renders a legend or extending the legend API.
+- **docs/LAYOUT.md** — internal design guide for the title + legend layout pipeline (`buildTitle` / `buildLegend` for appearance, `getTitleReserve` / `getLegendReserve` for per-edge pixel slots, grid vs body-centered consumer patterns). Read when adding a chart that renders a title or legend or extending either API.
 
 ### Demo site
 
@@ -157,40 +157,50 @@ adapter.resolve(data, options) ─── builds option ───  deepMerge(echa
 
 **Sankey vs Chord data:** both use `{ nodes, links }`. Type guards `isSankeyData` / `isChordData` are structurally identical — the chart **`type`** string selects the adapter.
 
-## Legend layout pipeline (read before adding charts with a legend)
+## Layout pipeline (read before adding charts with a title or legend)
 
-Same two-layer pattern as colors. One **appearance** builder, one **reserve** helper, two consumer paths — full design rationale and examples in [docs/LEGEND.md](docs/LEGEND.md).
+Same two-layer pattern as colors. **Two appearance builders** (`buildTitle`, `buildLegend`), **two reserve helpers** (`getTitleReserve`, `getLegendReserve`) returning the same `EdgeReserves` currency, two consumer paths — full design rationale and examples in [docs/LAYOUT.md](docs/LAYOUT.md).
 
 ```
-                ┌────────────────────────────────────────┐
-                │  RESERVE LAYER  (src/adapters/common)  │
-                │   getLegendReserve(options, show,      │
-                │                    extraGap?)          │
-                │   → EdgeReserves {top,bottom,left,right}│
-                └─────────────────┬──────────────────────┘
+                ┌──────────────────────────────────────────┐
+                │  RESERVE LAYER  (src/adapters/common)    │
+                │   getTitleReserve(options)               │
+                │   getLegendReserve(options, show,        │
+                │                    extraGap?)            │
+                │   → EdgeReserves {top,bottom,left,right} │
+                └─────────────────┬────────────────────────┘
                                   │
-              ┌───────────────────┼──────────────────────┐
-              ▼                   ▼                      ▼
-         buildGrid           buildRadarLayout       <new chart>
-         (XY: grid edges)    (radar: center +       (body-centered
-                              radius shrink)         positioning)
+              ┌───────────────────┼────────────────────────┐
+              ▼                   ▼                        ▼
+         buildGrid           buildRadarLayout         <new chart>
+         (XY: grid edges)    (radar: center +         (body-centered
+                              radius shrink)           positioning)
 ```
 
-`buildLegend(names, options)` is the orthogonal **appearance** helper — emits the ECharts `legend` block (icon, itemGap, position-driven `top`/`bottom`/`left`/`right`). Adapters never hand-author a `legend: { ... }` literal.
+`buildTitle(options)` and `buildLegend(names, options)` are the orthogonal **appearance** helpers — they emit the ECharts `title` / `legend` blocks. Adapters never hand-author `title: { ... }` or `legend: { ... }` literals.
+
+Both reserve helpers return the same `EdgeReserves` shape so adapters that need both (e.g. radar) compose them in a single edge loop instead of branching by widget type.
 
 | Consumer | Chart types | What it does with `EdgeReserves` |
 |---|---|---|
-| `buildGrid` (XY grid path) | line, bar, area | Pulls grid edge back by `padding + reserve`. Adapters call `buildGrid` (which uses the helper internally), not the helper directly. |
-| Body-centered path | radar (today), pie / gauge (potential) | Shifts component `center` and shrinks `radius` via percent math against a reference card size. Sees the reserve as raw pixels, no `padding` added. |
+| `buildGrid` (XY grid path) | line, bar, area | Pulls each grid edge back by `padding + reserve`, where reserve = title's top + legend's active edge. Adapters call `buildGrid` (which consumes both helpers internally), not the helpers directly. |
+| Body-centered path | radar (today), pie / gauge (title-only today, can extend) | Composes title + legend reserves into a single `EdgeReserves`, then shifts component `center` and shrinks `radius` via percent math against a reference card size. Sees reserves as raw pixels (no `padding` baked in). |
 
 ### Rules
 
-1. **`LegendOptions` only on subtypes that render a legend.** `XYChartOptions` (line/bar/area), `PieChartOptions`, `RadarChartOptions`. **Never** on base `ChartOptions` — gauge / sankey / chord deliberately don't expose it.
-2. **One source of truth for the slot.** `LEGEND_RESERVE` is defined once in `src/adapters/common.ts` and exported. Do not redeclare in any adapter.
-3. **Use `getLegendReserve(options, showLegend, extraGap?)` whenever a non-XY chart needs to react to legend position.** Returns `EdgeReserves` (`{top,bottom,left,right}`) with the slot on exactly the active edge, zero elsewhere.
-4. **`extraGap` is for body-overflow only.** Use it when chart-body decorations extend past the nominal radius (radar.axisName overflows ~15 px → `RADAR_EDGE_GAP = 24`). Don't use it to "make the legend bigger" — adjust spacing inside `echarts.legend` instead.
-5. **Compute `showLegend` once, forward it twice.** The adapter picks a chart-appropriate default (e.g. radar: `options.legend?.show ?? names.length > 1`) and passes the same value to both `buildLegend` and `getLegendReserve`. Don't let them disagree.
-6. **Theme owns the text color.** Legend text follows `colors.textPrimary` via `src/themes/echarts-theme.ts`. Adapters don't set `legend.textStyle.color`.
+1. **Title is universal; legend lives on subtypes that render one.** Every chart inherits `title?` from base `ChartOptions`. `legend?: LegendOptions` lives only on `XYChartOptions` (line/bar/area), `PieChartOptions`, `RadarChartOptions`. **Never** add `legend` to base `ChartOptions` — gauge / sankey / chord deliberately don't expose it.
+2. **One source of truth per widget.** `LEGEND_RESERVE` is defined once in `src/adapters/common.ts` and exported. The (module-private) `getTitleHeight` is the single entry point for title geometry; external code goes through `getTitleReserve(options).top`. Do not redeclare these in adapters.
+3. **Use the reserve helpers whenever a non-XY chart needs to react to title presence or legend position.** Both return `EdgeReserves` (`{top,bottom,left,right}`) — title puts its widget height on `top`, legend puts its slot on the active edge, zero elsewhere. Compose with the same edge loop.
+4. **`extraGap` (legend only) is for body-overflow.** Use it when chart-body decorations extend past the nominal radius (radar.axisName overflows ~15 px → `RADAR_EDGE_GAP = 24`). Don't use it to "make the legend bigger" — adjust spacing inside `echarts.legend` instead. `getTitleReserve` has no equivalent — bump `options.padding` if a title needs more breathing room.
+5. **Compute `showLegend` once, forward it twice.** The adapter picks a chart-appropriate default (e.g. radar: `options.legend?.show ?? names.length > 1`) and passes the same value to both `buildLegend` and `getLegendReserve`. Don't let them disagree. Title has no equivalent flag — visibility is unambiguous from `options.title`.
+6. **Theme owns the text color.** Title, legend, and data labels all draw their color from `colors.textPrimary` via `src/themes/echarts-theme.ts` — adapters never set `color` on any of them. The themed surfaces are:
+   - `title.textStyle.color`, `legend.textStyle.color`
+   - `bar.label.color` (covers `showLabel` **and** race value labels)
+   - `line.label.color`, `line.endLabel.color` (covers `showLabel` **and** line-race tracking labels)
+   - `pie.label.color`, `gauge.detail.color` / `gauge.title.color`, `markPoint.label.color`
+
+   ECharts deep-merges these series-type defaults into each series, so adapters can keep emitting `label: { show, position, valueAnimation, formatter }` (no `color` key) and a `chart.setTheme(...)` call automatically repaints every label. If a future feature needs a different label color (e.g. a warning highlight), thread it through the theme — don't hardcode it in the adapter. See `src/themes/echarts-theme.test.ts` for the regression test that locks this contract.
+7. **Reserves are padding-free.** Neither helper adds chart `padding`; callers add it where their coordinate system needs it (the XY grid path adds `padding + reserve`; the percent-center path lets `padding` cancel symmetrically). See [docs/LAYOUT.md §4.3](docs/LAYOUT.md).
 
 ### Public surface for `registerAdapter()` users
 
@@ -198,7 +208,9 @@ Custom chart types written outside this repo can import the same helpers:
 
 ```ts
 import {
+  buildTitle,
   buildLegend,
+  getTitleReserve,
   getLegendReserve,
   LEGEND_RESERVE,
   type EdgeReserves,
@@ -206,7 +218,7 @@ import {
 } from '@bndynet/icharts';
 ```
 
-See [docs/LEGEND.md §6](docs/LEGEND.md) for a full custom-adapter example.
+See [docs/LAYOUT.md §6](docs/LAYOUT.md) for a full custom-adapter example.
 
 ### Do not hardcode chart colors in adapters
 
@@ -285,12 +297,14 @@ Reference implementations:
 | Item tooltips + variants | `src/adapters/pie.ts` (`PieChartOptions`) |
 | Graph nodes/links | `src/adapters/sankey.ts` (`SankeyChartOptions`), `src/adapters/chord.ts` (`ChordChartOptions`) |
 | Single-metric | `src/adapters/gauge.ts` (`GaugeChartOptions`) |
-| Body-centered chart with legend reservation | `src/adapters/radar.ts` (`RadarChartOptions`) — uses `getLegendReserve(..., RADAR_EDGE_GAP)` to shift `center` and shrink `radius` based on `legend.position`. See [docs/LEGEND.md §4.2](docs/LEGEND.md). |
+| Body-centered chart composing title + legend reserves | `src/adapters/radar.ts` (`RadarChartOptions`) — uses `getTitleReserve(options)` + `getLegendReserve(..., RADAR_EDGE_GAP)` to shift `center` and shrink `radius` based on which edges are occupied. See [docs/LAYOUT.md §4.2](docs/LAYOUT.md). |
+| Body-centered chart consuming title-only reserve | `src/adapters/pie.ts`, `src/adapters/gauge.ts` — read `getTitleReserve(options).top` to shift the chart body below the title widget. |
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` and `src/adapters/line.ts` (`race` branches) |
 | Variant-specific sub-object (`race.topN` / `race.frameDuration`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`), `src/types/line.ts` (`LineRaceOptions` → `LineChartOptions.race`) |
 | Streaming axis pinning (race) | `src/adapters/line.ts` auto-pins `xAxis.min` to `categories[0]` for time-axis race; users pin `max` themselves via `xAxis.max`. Without this, axis re-layout each frame compresses the line. |
 | Auto-measured race frame duration | `src/adapters/race-utils.ts` (`resolveRaceFrameDuration`) — priority: explicit `race.frameDuration` > `ctx.observedFrameMs` (clamped to `[80, 3000]` ms) > 500 ms fallback. Consumed by bar/line race resolvers so callers don't have to mirror their own `setInterval` value. `core.ts` measures the gap between consecutive `update()` calls via `performance.now()` and threads the value through `RenderContext`. |
 | Adaptive race label headroom | `src/adapters/race-utils.ts` (`resolveRaceLabelHeadroom`) — bar/line race resolvers measure the widest current-frame label (`String(value)` for bar, `"<name> <value>"` for line) via a cached `canvas.getContext('2d').measureText` (falls back to a char-count estimate when `document` is unavailable) and set `grid.right = max(measured + gap + padding, RACE_LABEL_MIN_PX, ctx.maxRaceGridRight)`. `core.ts` lifts the high-water mark from the resolved option each frame and feeds it back via `RenderContext.maxRaceGridRight` so the reserve grows monotonically — wide-label frames don't release space on subsequent narrow-label frames, which would otherwise jitter the plot area. Skip the calculation entirely when `race.showValueLabel === false`; honor any explicit `options.grid.right`. |
+| Themed data labels (race + non-race) | `src/themes/echarts-theme.ts` registers `bar.label.color`, `line.label.color`, `line.endLabel.color` (all → `colors.textPrimary`). Bar/line adapters emit `label` / `endLabel` objects with `show` / `position` / `valueAnimation` / `formatter` only — never `color`. ECharts deep-merges the theme's series-type defaults so race value labels and `showLabel` data labels automatically follow the active theme; no per-adapter palette lookup. See Layout rule #6 for the full theme-owned-text-color contract and `src/themes/echarts-theme.test.ts` for the regression. |
 
 **Chart-type options layout.** Each chart's options live on its own `XxxChartOptions extends ChartOptions` subtype (see step 1). The chart's **own general options** (those that always apply, regardless of variant) belong **flat** on the subtype — no separate named type, no wrapping sub-object. Examples: `BarChartOptions.barWidth` / `colorByCategory`, `PieChartOptions.sliceBorderRadius` / `innerRadius`, `GaugeChartOptions.gaugeWidth`. Prefix the field name when a generic word (`borderRadius`, `gap`, …) would be ambiguous at the top level — that's why pie's slice fields read `sliceBorderRadius` / `sliceGap` rather than bare `borderRadius` / `gap`.
 
@@ -309,10 +323,17 @@ The adapter is responsible for both *resolving* (one call to the resolver) and *
 - [ ] **Area + spark**: also apply `buildSparkAreaGradient(colors[i])` to each `series[i].areaStyle`.
 - [ ] **No-name types** (e.g. gauge): skip the resolver entirely; rely on the registered ECharts theme.
 
-### 3.5 Legend (only when the chart renders a legend)
+### 3.5 Title + Legend layout
 
-Skip this section entirely when your chart has no legend (gauge / sankey / chord — none of them expose `legend?` on the subtype). Full design reference: [docs/LEGEND.md](docs/LEGEND.md).
+Title is universal — every chart inherits `title?` from base `ChartOptions`, and adapters always wire `title: buildTitle(options)`. Legend is per-subtype: skip the legend-specific bullets when your chart doesn't expose `legend?` (gauge / sankey / chord). Full design reference: [docs/LAYOUT.md](docs/LAYOUT.md).
 
+**Title (always applicable):**
+- [ ] Wire `title: buildTitle(options)` into your option object. No flags to thread.
+- [ ] **Body-centered charts**: read `getTitleReserve(options).top` to shift `center` (or grid `top`) below the title. See `src/adapters/pie.ts` / `gauge.ts` / `radar.ts` for variations.
+- [ ] **Grid charts**: nothing to do — `buildGrid(options)` already consumes `getTitleReserve` internally.
+- [ ] Never reach for the (module-private) `getTitleHeight`. `getTitleReserve(options).top` is the canonical entry point.
+
+**Legend (only when the chart renders one):**
 - [ ] Add `legend?: LegendOptions` to your `XxxChartOptions` subtype. Never add it to base `ChartOptions`.
 - [ ] In the adapter, compute the show flag with a chart-appropriate default and forward it consistently:
   ```ts
@@ -320,9 +341,9 @@ Skip this section entirely when your chart has no legend (gauge / sankey / chord
   const legend = buildLegend(names, { ...options, legend: { ...options.legend, show: showLegend } });
   ```
 - [ ] **Grid charts** (chart extends `XYChartOptions`): just call `buildGrid(options)`. The helper already consumes `getLegendReserve` internally. Use `buildGrid(options, { legendShow: false })` when the adapter forcibly hides the legend (see bar's `colorByCategory` mode).
-- [ ] **Body-centered charts** (radar, future pie/gauge improvements): call `getLegendReserve(options, showLegend, extraGap?)`, combine with title reserves into edge reserves, derive `center` / `radius` via percent math. See `src/adapters/radar.ts` `buildRadarLayout`.
+- [ ] **Body-centered charts** (radar, future pie/gauge improvements): call `getLegendReserve(options, showLegend, extraGap?)`, compose with `getTitleReserve(options)` into a single `EdgeReserves`, derive `center` / `radius` via percent math. See `src/adapters/radar.ts` `getEdgeReserves` + `buildRadarLayout`.
 - [ ] Pass an `extraGap` only when your chart body has decorations that extend past its nominal radius (radar.axisName labels overflow by ~15 px → `RADAR_EDGE_GAP = 24`).
-- [ ] Tests assert layout reacts to each `legend.position` value (top/bottom/left/right) and collapses when `show: false`. See `src/adapters/radar.test.ts` for the canonical pattern.
+- [ ] Tests assert layout reacts to each `legend.position` value (top/bottom/left/right), to title presence/absence, and that hiding either widget collapses the corresponding reserve. See `src/adapters/radar.test.ts` for the canonical pattern; `src/adapters/common.test.ts` covers the helpers in isolation.
 
 ### 4. Registry (`src/adapters/index.ts`)
 
@@ -384,7 +405,8 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Resolve colors anywhere except via `resolveColors` / `resolveColorsForNodes` — do not read `colorHub` directly, do not duplicate the priority rules (`options.colors` / `options.colorMap` / `consistentColors` / `node.color`).
 - Hardcode hex/rgb palette colors in `src/adapters/**` — use the color pipeline above (see **Do not hardcode chart colors**).
 - Re-introduce a central `applyChartColors` / `core.ts` color post-processing step — adapters now own color assembly end-to-end.
-- Redeclare `LEGEND_RESERVE` (or any legend-slot magic number) inside an adapter, or hand-author a `legend: { ... }` literal. Import `LEGEND_RESERVE` / `getLegendReserve` / `buildLegend` from `src/adapters/common.ts` — see [docs/LEGEND.md](docs/LEGEND.md) and the **Legend layout pipeline** section above.
+- Redeclare `LEGEND_RESERVE` (or any layout magic number) inside an adapter, or hand-author `title: { ... }` / `legend: { ... }` literals. Import `LEGEND_RESERVE` / `getTitleReserve` / `getLegendReserve` / `buildTitle` / `buildLegend` from `src/adapters/common.ts` — see [docs/LAYOUT.md](docs/LAYOUT.md) and the **Layout pipeline** section above.
+- Reach for `getTitleHeight`. It is module-private inside `src/adapters/common.ts` and intentionally not exported. Use `getTitleReserve(options).top` for title geometry — that's the only canonical entry point and keeps title and legend reserves on the same `EdgeReserves` shape.
 - Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
 - Wrap a chart's own general options inside a sub-object/named type when they could be flat. `BarChartOptions.barWidth` / `colorByCategory` / `PieChartOptions.sliceBorderRadius` live directly on the subtype — no `bar?: BarOptions` or `slice?: PieSliceOptions` wrappers. Reserve sub-objects (`race?: BarRaceOptions`, …) for **variant-bound or scoped sub-features** only.
 - Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.

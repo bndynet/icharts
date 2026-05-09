@@ -5,7 +5,7 @@ import {
   buildTitle,
   buildLegend,
   getLegendReserve,
-  getTitleHeight,
+  getTitleReserve,
 } from './common.js';
 
 // ---------------------------------------------------------------------------
@@ -94,10 +94,14 @@ function getEdgeReserves(
   showLegend: boolean,
 ): EdgeReserves {
   const p = options.padding ?? 12;
-  const titleHeight = getTitleHeight(options);
+  // Compose two EdgeReserves in the same edge math. Title contributes
+  // `p + h` (title-only paths add chart padding above the widget); we
+  // don't pre-add p inside getTitleReserve because percent-center math
+  // expects padding-free reserves — see EdgeReserves docblock.
+  const title = getTitleReserve(options);
   const legend = getLegendReserve(options, showLegend, RADAR_EDGE_GAP);
   return {
-    top: (titleHeight > 0 ? p + titleHeight : 0) + legend.top,
+    top: (title.top > 0 ? p + title.top : 0) + legend.top,
     bottom: legend.bottom,
     left: legend.left,
     right: legend.right,

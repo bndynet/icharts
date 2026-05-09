@@ -2,7 +2,7 @@ import type { SankeyData, SankeyChartOptions, SankeyVariant } from '../types.js'
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
-import { buildTitle, getTitleHeight } from './common.js';
+import { buildTitle, getTitleReserve } from './common.js';
 import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
 function sankeyTooltipSyncHtml(params: unknown, options: SankeyChartOptions): string {
@@ -40,7 +40,7 @@ export function resolveSankeyOptions(
   );
 
   const p = options.padding ?? 12;
-  const titleOffset = getTitleHeight(options);
+  const titleOffset = getTitleReserve(options).top;
   const top = p + titleOffset;
 
   const series: Record<string, unknown> = {

@@ -5,7 +5,7 @@ import {
   pieParamsToTooltipContext,
 } from '../tooltip-context.js';
 import { deepMerge, resolveColors } from '../utils.js';
-import { buildTitle, buildLegend, getTitleHeight } from './common.js';
+import { buildTitle, buildLegend, getTitleReserve } from './common.js';
 
 const DEFAULT_OUTER_RADIUS = '75%';
 
@@ -59,7 +59,7 @@ function buildPieSeries(
   const innerRadius = options.innerRadius ?? 0;
   const outerRadius = options.outerRadius ?? DEFAULT_OUTER_RADIUS;
   const p = options.padding ?? 12;
-  const titleOffset = getTitleHeight(options);
+  const titleOffset = getTitleReserve(options).top;
 
   const series: Record<string, unknown> = {
     type: 'pie',

@@ -3,6 +3,5 @@
 node_modules
 dist
 site-dist
-docs
 coverage
 false

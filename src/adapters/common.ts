@@ -81,8 +81,16 @@ function normalizeTitleOptions(title: string | TitleOptions): TitleOptions {
   return typeof title === 'string' ? { text: title } : title;
 }
 
-/** Returns the vertical space (px) consumed by the title, or 0 if no title. */
-export function getTitleHeight(options: ChartOptions): number {
+/**
+ * Vertical space (px) consumed by the title widget itself, or 0 if no title.
+ *
+ * Module-private — the only canonical entry point for "how much room does
+ * the title need?" is {@link getTitleReserve}, which wraps this number into
+ * an {@link EdgeReserves} so callers can compose it with
+ * {@link getLegendReserve} using the same edge math. External adapters
+ * should reach for `getTitleReserve(options).top` instead.
+ */
+function getTitleHeight(options: ChartOptions): number {
   if (!options.title) return 0;
   const t = normalizeTitleOptions(options.title);
   return (t.fontSize ?? TITLE_DEFAULT_FONT_SIZE) + (t.padding ?? TITLE_DEFAULT_PADDING) * 2 + TITLE_CHART_GAP;
@@ -144,7 +152,11 @@ export function buildGrid(
 ): Record<string, unknown> {
   const grid: GridOptions = options.grid ?? {};
   const legendArea = getLegendGridAdjustment(options, overrides?.legendShow);
-  const titleHeight = getTitleHeight(options);
+  // Route through getTitleReserve so the grid path and body-centered
+  // adapters (radar / pie / gauge) ask the same question of the title
+  // widget. `.top` is the title widget height; `padding` is added here
+  // because grid edges are absolute pixels (see EdgeReserves docs).
+  const titleHeight = getTitleReserve(options).top;
   const p = getChartPadding(options);
   return deepMerge(
     {
@@ -171,9 +183,17 @@ export const LEGEND_RESERVE = 36;
 /**
  * Pixel reserves at each canvas edge. Empty edges are `0`.
  *
- * Returned by {@link getLegendReserve}; consumed by chart-body
- * positioning math (radar.center + radius, pie.center, gauge.center)
- * and by {@link buildGrid} for grid-based charts.
+ * The shared "layout currency" returned by both {@link getTitleReserve}
+ * (title widget on the top edge) and {@link getLegendReserve} (legend
+ * widget on whichever edge `legend.position` selects). Consumed by
+ * chart-body positioning math (radar.center + radius, pie.center,
+ * gauge.center) and by {@link buildGrid} for grid-based charts. Charts
+ * that need both reserves at once compose them edge-by-edge with
+ * identical math (see `src/adapters/radar.ts` `getEdgeReserves`).
+ *
+ * Reserves are padding-free by convention — see {@link getLegendReserve}
+ * for the rationale; callers add the chart's outer `padding` when their
+ * coordinate system needs it.
  */
 export interface EdgeReserves {
   top: number;
@@ -183,6 +203,36 @@ export interface EdgeReserves {
 }
 
 const EMPTY_EDGES: EdgeReserves = Object.freeze({ top: 0, bottom: 0, left: 0, right: 0 });
+
+/**
+ * Pixel reserve the title widget occupies on each canvas edge.
+ *
+ * Returns all-zero {@link EdgeReserves} when no title is set; otherwise
+ * places the title widget's pixel height (font + its own padding +
+ * gap-to-content) on `top`, with the other edges still zero — `buildTitle`
+ * always renders the title at the top of the canvas.
+ *
+ * The {@link EdgeReserves} shape mirrors {@link getLegendReserve} so
+ * adapters that compose title + legend reserves can write a single edge
+ * loop instead of branching on which component contributed which slot.
+ * Forward-compatible: if `TitleOptions.position` is ever introduced this
+ * helper switches edges the same way `getLegendReserve` does today —
+ * callers won't need to change.
+ *
+ * Reserves do NOT include the chart's outer `padding`; that's a uniform
+ * offset callers add when their coordinate system needs it (the XY grid
+ * path adds `padding + reserve.top`; the percent-center path lets
+ * `padding` cancel symmetrically — see the {@link getLegendReserve}
+ * docblock for the same rationale).
+ *
+ * Title visibility is unambiguous (`options.title` defined ↔ shown), so
+ * — unlike {@link getLegendReserve} — this helper takes no `show` flag.
+ */
+export function getTitleReserve(options: ChartOptions): EdgeReserves {
+  const h = getTitleHeight(options);
+  if (h === 0) return { ...EMPTY_EDGES };
+  return { ...EMPTY_EDGES, top: h };
+}
 
 /**
  * Pixel reserve the legend occupies on each canvas edge.

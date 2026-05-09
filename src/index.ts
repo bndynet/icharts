@@ -22,6 +22,7 @@ export {
 export {
   formatAxisTooltipSyncHtml,
   buildAxisTooltipContext,
+  getTitleReserve,
   getLegendReserve,
   LEGEND_RESERVE,
   type EdgeReserves,
