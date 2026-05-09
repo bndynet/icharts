@@ -9,6 +9,7 @@ import type {
   TooltipOptions,
   TooltipContextAxis,
 } from '../types.js';
+import type { RenderContext } from './index.js';
 
 /**
  * Structural shape consumed by {@link buildLegend} and its grid offset helper.
@@ -22,6 +23,7 @@ import type {
 type WithLegend = ChartOptions & { legend?: LegendOptions };
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { deepMerge } from '../utils.js';
+import { DEFAULT_LABEL_FONT, measureMaxTextWidth } from './text-measure.js';
 
 // ---------------------------------------------------------------------------
 // Default font stack
@@ -132,11 +134,23 @@ export function buildLegend(
     right: { top: 'center', right: p, orient: 'vertical' },
   };
 
+  // Default to 'scroll' so a long series list shows paging arrows instead
+  // of wrapping onto a second row. The reserve helpers
+  // ({@link getLegendReserve} / {@link buildGrid}) assume a one-row slot
+  // (LEGEND_RESERVE = 36 px); native ECharts wrapping ('plain') would
+  // grow the legend's actual height without growing the reserve, so
+  // wrapped rows would land on top of the chart body. Users who want
+  // wrapping can opt back in via `options.legend.type = 'plain'` (and
+  // are then responsible for adjusting `padding` accordingly).
   return {
     show,
+    type: legend.type ?? 'scroll',
     data: names,
     icon: 'roundRect',
     itemGap: 10,
+    pageButtonItemGap: 5,
+    pageButtonGap: 10,
+    pageIconSize: 12,
     ...positionMap[position],
   };
 }
@@ -173,12 +187,28 @@ export function buildGrid(
 }
 
 /**
- * Pixel slot reserved for the legend component (legend height + gap to
- * the plot area). Adapters compose this with their own layout — see
- * {@link getLegendReserve} for the helper that turns it into per-edge
- * reserves, and {@link buildGrid} for the XY-chart consumer.
+ * Pixel slot reserved for the legend component on the **top / bottom**
+ * edges (i.e. the legend's row height + gap to the plot area). Adapters
+ * compose this with their own layout — see {@link getLegendReserve} for
+ * the helper that turns it into per-edge reserves, and {@link buildGrid}
+ * for the XY-chart consumer.
+ *
+ * Side legends (`legend.position: 'left' | 'right'`) are stacked columns
+ * whose width depends on the longest label — a fixed 36 px is far too
+ * narrow there. {@link getLegendReserve} computes a width-based reserve
+ * for those positions when callers pass the series names; this constant
+ * stays the right answer for horizontal legends and serves as the floor
+ * when the side legend has no names to measure.
  */
 export const LEGEND_RESERVE = 36;
+
+/**
+ * Width budget added on top of the widest measured legend label for side
+ * legends: swatch (~14 px) + icon-to-text gap (~5 px) + chart-to-legend
+ * margin (~10 px). Approximates ECharts' default vertical legend padding
+ * closely enough that the body never lands underneath the labels.
+ */
+const SIDE_LEGEND_NON_TEXT_PX = 30;
 
 /**
  * Pixel reserves at each canvas edge. Empty edges are `0`.
@@ -255,15 +285,39 @@ export function getTitleReserve(options: ChartOptions): EdgeReserves {
  * @param extraGap optional pixel padding stacked onto the legend's own
  *   edge, for charts whose body extends past its nominal radius (e.g.
  *   radar.axisName labels overflow the polygon by ~15 px).
+ * @param names optional series names that will appear in the legend.
+ *   When the legend is on `'left'` / `'right'`, the slot width is
+ *   computed as `widestLabel + swatch/icon/gap` (≥ {@link LEGEND_RESERVE}),
+ *   so vertical legends with long labels don't overlap the chart body.
+ *   Omit for the XY grid path (where the legend defaults to the bottom
+ *   edge and one row of height is the right reserve regardless of label
+ *   width).
  */
 export function getLegendReserve(
   options: WithLegend,
   showLegend: boolean,
   extraGap = 0,
+  names?: ReadonlyArray<string>,
 ): EdgeReserves {
   if (!showLegend) return { ...EMPTY_EDGES };
-  const slot = LEGEND_RESERVE + extraGap;
   const position = options.legend?.position ?? 'bottom';
+  const isSide = position === 'left' || position === 'right';
+
+  let slot: number;
+  if (isSide && names && names.length > 0) {
+    // Vertical legend on a side edge — the slot must be at least as wide
+    // as the widest label plus swatch / icon / chart-gap. Falling back to
+    // a fixed 36 px (the row-height reserve for horizontal legends) lets
+    // the legend land on top of the chart body in narrow cards, which is
+    // exactly what bit us with the pie / doughnut `position: 'right'`
+    // case before this helper became name-aware.
+    const widest = measureMaxTextWidth(names, DEFAULT_LABEL_FONT);
+    slot =
+      Math.max(LEGEND_RESERVE, Math.ceil(widest) + SIDE_LEGEND_NON_TEXT_PX) + extraGap;
+  } else {
+    slot = LEGEND_RESERVE + extraGap;
+  }
+
   switch (position) {
     case 'top':
       return { ...EMPTY_EDGES, top: slot };
@@ -483,11 +537,183 @@ export function buildAxisTooltipContext(
   };
 }
 
+/**
+ * Inputs ECharts passes to a `tooltip.position` callback (the subset
+ * we actually need). The full signature is
+ * `(point, params, dom, rect, size) => Array | Object`; we only read
+ * the cursor `point` and the `size.contentSize` / `size.viewSize`
+ * pair, so we narrow it here to avoid leaking `any`s through the
+ * helper return type. ECharts is tolerant of extra args in the
+ * callback signature — declaring fewer is safe.
+ */
+interface TooltipPositionSize {
+  contentSize: [number, number];
+  viewSize: [number, number];
+}
+
+/**
+ * `tooltip.position` callback type — narrowed from ECharts' broader
+ * `Array | Object` return to the `[x, y]` tuple form we always produce.
+ */
+type TooltipPositionFn = (
+  point: [number, number],
+  params: unknown,
+  dom: unknown,
+  rect: unknown,
+  size: TooltipPositionSize,
+) => [number, number];
+
+/**
+ * Build a `tooltip.position` callback that places the tooltip a
+ * configurable `gap` pixels away from the cursor — same edge-flip
+ * geometry ECharts ships with by default, only with the hardcoded
+ * 20 px replaced by `options.tooltip.cursorGap`.
+ *
+ * Returns `undefined` when the user did not set `cursorGap`, so the
+ * resulting tooltip block can include `position: undefined` (ECharts
+ * treats undefined as "use the built-in default" — identical to
+ * omitting the field). This keeps every chart that doesn't opt in
+ * pixel-for-pixel identical to the prior behavior.
+ *
+ * Edge-flip semantics (verbatim from ECharts' `refixTooltipPosition`):
+ *   - Place the tooltip down-right of the cursor by `gap` px.
+ *   - If the right edge would overflow the viewport, flip to
+ *     down-left (with an extra 2 px buffer ECharts uses to keep the
+ *     CSS `float: right` value column from wrapping to a second row).
+ *   - If the bottom edge would overflow, flip to up.
+ *
+ * Why mirror ECharts' geometry instead of inventing our own:
+ *   - Users dragging `cursorGap` from `20` → `8` expect the only
+ *     change to be the spacing — not "the tooltip suddenly clips off
+ *     the right side because we used a simpler positioning rule".
+ *   - The 2 px right-edge buffer is invisible until it isn't (HTML
+ *     tooltips with `float: right` values are exactly the layout the
+ *     library's default theme uses), so dropping it would manifest
+ *     as a regression for narrow charts only.
+ */
+export function resolveTooltipPosition(
+  options: ChartOptions,
+): TooltipPositionFn | undefined {
+  const gap = options.tooltip?.cursorGap;
+  if (gap === undefined) return undefined;
+  return (point, _params, _dom, _rect, size) => {
+    const [px, py] = point;
+    const [w, h] = size.contentSize;
+    const [vw, vh] = size.viewSize;
+    let x = px + gap;
+    let y = py + gap;
+    // 2 px buffer mirrors ECharts' built-in handling for the CSS
+    // `float: right` value column — see ECharts' `refixTooltipPosition`.
+    if (x + w + 2 > vw) x = px - w - gap;
+    if (y + h > vh) y = py - h - gap;
+    return [x, y];
+  };
+}
+
+/**
+ * Decide ECharts' `tooltip.appendToBody` for a single tooltip block.
+ *
+ * Two-layer rule, mirroring the resolver pattern we use for colors:
+ *
+ *   1. **Explicit override wins** — if the user set
+ *      `options.tooltip.appendToBody` to a boolean, use that verbatim.
+ *      This is the escape hatch for the edge cases documented on
+ *      {@link TooltipOptions.appendToBody}.
+ *   2. **Auto by container** — otherwise default `true` for light-DOM
+ *      containers (the tooltip can escape `overflow: hidden` ancestors
+ *      like card / KPI / dialog wrappers) and `false` for shadow-DOM
+ *      containers (preserve the `<i-chart>` web component's style
+ *      encapsulation and stacking context).
+ *
+ * `ctx?.inShadowDom` is set once at engine init time from
+ * `container.getRootNode() instanceof ShadowRoot` — see `IChart` in
+ * `core.ts`. `undefined` ctx is treated as light DOM (the imperative
+ * `createChart(divEl, ...)` happy path), so consumers who never touch
+ * the web component get the bug-fix behaviour by default.
+ *
+ * Exported for the same reason `buildLegend` / `buildTooltip` are: any
+ * future adapter that hand-rolls its own tooltip block (e.g. pie /
+ * sankey / chord, which build tooltips inline because they need
+ * trigger-specific formatters) should route the `appendToBody` field
+ * through here so the decision stays in one place.
+ */
+export function resolveAppendToBody(
+  options: ChartOptions,
+  ctx?: RenderContext,
+): boolean {
+  const explicit = options.tooltip?.appendToBody;
+  if (explicit !== undefined) return explicit;
+  return !ctx?.inShadowDom;
+}
+
+/**
+ * Tooltip config for `variant: 'spark'` line / bar / area charts.
+ *
+ * Spark charts live in tiny containers (e.g. a 96×48 px KPI card), so two
+ * normal tooltip defaults stop being safe:
+ *
+ *   1. `confine: true` (what {@link buildTooltip} sets) would jam the
+ *      tooltip into the same tiny rect as the chart canvas, making the
+ *      label unreadable.
+ *   2. Without confine, the tooltip extends past the chart container.
+ *      Spark charts are almost always rendered inside a card / KPI cell
+ *      with `overflow: hidden`, which clips the tooltip's DOM.
+ *
+ * The `appendToBody` field (defaulted by {@link resolveAppendToBody}) is
+ * how we solve (2): in light DOM it lifts the tooltip element to
+ * `<body>` so it escapes every `overflow: hidden` ancestor while ECharts
+ * still positions it relative to the cursor; inside the `<i-chart>` web
+ * component's shadow root it stays off so the tooltip stays inside the
+ * shadow root for encapsulation. Either way, with `confine` left off the
+ * tooltip can grow to whatever width it needs.
+ *
+ * Centralized so line + bar (and any future spark-capable adapter) share
+ * the exact same tooltip behavior — drift between them would surface as
+ * "the line spark tooltip works but the bar spark tooltip is clipped".
+ */
+/**
+ * Default `cursorGap` for spark variants. ECharts' built-in 20 px is a
+ * sane default on a 600×400 chart but covers roughly 40 % of a 96×48
+ * KPI spark — large enough that the tooltip frequently lands on top of
+ * the line it's annotating. 6 px is the smallest value where the
+ * tooltip still reads as "next to the cursor" rather than "stuck on
+ * the cursor" on typical card sizes (~ 80–160 px wide). Users who
+ * want pixel-tight positioning can still pass `cursorGap: 0`
+ * explicitly; setting an explicit value (including `0`) overrides
+ * this default via the spread in `buildSparkTooltip` below.
+ */
+const SPARK_DEFAULT_CURSOR_GAP_PX = 6;
+
+export function buildSparkTooltip(
+  options: ChartOptions = {},
+  ctx?: RenderContext,
+): Record<string, unknown> {
+  // Inject the spark cursorGap default BEFORE calling
+  // `resolveTooltipPosition`. Spread order matters: the user's
+  // `options.tooltip` lands on top of our default, so an explicit
+  // `cursorGap: 0` (or any other value) still wins.
+  const sparkOptions: ChartOptions = {
+    ...options,
+    tooltip: {
+      cursorGap: SPARK_DEFAULT_CURSOR_GAP_PX,
+      ...options.tooltip,
+    },
+  };
+  return {
+    show: true,
+    trigger: 'axis',
+    axisPointer: { type: 'none' },
+    appendToBody: resolveAppendToBody(options, ctx),
+    position: resolveTooltipPosition(sparkOptions),
+  };
+}
+
 export function buildTooltip(
   options: ChartOptions,
   trigger: 'axis' | 'item' = 'axis',
   pointerType?: 'cross' | 'shadow' | 'line' | 'none',
   isTimeAxis = false,
+  ctx?: RenderContext,
 ): Record<string, unknown> {
   const tooltip = options.tooltip ?? {};
   const result: Record<string, unknown> = {
@@ -495,6 +721,8 @@ export function buildTooltip(
     padding: [6, 12],
     textStyle: { fontWeight: 'normal' },
     confine: true,
+    appendToBody: resolveAppendToBody(options, ctx),
+    position: resolveTooltipPosition(options),
   };
 
   if (pointerType) {

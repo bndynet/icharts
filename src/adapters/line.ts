@@ -8,6 +8,7 @@ import {
   buildXAxis,
   buildYAxis,
   buildTooltip,
+  buildSparkTooltip,
   isTimeCategories,
 } from './common.js';
 import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './race-utils.js';
@@ -48,8 +49,8 @@ export function resolveLineOptions(
       ? [{ show: false, type: 'value' }]
       : buildYAxis(options, yAxisCount),
     tooltip: isSpark
-      ? { show: true, trigger: 'axis', axisPointer: { type: 'none' } }
-      : buildTooltip(options, 'axis', 'cross', isTime),
+      ? buildSparkTooltip(options, ctx)
+      : buildTooltip(options, 'axis', 'cross', isTime, ctx),
     series: buildLineSeries(data, options, isTime, false),
   };
 
@@ -182,7 +183,7 @@ function resolveLineRaceOptions(
     grid,
     xAxis,
     yAxis: buildYAxis(options, yAxisCount),
-    tooltip: buildTooltip(options, 'axis', 'cross', isTime),
+    tooltip: buildTooltip(options, 'axis', 'cross', isTime, ctx),
     series,
     animationDuration: 0,
     animationDurationUpdate: frameDuration,
@@ -198,6 +199,7 @@ function resolveLineRaceOptions(
 export function resolveAreaOptions(
   data: AreaData,
   options: AreaChartOptions,
+  ctx?: RenderContext,
 ): Record<string, unknown> {
   const isTime =
     options.xAxis?.dateFormat !== undefined ||
@@ -221,8 +223,8 @@ export function resolveAreaOptions(
       ? [{ show: false, type: 'value' }]
       : buildYAxis(options, yAxisCount),
     tooltip: isSpark
-      ? { show: true, trigger: 'axis', axisPointer: { type: 'none' } }
-      : buildTooltip(options, 'axis', 'cross', isTime),
+      ? buildSparkTooltip(options, ctx)
+      : buildTooltip(options, 'axis', 'cross', isTime, ctx),
     series: buildLineSeries(data, options, isTime, true),
   };
 

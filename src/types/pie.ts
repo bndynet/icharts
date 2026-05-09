@@ -27,6 +27,16 @@ export interface PieChartOptions extends ChartOptions {
   /** When false, slices keep their data order; otherwise sorted by value desc. Default: true. */
   autoSort?: boolean;
 
+  /**
+   * Whether to render the outside slice labels (`{name}: {percent}%`
+   * leader-line text). Defaults to `!showLegend` — when the legend is
+   * shown it already names every slice and the outside labels would
+   * duplicate it (and steal radius headroom). Set to `true` to force
+   * them alongside a legend, or to `false` to hide them even when the
+   * legend is hidden.
+   */
+  showSliceLabel?: boolean;
+
   // ---------------------------------------------------------------------------
   // Slice styling — pie chart's own options, flat on the subtype. Field names
   // are prefixed with `slice` so generic names like `borderRadius` / `gap` are

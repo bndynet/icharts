@@ -23,8 +23,9 @@ export interface ChartSetupResult {
 /**
  * Per-render context the engine passes to adapters alongside data/options.
  *
- * Carries lightweight signals derived from prior render passes so adapters
- * can make better decisions without holding their own state:
+ * Carries lightweight signals derived from prior render passes — or from
+ * the chart container itself — so adapters can make better decisions
+ * without holding their own state or doing their own DOM lookups:
  *
  *   - `observedFrameMs` — wall-clock gap between the last two `chart.update()`
  *     calls. Race / streaming adapters use this to auto-size
@@ -36,12 +37,25 @@ export interface ChartSetupResult {
  *     label-headroom calculation (see `resolveRaceLabelHeadroom`) so the
  *     reserved space grows monotonically as labels widen and never shrinks
  *     back, avoiding plot-area jitter when label digits flip frame to frame.
+ *   - `inShadowDom` — `true` when the chart container's root is a
+ *     `ShadowRoot` (e.g. the `<i-chart>` web component). Tooltip helpers
+ *     (`buildTooltip` / `buildSparkTooltip`) use this to decide the default
+ *     value of ECharts' `appendToBody`: `false` inside shadow DOM (so the
+ *     tooltip stays inside the shadow root for style encapsulation) and
+ *     `true` in light DOM (so it can escape ancestors with `overflow:
+ *     hidden` like card / KPI containers). Users can still override via
+ *     `options.tooltip.appendToBody`. The engine sets this flag once at
+ *     construction time — moving the host between shadow / light DOM
+ *     after `init` isn't a supported scenario.
  *
- * All fields are `undefined` during initial render from the constructor.
+ * Frame-derived fields (`observedFrameMs`, `maxRaceGridRight`) are
+ * `undefined` during the initial render from the constructor; container-
+ * derived fields (`inShadowDom`) are populated from the very first render.
  */
 export interface RenderContext {
   observedFrameMs?: number;
   maxRaceGridRight?: number;
+  inShadowDom?: boolean;
 }
 
 /**
@@ -140,8 +154,8 @@ registerAdapter(ChartType.Line, {
 
 registerAdapter(ChartType.Area, {
   validate: isXYData,
-  resolve: (data, options) => ({
-    option: resolveAreaOptions(data as AreaData, options as AreaChartOptions),
+  resolve: (data, options, ctx) => ({
+    option: resolveAreaOptions(data as AreaData, options as AreaChartOptions, ctx),
   }),
 });
 
@@ -153,9 +167,8 @@ registerAdapter(ChartType.Bar, {
 
 registerAdapter(ChartType.Pie, {
   validate: isPieData,
-  resolve: (data, options) => ({
-    option: resolvePieOptions(data as PieData, options as PieChartOptions),
-  }),
+  resolve: (data, options, ctx) =>
+    resolvePieOptions(data as PieData, options as PieChartOptions, ctx),
 });
 
 registerAdapter(ChartType.Gauge, {
@@ -167,20 +180,20 @@ registerAdapter(ChartType.Gauge, {
 
 registerAdapter(ChartType.Sankey, {
   validate: isSankeyData,
-  resolve: (data, options) => ({
-    option: resolveSankeyOptions(data as SankeyData, options as SankeyChartOptions),
+  resolve: (data, options, ctx) => ({
+    option: resolveSankeyOptions(data as SankeyData, options as SankeyChartOptions, ctx),
   }),
 });
 
 registerAdapter(ChartType.Chord, {
   validate: isChordData,
-  resolve: (data, options) =>
-    resolveChordOptions(data as ChordData, options as ChordChartOptions),
+  resolve: (data, options, ctx) =>
+    resolveChordOptions(data as ChordData, options as ChordChartOptions, ctx),
 });
 
 registerAdapter(ChartType.Radar, {
   validate: isRadarData,
-  resolve: (data, options) => ({
-    option: resolveRadarOptions(data as RadarData, options as RadarChartOptions),
+  resolve: (data, options, ctx) => ({
+    option: resolveRadarOptions(data as RadarData, options as RadarChartOptions, ctx),
   }),
 });

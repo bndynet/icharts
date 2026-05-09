@@ -1,4 +1,5 @@
 import type { RenderContext } from './index.js';
+import { DEFAULT_LABEL_FONT, measureMaxTextWidth } from './text-measure.js';
 
 // ---------------------------------------------------------------------------
 // Frame duration
@@ -61,49 +62,16 @@ export function resolveRaceFrameDuration(
 /**
  * ECharts' default label font. Series `label` / `endLabel` inherit from
  * `textStyle` which defaults to 12px `sans-serif` unless a theme overrides
- * it. We match that so canvas measurement lines up with what gets painted.
+ * it; {@link DEFAULT_LABEL_FONT} matches that. Re-exported as a named
+ * local for grep-ability of "race label" decisions.
  */
-const RACE_LABEL_FONT = '12px sans-serif';
+const RACE_LABEL_FONT = DEFAULT_LABEL_FONT;
 /** Distance between the bar/line right edge and the label's left edge. */
 const RACE_LABEL_GAP_PX = 8;
 /** Distance between the label's right edge and the chart's right edge. */
 const RACE_LABEL_PAD_PX = 8;
 /** Floor: don't shrink below the old fixed reserve for very short labels. */
 const RACE_LABEL_MIN_PX = 32;
-/** SSR / no-DOM rough estimate (px per char at 12px sans-serif). */
-const RACE_LABEL_FALLBACK_CHAR_PX = 7;
-
-let measureCtx: CanvasRenderingContext2D | null | undefined;
-
-/**
- * Lazy module-level canvas context for `measureText`. Cached so we don't
- * attach a fresh DOM element on every frame. Returns `null` outside a
- * browser (SSR, Node tests) so callers can fall back to a char-count
- * estimate.
- */
-function getMeasureCtx(): CanvasRenderingContext2D | null {
-  if (measureCtx !== undefined) return measureCtx;
-  if (typeof document === 'undefined') {
-    measureCtx = null;
-    return null;
-  }
-  try {
-    measureCtx = document.createElement('canvas').getContext('2d');
-  } catch {
-    measureCtx = null;
-  }
-  return measureCtx ?? null;
-}
-
-function measureLabelWidth(text: string): number {
-  if (!text) return 0;
-  const ctx = getMeasureCtx();
-  if (ctx) {
-    ctx.font = RACE_LABEL_FONT;
-    return Math.ceil(ctx.measureText(text).width);
-  }
-  return text.length * RACE_LABEL_FALLBACK_CHAR_PX;
-}
 
 /**
  * Compute the pixel headroom needed on the right side of a race chart's
@@ -131,11 +99,7 @@ export function resolveRaceLabelHeadroom(
   labels: ReadonlyArray<string>,
   ctx: RenderContext | undefined,
 ): number {
-  let widest = 0;
-  for (const label of labels) {
-    const w = measureLabelWidth(label);
-    if (w > widest) widest = w;
-  }
+  const widest = measureMaxTextWidth(labels, RACE_LABEL_FONT);
   const suggested = Math.max(
     RACE_LABEL_MIN_PX,
     widest + RACE_LABEL_GAP_PX + RACE_LABEL_PAD_PX,

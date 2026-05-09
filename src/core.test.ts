@@ -54,10 +54,17 @@ function fakeContainer(): HTMLElement {
 }
 
 describe('IChart engine — RenderContext threading', () => {
-  it('reports no observation on initial render', () => {
+  // Note on assertion shape: `_apply` always carries `inShadowDom`
+  // (engine-owned, container-derived), so `ctx` is never `undefined`
+  // anymore. Frame-derived fields (`observedFrameMs`, `maxRaceGridRight`)
+  // are what we assert "absence" on — those *are* still undefined on
+  // non-tick code paths (initial render, setTheme).
+
+  it('reports no frame observation on initial render', () => {
     const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
     expect(observations).toHaveLength(1);
-    expect(observations[0]).toBeUndefined();
+    expect(observations[0]?.observedFrameMs).toBeUndefined();
+    expect(observations[0]?.maxRaceGridRight).toBeUndefined();
     chart.dispose();
   });
 
@@ -95,13 +102,98 @@ describe('IChart engine — RenderContext threading', () => {
     nowSpy.mockRestore();
   });
 
-  it('setTheme() re-renders without a ctx (theme switches are not ticks)', () => {
+  it('setTheme() does not report a frame tick (theme switches are not ticks)', () => {
     const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
     observations.length = 0;
 
     chart.setTheme('default');
     expect(observations).toHaveLength(1);
-    expect(observations[0]).toBeUndefined();
+    expect(observations[0]?.observedFrameMs).toBeUndefined();
+    chart.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `inShadowDom` threading — the engine samples the container's root once at
+// construction and forwards it on every render. The flag is the contract the
+// tooltip helpers (`buildTooltip` / `buildSparkTooltip` / `resolveAppendToBody`)
+// rely on to decide whether to default `tooltip.appendToBody` to true (light
+// DOM) or false (Shadow DOM, e.g. <i-chart>).
+//
+// Vitest's default node env has no `ShadowRoot` global and no real DOM — we
+// simulate both halves of the check:
+//   - "in shadow DOM": container.getRootNode() returns an instance of a fake
+//     ShadowRoot class we install on globalThis.
+//   - "in light DOM": ShadowRoot is defined but the container's root is not
+//     an instance of it. (Or ShadowRoot is undefined entirely, the SSR case.)
+// Both branches must produce the same answer the production engine produces
+// in a real browser.
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — inShadowDom detection and threading', () => {
+  // We pollute the global namespace on purpose; afterEach restores it so
+  // tests below this block run under the original (undefined) ShadowRoot.
+  const originalShadowRoot = (
+    globalThis as { ShadowRoot?: unknown }
+  ).ShadowRoot;
+  afterEach(() => {
+    if (originalShadowRoot === undefined) {
+      delete (globalThis as { ShadowRoot?: unknown }).ShadowRoot;
+    } else {
+      (globalThis as { ShadowRoot?: unknown }).ShadowRoot = originalShadowRoot;
+    }
+  });
+
+  function shadowRootContainer(): HTMLElement {
+    class FakeShadowRoot {}
+    (globalThis as { ShadowRoot?: unknown }).ShadowRoot = FakeShadowRoot;
+    const root = new FakeShadowRoot();
+    return {
+      getRootNode: () => root,
+    } as unknown as HTMLElement;
+  }
+
+  function lightDomContainer(): HTMLElement {
+    class FakeShadowRoot {}
+    (globalThis as { ShadowRoot?: unknown }).ShadowRoot = FakeShadowRoot;
+    // Some non-ShadowRoot root node — what an `<el-card>` body looks like.
+    return {
+      getRootNode: () => ({}),
+    } as unknown as HTMLElement;
+  }
+
+  it('reports inShadowDom: true when the container lives under a ShadowRoot', () => {
+    const chart = new IChart(shadowRootContainer(), 'observed-stub', stubData);
+    expect(observations[0]?.inShadowDom).toBe(true);
+    chart.dispose();
+  });
+
+  it('reports inShadowDom: false in light DOM containers', () => {
+    const chart = new IChart(lightDomContainer(), 'observed-stub', stubData);
+    expect(observations[0]?.inShadowDom).toBe(false);
+    chart.dispose();
+  });
+
+  it('reports inShadowDom: false when ShadowRoot is undefined (SSR / node)', () => {
+    // Default test env has no ShadowRoot global; the engine's typeof
+    // guard short-circuits before calling getRootNode(), so a plain
+    // fakeContainer (which has no getRootNode) doesn't throw.
+    delete (globalThis as { ShadowRoot?: unknown }).ShadowRoot;
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    expect(observations[0]?.inShadowDom).toBe(false);
+    chart.dispose();
+  });
+
+  it('threads inShadowDom through update() and setTheme(), not just construction', () => {
+    const chart = new IChart(shadowRootContainer(), 'observed-stub', stubData);
+    observations.length = 0;
+
+    chart.update(stubData);
+    chart.setTheme('default');
+
+    expect(observations).toHaveLength(2);
+    expect(observations[0]?.inShadowDom).toBe(true);
+    expect(observations[1]?.inShadowDom).toBe(true);
     chart.dispose();
   });
 });

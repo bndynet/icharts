@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { LEGEND_RESERVE, getLegendReserve, getTitleReserve } from './common.js';
+import {
+  LEGEND_RESERVE,
+  buildLegend,
+  buildSparkTooltip,
+  buildTooltip,
+  getLegendReserve,
+  getTitleReserve,
+  resolveAppendToBody,
+  resolveTooltipPosition,
+} from './common.js';
+import { resolveLineOptions, resolveAreaOptions } from './line.js';
+import { resolveBarOptions } from './bar.js';
+import { resolvePieOptions } from './pie.js';
+import { resolveSankeyOptions } from './sankey.js';
+import { resolveChordOptions } from './chord.js';
+import { resolveRadarOptions } from './radar.js';
+import { deepMerge } from '../utils.js';
 
 const EMPTY = { top: 0, bottom: 0, left: 0, right: 0 };
 
@@ -58,6 +74,760 @@ describe('getLegendReserve', () => {
     a.bottom = 999;
     expect(b.bottom).toBe(LEGEND_RESERVE);
   });
+
+  // -------------------------------------------------------------------------
+  // Side-legend width math — kicks in when callers pass `names`, which they
+  // must for left/right legends so the slot fits the widest label. Without
+  // this the 36 px row-height slot was narrower than a single legend entry
+  // and the legend overlapped the chart body (pie/doughnut regression).
+  // Assertions use `>` / `>=` rather than exact pixels so the canvas vs.
+  // char-count fallback paths stay interchangeable across Node/JSDOM/browser.
+  // -------------------------------------------------------------------------
+
+  it('ignores names for top/bottom legends (slot height is constant regardless of label width)', () => {
+    const short = getLegendReserve({ legend: { position: 'bottom' } }, true, 0, ['A']);
+    const longList = getLegendReserve(
+      { legend: { position: 'bottom' } },
+      true,
+      0,
+      ['A very very very very very very long label that should not affect height'],
+    );
+    expect(short.bottom).toBe(LEGEND_RESERVE);
+    expect(longList.bottom).toBe(LEGEND_RESERVE);
+    expect(short).toEqual(longList);
+  });
+
+  it('grows the side-legend slot to fit the widest label when names are provided', () => {
+    const long = 'A really really really wide legend label';
+    const right = getLegendReserve({ legend: { position: 'right' } }, true, 0, [long]);
+    // Each edge except the active one is still zero.
+    expect(right.top).toBe(0);
+    expect(right.bottom).toBe(0);
+    expect(right.left).toBe(0);
+    // The active edge must be at LEAST as wide as the floor, and (because
+    // we're measuring a long label) strictly wider than the floor.
+    expect(right.right).toBeGreaterThan(LEGEND_RESERVE);
+  });
+
+  it('side-legend slot is monotonic in label width (longer labels → larger slot)', () => {
+    const small = getLegendReserve({ legend: { position: 'left' } }, true, 0, ['A']);
+    const big = getLegendReserve(
+      { legend: { position: 'left' } },
+      true,
+      0,
+      ['A label that is much wider than a single character'],
+    );
+    expect(big.left).toBeGreaterThan(small.left);
+  });
+
+  it('side-legend slot picks the WIDEST label, not the count', () => {
+    const manyShort = getLegendReserve(
+      { legend: { position: 'right' } },
+      true,
+      0,
+      Array.from({ length: 20 }, () => 'A'),
+    );
+    const oneLong = getLegendReserve(
+      { legend: { position: 'right' } },
+      true,
+      0,
+      ['One single very wide legend label here'],
+    );
+    expect(oneLong.right).toBeGreaterThan(manyShort.right);
+  });
+
+  it('side-legend slot honours extraGap on top of the width-based reserve', () => {
+    const label = 'Premium';
+    const noGap = getLegendReserve({ legend: { position: 'right' } }, true, 0, [label]);
+    const withGap = getLegendReserve({ legend: { position: 'right' } }, true, 24, [label]);
+    expect(withGap.right - noGap.right).toBe(24);
+  });
+
+  it('side-legend slot falls back to LEGEND_RESERVE when names is empty or omitted', () => {
+    expect(getLegendReserve({ legend: { position: 'right' } }, true, 0, []).right).toBe(
+      LEGEND_RESERVE,
+    );
+    expect(getLegendReserve({ legend: { position: 'right' } }, true).right).toBe(
+      LEGEND_RESERVE,
+    );
+  });
+});
+
+describe('buildLegend', () => {
+  // The reserve helpers (getLegendReserve / buildGrid) assume a single-row
+  // legend slot (LEGEND_RESERVE = 36 px). Default scroll mode keeps that
+  // invariant true regardless of series count — ECharts adds pagination
+  // arrows instead of wrapping onto rows that would overlap the chart body.
+  it('defaults to type: "scroll" so long legends paginate instead of wrapping', () => {
+    const legend = buildLegend(['A', 'B', 'C'], {});
+    expect(legend.type).toBe('scroll');
+  });
+
+  it('honors user-supplied legend.type = "plain" (opt-in wrapping)', () => {
+    const legend = buildLegend(['A', 'B', 'C'], { legend: { type: 'plain' } });
+    expect(legend.type).toBe('plain');
+  });
+
+  it('honors user-supplied legend.type = "scroll" (explicit default)', () => {
+    const legend = buildLegend(['A', 'B', 'C'], { legend: { type: 'scroll' } });
+    expect(legend.type).toBe('scroll');
+  });
+
+  // Adapters end with `deepMerge(eOption, options.echarts ?? {})`, so any
+  // user override at echarts.legend.type must win over our default. This
+  // is the escape hatch documented in LegendOptions.type for callers who
+  // want full ECharts behavior without setting our typed knob.
+  it('options.echarts.legend.type overrides the default via the final deepMerge', () => {
+    const eOption = { legend: buildLegend(['A', 'B', 'C'], {}) };
+    const merged = deepMerge(eOption, { legend: { type: 'plain' } });
+    expect((merged.legend as Record<string, unknown>).type).toBe('plain');
+  });
+
+  it('keeps default positioning, show flag, and data wiring intact', () => {
+    const legend = buildLegend(['A', 'B'], {});
+    expect(legend.show).toBe(true);
+    expect(legend.data).toEqual(['A', 'B']);
+    expect(legend.bottom).toBe(12); // CHART_DEFAULT_PADDING
+    expect(legend.left).toBe('center');
+    expect(legend.orient).toBe('horizontal');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `tooltip.appendToBody` defaults — decided by `resolveAppendToBody` based on
+// (1) explicit user override and (2) light-DOM vs. shadow-DOM container.
+// Verified at three layers:
+//   1. The decision function itself (table of cases).
+//   2. The two centralized builders (`buildTooltip`, `buildSparkTooltip`).
+//   3. Every adapter (regression guard: a future inline tooltip rewrite
+//      could silently drop the wiring).
+// ---------------------------------------------------------------------------
+
+describe('resolveAppendToBody', () => {
+  // Auto-detection by container: light-DOM default `true` is what fixes
+  // the KPI-card clipping bug; shadow-DOM default `false` is what keeps
+  // <i-chart> users from leaking tooltip DOM out of their shadow root.
+  it('defaults to true when no ctx is supplied (light-DOM / imperative createChart path)', () => {
+    expect(resolveAppendToBody({})).toBe(true);
+  });
+
+  it('defaults to true when ctx is supplied but inShadowDom is false / undefined', () => {
+    expect(resolveAppendToBody({}, {})).toBe(true);
+    expect(resolveAppendToBody({}, { inShadowDom: false })).toBe(true);
+  });
+
+  it('defaults to false inside a Shadow DOM container (<i-chart> web component)', () => {
+    expect(resolveAppendToBody({}, { inShadowDom: true })).toBe(false);
+  });
+
+  // Explicit override is the escape hatch: a consumer with <i-chart> in
+  // a Teleport (or any other non-standard host) can force true; a
+  // light-DOM consumer who manages stacking-context themselves can
+  // force false. The explicit value must beat the auto-detection in
+  // BOTH directions.
+  it('explicit tooltip.appendToBody: true wins over shadow-DOM default', () => {
+    expect(
+      resolveAppendToBody({ tooltip: { appendToBody: true } }, { inShadowDom: true }),
+    ).toBe(true);
+  });
+
+  it('explicit tooltip.appendToBody: false wins over light-DOM default', () => {
+    expect(
+      resolveAppendToBody({ tooltip: { appendToBody: false } }, { inShadowDom: false }),
+    ).toBe(false);
+    // Same answer with no ctx — explicit value always wins.
+    expect(resolveAppendToBody({ tooltip: { appendToBody: false } })).toBe(false);
+  });
+
+  it('treats undefined tooltip.appendToBody as "not set" and falls back to auto', () => {
+    expect(
+      resolveAppendToBody({ tooltip: {} }, { inShadowDom: true }),
+    ).toBe(false);
+    expect(
+      resolveAppendToBody({ tooltip: {} }, { inShadowDom: false }),
+    ).toBe(true);
+  });
+});
+
+describe('buildSparkTooltip', () => {
+  it('keeps the spark tooltip contract (axis trigger, no axis pointer, no confine)', () => {
+    const tt = buildSparkTooltip();
+    expect(tt.show).toBe(true);
+    expect(tt.trigger).toBe('axis');
+    expect(tt.axisPointer).toEqual({ type: 'none' });
+    // No confine — confining the tooltip to a 96×48 KPI cell would
+    // make it unreadable. The clipping fix comes from appendToBody.
+    expect(tt.confine).toBeUndefined();
+  });
+
+  it('defaults appendToBody: true in light DOM (fixes KPI-card clipping)', () => {
+    expect(buildSparkTooltip().appendToBody).toBe(true);
+    expect(buildSparkTooltip({}, {}).appendToBody).toBe(true);
+  });
+
+  it('defaults appendToBody: false in Shadow DOM (preserves <i-chart> encapsulation)', () => {
+    expect(buildSparkTooltip({}, { inShadowDom: true }).appendToBody).toBe(false);
+  });
+
+  it('honors explicit tooltip.appendToBody over the container-derived default', () => {
+    expect(
+      buildSparkTooltip({ tooltip: { appendToBody: false } }).appendToBody,
+    ).toBe(false);
+    expect(
+      buildSparkTooltip({ tooltip: { appendToBody: true } }, { inShadowDom: true })
+        .appendToBody,
+    ).toBe(true);
+  });
+});
+
+describe('buildTooltip', () => {
+  // buildTooltip keeps `confine: true` (its tooltip stays inside the
+  // chart canvas regardless of where the DOM is mounted). The new
+  // `appendToBody` field is orthogonal and routed through the same
+  // helper so all chart types behave consistently — see the
+  // adapter-wiring describe below for the user-visible guard.
+  it('defaults to appendToBody: true with confine: true in light DOM', () => {
+    const tt = buildTooltip({}, 'axis');
+    expect(tt.appendToBody).toBe(true);
+    expect(tt.confine).toBe(true);
+  });
+
+  it('defaults appendToBody: false inside Shadow DOM (still confined)', () => {
+    const tt = buildTooltip({}, 'axis', undefined, false, { inShadowDom: true });
+    expect(tt.appendToBody).toBe(false);
+    expect(tt.confine).toBe(true);
+  });
+
+  it('honors explicit tooltip.appendToBody over the container-derived default', () => {
+    const off = buildTooltip(
+      { tooltip: { appendToBody: false } },
+      'axis',
+      undefined,
+      false,
+      { inShadowDom: false },
+    );
+    expect(off.appendToBody).toBe(false);
+
+    const on = buildTooltip(
+      { tooltip: { appendToBody: true } },
+      'axis',
+      undefined,
+      false,
+      { inShadowDom: true },
+    );
+    expect(on.appendToBody).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adapter-level regression guard.
+//
+// `appendToBody` must reach the resolved option for every chart type the
+// library ships. The two failure modes we're guarding against:
+//
+//   1. A future refactor inlines a tooltip object somewhere and forgets
+//      to route through `resolveAppendToBody` / `buildTooltip` /
+//      `buildSparkTooltip` — the field silently disappears and the
+//      KPI-card-clipping bug returns.
+//   2. The adapter accepts `ctx` from the registry but stops threading
+//      it into its tooltip block — the <i-chart> Shadow DOM path leaks
+//      tooltip DOM out of the shadow root again.
+//
+// We assert all three states (default, in-shadow-DOM, explicit override)
+// for each adapter so either regression is caught at the surface that
+// users actually see.
+// ---------------------------------------------------------------------------
+
+describe('Tooltip appendToBody wiring across adapters', () => {
+  const xyData = {
+    categories: ['Jan', 'Feb', 'Mar'],
+    series: [{ name: 'ARR', data: [1, 2, 3] }],
+  };
+  const pieData = [
+    { name: 'A', value: 1 },
+    { name: 'B', value: 2 },
+  ];
+  const graphData = {
+    nodes: [{ name: 'A' }, { name: 'B' }],
+    links: [{ source: 'A', target: 'B', value: 1 }],
+  };
+  const radarData = {
+    indicators: [{ name: 'X' }, { name: 'Y' }, { name: 'Z' }],
+    series: [{ name: 'S', values: [1, 2, 3] }],
+  };
+
+  type TooltipOf = (overrides?: { ctx?: { inShadowDom?: boolean }; appendToBody?: boolean }) =>
+    Record<string, unknown>;
+
+  // Each entry knows how to materialize one tooltip for a given chart
+  // type. Keeps the assertion loop short and makes the matrix obvious
+  // when a new chart type is added.
+  const adapters: Array<{ name: string; tooltipOf: TooltipOf }> = [
+    {
+      name: 'line (default)',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveLineOptions(
+          xyData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'line (spark)',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveLineOptions(
+          xyData,
+          appendToBody === undefined
+            ? { variant: 'spark' }
+            : { variant: 'spark', tooltip: { appendToBody } },
+          ctx,
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'area (default)',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveAreaOptions(
+          xyData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'area (spark)',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveAreaOptions(
+          xyData,
+          appendToBody === undefined
+            ? { variant: 'spark' }
+            : { variant: 'spark', tooltip: { appendToBody } },
+          ctx,
+        ).tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'bar (default)',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveBarOptions(
+          xyData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'bar (spark)',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveBarOptions(
+          xyData,
+          appendToBody === undefined
+            ? { variant: 'spark' }
+            : { variant: 'spark', tooltip: { appendToBody } },
+          ctx,
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'pie',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolvePieOptions(
+          pieData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'sankey',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveSankeyOptions(
+          graphData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'chord',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveChordOptions(
+          graphData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'radar',
+      tooltipOf: ({ ctx, appendToBody } = {}) =>
+        resolveRadarOptions(
+          radarData,
+          appendToBody === undefined ? {} : { tooltip: { appendToBody } },
+          ctx,
+        ).tooltip as Record<string, unknown>,
+    },
+  ];
+
+  for (const { name, tooltipOf } of adapters) {
+    describe(name, () => {
+      it('defaults appendToBody: true in light DOM (no ctx)', () => {
+        expect(tooltipOf().appendToBody).toBe(true);
+      });
+
+      it('defaults appendToBody: false inside Shadow DOM', () => {
+        expect(tooltipOf({ ctx: { inShadowDom: true } }).appendToBody).toBe(false);
+      });
+
+      it('explicit tooltip.appendToBody beats the Shadow-DOM default', () => {
+        expect(
+          tooltipOf({ ctx: { inShadowDom: true }, appendToBody: true }).appendToBody,
+        ).toBe(true);
+      });
+
+      it('explicit tooltip.appendToBody: false beats the light-DOM default', () => {
+        expect(tooltipOf({ appendToBody: false }).appendToBody).toBe(false);
+      });
+    });
+  }
+});
+
+describe('resolveTooltipPosition', () => {
+  // The helper has one job: emit `undefined` when the user did not opt
+  // in (so ECharts' built-in 20 px default keeps existing charts
+  // pixel-identical), and otherwise emit a position callback that
+  // reproduces ECharts' own edge-flip math with `cursorGap` substituted
+  // for the hardcoded 20.
+  //
+  // Test fixtures use the exact `size` shape ECharts passes at runtime
+  // (`{ contentSize, viewSize }`) — narrowing it in the helper would
+  // hide regressions where ECharts changes the callback contract.
+  it('returns undefined when cursorGap is not set (preserves ECharts 20 px default)', () => {
+    expect(resolveTooltipPosition({})).toBeUndefined();
+    expect(resolveTooltipPosition({ tooltip: {} })).toBeUndefined();
+    // Explicitly undefined cursorGap is treated the same as omitted.
+    expect(
+      resolveTooltipPosition({ tooltip: { cursorGap: undefined } }),
+    ).toBeUndefined();
+  });
+
+  it('returns a function when cursorGap is set (even at 0)', () => {
+    expect(typeof resolveTooltipPosition({ tooltip: { cursorGap: 8 } })).toBe(
+      'function',
+    );
+    // 0 is meaningful (tooltip glued to cursor) — must produce a fn,
+    // not undefined.
+    expect(typeof resolveTooltipPosition({ tooltip: { cursorGap: 0 } })).toBe(
+      'function',
+    );
+  });
+
+  // Geometry tests use a 100×60 tooltip on a 400×300 viewport so the
+  // overflow boundary numbers are unambiguous.
+  const SIZE = { contentSize: [100, 60] as [number, number], viewSize: [400, 300] as [number, number] };
+
+  it('places the tooltip down-right of the cursor by `gap` px in the no-overflow case', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 8 } })!;
+    // Cursor at [50, 50] → expect [58, 58] (px+gap, py+gap).
+    expect(pos([50, 50], null, null, null, SIZE)).toEqual([58, 58]);
+  });
+
+  it('honors cursorGap: 0 — tooltip sits right at the cursor', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 0 } })!;
+    expect(pos([50, 50], null, null, null, SIZE)).toEqual([50, 50]);
+  });
+
+  it('flips horizontally when the right edge would overflow (with the +2 buffer ECharts uses)', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 8 } })!;
+    // Cursor at [300, 50]: px+gap+w+2 = 300+8+100+2 = 410 > 400.
+    // Expect flip: x = 300 - 100 - 8 = 192. y unchanged: 50+8 = 58.
+    expect(pos([300, 50], null, null, null, SIZE)).toEqual([192, 58]);
+  });
+
+  it('flips vertically when the bottom edge would overflow', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 8 } })!;
+    // Cursor at [50, 250]: py+gap+h = 250+8+60 = 318 > 300.
+    // Expect flip: y = 250 - 60 - 8 = 182. x unchanged: 50+8 = 58.
+    expect(pos([50, 250], null, null, null, SIZE)).toEqual([58, 182]);
+  });
+
+  it('flips both axes when the cursor is near the bottom-right corner', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 8 } })!;
+    // Cursor at [300, 250]: both overflows trigger.
+    expect(pos([300, 250], null, null, null, SIZE)).toEqual([192, 182]);
+  });
+
+  it('respects the +2 buffer boundary exactly — ECharts parity check', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 8 } })!;
+    // x + w + 2 == vw → 290 + 8 + 100 + 2 = 400 (NOT > 400), so NO flip.
+    expect(pos([290, 50], null, null, null, SIZE)).toEqual([298, 58]);
+    // One pixel later → flip triggers.
+    expect(pos([291, 50], null, null, null, SIZE)).toEqual([183, 58]);
+  });
+
+  it('scales with cursorGap — larger gap produces larger offset and earlier flip threshold', () => {
+    const pos = resolveTooltipPosition({ tooltip: { cursorGap: 20 } })!;
+    expect(pos([50, 50], null, null, null, SIZE)).toEqual([70, 70]);
+    // With gap=20: flip when px + 20 + 100 + 2 > 400 → px > 278.
+    expect(pos([279, 50], null, null, null, SIZE)).toEqual([159, 70]);
+  });
+});
+
+describe('buildSparkTooltip — cursorGap wiring', () => {
+  // Spark variants get a built-in 6 px default — 20 px (ECharts'
+  // default) is too much on a 96×48 KPI card and frequently obscures
+  // the line the tooltip is annotating. Tested at three values:
+  //   - default (no user override)              → position is a fn
+  //   - user override to a different number     → fn with their gap
+  //   - user override to 0 (tight-to-cursor)    → fn (not undefined,
+  //                                                because 0 is a
+  //                                                meaningful gap)
+  //
+  // The geometry is exercised in the `resolveTooltipPosition` block
+  // above — here we only assert the spark builder routes through it.
+  it('defaults to a position function (6 px) — spark-specific override of ECharts 20 px', () => {
+    const tt = buildSparkTooltip();
+    expect(typeof tt.position).toBe('function');
+    const fn = tt.position as (
+      point: [number, number],
+      p: unknown,
+      d: unknown,
+      r: unknown,
+      s: { contentSize: [number, number]; viewSize: [number, number] },
+    ) => [number, number];
+    const SIZE = {
+      contentSize: [100, 60] as [number, number],
+      viewSize: [400, 300] as [number, number],
+    };
+    // Cursor at [50, 50] + 6 px gap → [56, 56]. If the default ever
+    // changes, this assertion fails loudly with the new expected
+    // coordinates — that's the contract we want.
+    expect(fn([50, 50], null, null, null, SIZE)).toEqual([56, 56]);
+  });
+
+  it('explicit cursorGap overrides the spark default', () => {
+    const tt = buildSparkTooltip({ tooltip: { cursorGap: 12 } });
+    expect(typeof tt.position).toBe('function');
+    const fn = tt.position as (
+      point: [number, number],
+      p: unknown,
+      d: unknown,
+      r: unknown,
+      s: { contentSize: [number, number]; viewSize: [number, number] },
+    ) => [number, number];
+    const SIZE = {
+      contentSize: [100, 60] as [number, number],
+      viewSize: [400, 300] as [number, number],
+    };
+    expect(fn([50, 50], null, null, null, SIZE)).toEqual([62, 62]);
+  });
+
+  it('explicit cursorGap: 0 wins over the spark default (tooltip glued to cursor)', () => {
+    // Regression guard: a naive `cursorGap = options.tooltip?.cursorGap ?? 6`
+    // would treat 0 as falsy and silently fall back to 6.
+    const tt = buildSparkTooltip({ tooltip: { cursorGap: 0 } });
+    expect(typeof tt.position).toBe('function');
+    const fn = tt.position as (
+      point: [number, number],
+      p: unknown,
+      d: unknown,
+      r: unknown,
+      s: { contentSize: [number, number]; viewSize: [number, number] },
+    ) => [number, number];
+    const SIZE = {
+      contentSize: [100, 60] as [number, number],
+      viewSize: [400, 300] as [number, number],
+    };
+    expect(fn([50, 50], null, null, null, SIZE)).toEqual([50, 50]);
+  });
+});
+
+describe('buildTooltip — cursorGap wiring', () => {
+  it('emits position: undefined when cursorGap is not set', () => {
+    expect(buildTooltip({}, 'axis').position).toBeUndefined();
+  });
+
+  it('emits position as a function when cursorGap is set', () => {
+    const tt = buildTooltip({ tooltip: { cursorGap: 4 } }, 'axis');
+    expect(typeof tt.position).toBe('function');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Adapter-level regression guard — cursorGap, twin to the appendToBody one.
+//
+// Same failure modes we care about: an adapter that resolves its tooltip
+// inline (pie / sankey / chord / radar) silently dropping the `position`
+// field, or stopping the threading at some point in the pipeline. We
+// assert across every chart type so a future refactor that breaks one
+// adapter fails one focused test, not the whole `position` contract.
+// ---------------------------------------------------------------------------
+
+describe('Tooltip cursorGap wiring across adapters', () => {
+  const xyData = {
+    categories: ['Jan', 'Feb', 'Mar'],
+    series: [{ name: 'ARR', data: [1, 2, 3] }],
+  };
+  const pieData = [
+    { name: 'A', value: 1 },
+    { name: 'B', value: 2 },
+  ];
+  const graphData = {
+    nodes: [{ name: 'A' }, { name: 'B' }],
+    links: [{ source: 'A', target: 'B', value: 1 }],
+  };
+  const radarData = {
+    indicators: [{ name: 'X' }, { name: 'Y' }, { name: 'Z' }],
+    series: [{ name: 'S', values: [1, 2, 3] }],
+  };
+
+  type TooltipOf = (cursorGap?: number) => Record<string, unknown>;
+
+  // `defaultGap` semantics:
+  //   - undefined → adapter has NO library-level default; tooltip.position
+  //     should be undefined when the user doesn't set `cursorGap`
+  //     (ECharts' built-in 20 px takes over).
+  //   - number    → adapter has a built-in default (currently only the
+  //     spark variants — 6 px); tooltip.position is a callback baked
+  //     with that gap, observable via the position math.
+  const adapters: Array<{ name: string; tooltipOf: TooltipOf; defaultGap: number | undefined }> = [
+    {
+      name: 'line (default)',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolveLineOptions(
+          xyData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'line (spark)',
+      defaultGap: 6,
+      tooltipOf: (cursorGap) =>
+        resolveLineOptions(
+          xyData,
+          cursorGap === undefined
+            ? { variant: 'spark' }
+            : { variant: 'spark', tooltip: { cursorGap } },
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'area (default)',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolveAreaOptions(
+          xyData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'area (spark)',
+      defaultGap: 6,
+      tooltipOf: (cursorGap) =>
+        resolveAreaOptions(
+          xyData,
+          cursorGap === undefined
+            ? { variant: 'spark' }
+            : { variant: 'spark', tooltip: { cursorGap } },
+        ).tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'bar (default)',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolveBarOptions(
+          xyData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'bar (spark)',
+      defaultGap: 6,
+      tooltipOf: (cursorGap) =>
+        resolveBarOptions(
+          xyData,
+          cursorGap === undefined
+            ? { variant: 'spark' }
+            : { variant: 'spark', tooltip: { cursorGap } },
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'pie',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolvePieOptions(
+          pieData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'sankey',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolveSankeyOptions(
+          graphData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'chord',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolveChordOptions(
+          graphData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).option.tooltip as Record<string, unknown>,
+    },
+    {
+      name: 'radar',
+      defaultGap: undefined,
+      tooltipOf: (cursorGap) =>
+        resolveRadarOptions(
+          radarData,
+          cursorGap === undefined ? {} : { tooltip: { cursorGap } },
+        ).tooltip as Record<string, unknown>,
+    },
+  ];
+
+  // Shared fixture for all geometry checks below — 100×60 tooltip on a
+  // 400×300 viewport, cursor at [50, 50]. With a gap of N, the expected
+  // result is [50+N, 50+N] (no overflow → no flip).
+  const SIZE = {
+    contentSize: [100, 60] as [number, number],
+    viewSize: [400, 300] as [number, number],
+  };
+  type PositionFn = (
+    point: [number, number],
+    p: unknown,
+    d: unknown,
+    r: unknown,
+    s: { contentSize: [number, number]; viewSize: [number, number] },
+  ) => [number, number];
+
+  for (const { name, tooltipOf, defaultGap } of adapters) {
+    describe(name, () => {
+      if (defaultGap === undefined) {
+        // Non-spark charts: no library default — tooltip.position is
+        // undefined unless the user opts in, so ECharts' built-in
+        // 20 px gap stays in effect (zero visual regression).
+        it('keeps position undefined when cursorGap is not set (preserves ECharts 20 px default)', () => {
+          expect(tooltipOf().position).toBeUndefined();
+        });
+      } else {
+        // Spark variants: library injects a 6 px default into the
+        // tooltip pipeline. The adapter must forward the resolved
+        // position callback or the KPI-card use-case regresses.
+        it(`defaults position to a ${defaultGap} px callback (spark default)`, () => {
+          const tt = tooltipOf();
+          expect(typeof tt.position).toBe('function');
+          const fn = tt.position as PositionFn;
+          expect(fn([50, 50], null, null, null, SIZE)).toEqual([
+            50 + defaultGap,
+            50 + defaultGap,
+          ]);
+        });
+      }
+
+      it('routes an explicit cursorGap into the resolved tooltip position', () => {
+        const tt = tooltipOf(8);
+        expect(typeof tt.position).toBe('function');
+        const fn = tt.position as PositionFn;
+        expect(fn([50, 50], null, null, null, SIZE)).toEqual([58, 58]);
+      });
+    });
+  }
 });
 
 describe('getTitleReserve', () => {

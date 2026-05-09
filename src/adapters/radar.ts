@@ -1,4 +1,5 @@
 import type { RadarData, RadarChartOptions, RadarVariant } from '../types.js';
+import type { RenderContext } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
   type EdgeReserves,
@@ -6,6 +7,8 @@ import {
   buildLegend,
   getLegendReserve,
   getTitleReserve,
+  resolveAppendToBody,
+  resolveTooltipPosition,
 } from './common.js';
 
 // ---------------------------------------------------------------------------
@@ -54,6 +57,7 @@ const RADAR_RADIUS_SHRINK_FACTOR = 35;
 export function resolveRadarOptions(
   data: RadarData,
   options: RadarChartOptions,
+  ctx?: RenderContext,
 ): Record<string, unknown> {
   const variant = (options.variant ?? 'default') as RadarVariant;
   const names = data.series.map((s) => s.name);
@@ -65,8 +69,8 @@ export function resolveRadarOptions(
       ...options,
       legend: { ...options.legend, show: showLegend },
     }),
-    tooltip: buildRadarTooltip(options),
-    radar: buildRadarComponent(data, options, variant, showLegend),
+    tooltip: buildRadarTooltip(options, ctx),
+    radar: buildRadarComponent(data, options, variant, showLegend, names),
     series: buildRadarSeries(data, options),
   };
 
@@ -87,11 +91,13 @@ export function resolveRadarOptions(
  * the legend row needs (the XY grid path consumes the same helper via
  * {@link buildGrid}). Adds {@link RADAR_EDGE_GAP} as the `extraGap`
  * argument to account for radar.axisName labels overflowing the
- * polygon.
+ * polygon, and forwards `names` so side legends (left/right) get a
+ * width-based slot rather than the 36 px row-height default.
  */
 function getEdgeReserves(
   options: RadarChartOptions,
   showLegend: boolean,
+  names: ReadonlyArray<string>,
 ): EdgeReserves {
   const p = options.padding ?? 12;
   // Compose two EdgeReserves in the same edge math. Title contributes
@@ -99,7 +105,7 @@ function getEdgeReserves(
   // don't pre-add p inside getTitleReserve because percent-center math
   // expects padding-free reserves — see EdgeReserves docblock.
   const title = getTitleReserve(options);
-  const legend = getLegendReserve(options, showLegend, RADAR_EDGE_GAP);
+  const legend = getLegendReserve(options, showLegend, RADAR_EDGE_GAP, names);
   return {
     top: (title.top > 0 ? p + title.top : 0) + legend.top,
     bottom: legend.bottom,
@@ -111,8 +117,9 @@ function getEdgeReserves(
 function buildRadarLayout(
   options: RadarChartOptions,
   showLegend: boolean,
+  names: ReadonlyArray<string>,
 ): { center: (string | number)[]; radius: string | number } {
-  const reserves = getEdgeReserves(options, showLegend);
+  const reserves = getEdgeReserves(options, showLegend, names);
 
   // Center: shift toward the side with more remaining space.
   // shift_pct = (opposite_reserve - this_reserve) / (2 * REF) * 100
@@ -148,8 +155,9 @@ function buildRadarComponent(
   options: RadarChartOptions,
   variant: RadarVariant,
   showLegend: boolean,
+  names: ReadonlyArray<string>,
 ): Record<string, unknown> {
-  const { center, radius } = buildRadarLayout(options, showLegend);
+  const { center, radius } = buildRadarLayout(options, showLegend, names);
   return {
     indicator: data.indicators.map((ind) => ({
       name: ind.name,
@@ -180,12 +188,17 @@ function buildRadarSeries(
   ];
 }
 
-function buildRadarTooltip(options: RadarChartOptions): Record<string, unknown> {
+function buildRadarTooltip(
+  options: RadarChartOptions,
+  ctx?: RenderContext,
+): Record<string, unknown> {
   const tooltip: Record<string, unknown> = {
     trigger: 'item',
     confine: true,
     padding: [6, 12],
     textStyle: { fontWeight: 'normal' },
+    appendToBody: resolveAppendToBody(options, ctx),
+    position: resolveTooltipPosition(options),
   };
 
   if (options.tooltip?.enabled === false) {

@@ -8,6 +8,7 @@ import {
   buildGrid,
   buildXAxis,
   buildTooltip,
+  buildSparkTooltip,
   isTimeCategories,
 } from './common.js';
 import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './series-utils.js';
@@ -48,8 +49,8 @@ export function resolveBarOptions(
       ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
       : buildGrid(options, { legendShow: legendVisible }),
     tooltip: isSpark
-      ? { show: true, trigger: 'axis', axisPointer: { type: 'none' } }
-      : buildTooltip(options, 'axis', 'shadow', isTime),
+      ? buildSparkTooltip(options, ctx)
+      : buildTooltip(options, 'axis', 'shadow', isTime, ctx),
   };
 
   const categoryAxis: Record<string, unknown> = {
@@ -170,7 +171,7 @@ function resolveBarRaceOptions(
     title: buildTitle(options),
     legend: enableColorByCategory ? { show: false } : buildLegend([seriesName], options),
     grid,
-    tooltip: buildTooltip(options, 'axis', 'shadow', false),
+    tooltip: buildTooltip(options, 'axis', 'shadow', false, ctx),
     xAxis: {
       type: 'value',
       max: 'dataMax',

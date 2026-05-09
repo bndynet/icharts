@@ -40,6 +40,35 @@ export class IChart implements IChartInstance {
    * mark equals the current value, and nothing changes.
    */
   private _maxGridRight = 0;
+  /**
+   * `true` when the chart container's root is a `ShadowRoot` (i.e. the
+   * `<i-chart>` web component path; plain `createChart(divEl, ...)`
+   * leaves this `false`).
+   *
+   * Sampled once at construction time because:
+   *   - `getRootNode()` is the only cheap way to ask this question
+   *     ("am I in shadow DOM?") and the answer doesn't change for a
+   *     given mounted instance — moving the host element between
+   *     shadow / light DOM after `echarts.init` isn't a supported
+   *     scenario (ECharts would need a re-init anyway).
+   *   - Doing it once avoids paying the cost every `update()` /
+   *     `setTheme()` call when the value can never change.
+   *
+   * Threaded through every `_apply()` call via {@link RenderContext}.
+   * Adapters consume it from `buildTooltip` / `buildSparkTooltip` (and
+   * the inline tooltip blocks in pie / sankey / chord / radar) to
+   * default `tooltip.appendToBody`: `true` in light DOM so the tooltip
+   * escapes `overflow: hidden` ancestors like cards / dialogs, `false`
+   * inside shadow DOM so the tooltip stays inside the web component
+   * for style encapsulation. Users can still override via
+   * `options.tooltip.appendToBody`.
+   *
+   * Conservative on non-DOM platforms (SSR / tests without
+   * `ShadowRoot`): when the `ShadowRoot` global is undefined we treat
+   * the container as light DOM, which matches the dominant CSR path
+   * and keeps tooltips functional.
+   */
+  private _inShadowDom: boolean;
 
   constructor(
     container: HTMLElement,
@@ -52,6 +81,9 @@ export class IChart implements IChartInstance {
     this._data = data;
     this._options = options;
     this._activeTheme = resolveThemeName(options.theme);
+    this._inShadowDom =
+      typeof ShadowRoot !== 'undefined' &&
+      container.getRootNode() instanceof ShadowRoot;
     this.ecInstance = echarts.init(container, this._activeTheme);
     chartRegistry.add(this);
     this._apply();
@@ -108,11 +140,20 @@ export class IChart implements IChartInstance {
   }
 
   private _apply(ctx?: RenderContext): void {
+    // `inShadowDom` is engine-owned: every render path must see it,
+    // even the ones (constructor, `setTheme`) that pass no caller ctx.
+    // Merging here keeps each call site terse and prevents the flag
+    // from being silently dropped when a future code path forgets to
+    // forward it.
+    const fullCtx: RenderContext = {
+      ...ctx,
+      inShadowDom: this._inShadowDom,
+    };
     const { option, onInit, notMerge } = resolveEChartsOption(
       this._type,
       this._data,
       this._options,
-      ctx,
+      fullCtx,
     );
     this._observeGridRight(option);
     this.ecInstance.setOption(option, notMerge ?? true);

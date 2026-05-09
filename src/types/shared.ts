@@ -22,6 +22,19 @@ export interface TitleOptions {
 export interface LegendOptions {
   show?: boolean;
   position?: 'top' | 'bottom' | 'left' | 'right';
+  /**
+   * How the legend behaves when the entries don't fit on a single row/column.
+   *
+   * - `'scroll'` (default): one row/column with paging arrows. Keeps the
+   *   layout reserve helpers (`getLegendReserve` / `buildGrid`) accurate
+   *   because they assume a single-line slot — extra series add a "›" button,
+   *   not extra rows that would overlap the chart body.
+   * - `'plain'`: ECharts' native behavior — wraps onto extra rows/columns
+   *   when overflowing. Callers must ensure the legend won't wrap (or bump
+   *   `padding` / move the legend to a side edge), otherwise wrapped rows
+   *   land on top of the plot area.
+   */
+  type?: 'scroll' | 'plain';
 }
 
 export interface GridOptions {
@@ -174,4 +187,58 @@ export interface TooltipOptions {
    * @default 'Loading…'
    */
   placeholder?: string;
+  /**
+   * Pixel gap between the cursor (or anchored data point) and the
+   * nearest edge of the tooltip box.
+   *
+   * **Defaults (when omitted):**
+   *   - `variant: 'spark'` (line / area / bar) → 6 px — small enough
+   *     for a 96×48 KPI card to feel "next to the cursor" rather
+   *     than "in another zip code".
+   *   - All other charts → ECharts' built-in 20 px (hardcoded in
+   *     `refixTooltipPosition` inside ECharts' `TooltipView`). We do
+   *     not override it so charts you've already styled keep the
+   *     exact spacing they had.
+   *
+   * **When to set:** override either default when the chart's pixel
+   * dimensions are unusual (e.g. very wide hero charts where 6 px
+   * looks crowded, or non-spark charts on a small card where 20 px
+   * is still too much). `0` is meaningful — tooltip sits right at
+   * the cursor.
+   *
+   * **Implementation note:** the library translates this into a
+   * `tooltip.position` callback that mirrors ECharts' built-in
+   * edge-flip logic (tooltip flips to the opposite side of the cursor
+   * when it would overflow the chart viewport), only with your `gap`
+   * substituted for the hardcoded 20. Setting
+   * `options.echarts.tooltip.position` (passthrough) still wins via
+   * the final `deepMerge` if you need full custom positioning.
+   */
+  cursorGap?: number;
+  /**
+   * Attach the tooltip DOM to `<body>` instead of the chart container,
+   * so it can escape ancestors with `overflow: hidden` (common with
+   * card / KPI / dialog containers).
+   *
+   * **Defaults:**
+   * - Light DOM containers (e.g. `createChart(divEl, ...)`): `true` —
+   *   the tooltip can render anywhere on screen without being clipped
+   *   by a parent card.
+   * - Shadow DOM containers (e.g. the `<i-chart>` web component):
+   *   `false` — keeping the tooltip inside the shadow root preserves
+   *   the component's style encapsulation and keeps the tooltip in the
+   *   same stacking context as the host element.
+   *
+   * Pass an explicit `true` / `false` to override the auto-detected
+   * default. Most consumers should leave this unset.
+   *
+   * Edge cases where you may want to override:
+   * - `<i-chart>` rendered inside a Vue `<Teleport>` / portal where
+   *   you need the tooltip in `<body>` regardless of shadow — set
+   *   `appendToBody: true`.
+   * - Light-DOM chart inside a stacking-context that you want the
+   *   tooltip to stay glued to (e.g. some custom popper logic) — set
+   *   `appendToBody: false`.
+   */
+  appendToBody?: boolean;
 }

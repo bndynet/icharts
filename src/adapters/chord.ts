@@ -1,9 +1,9 @@
 import type { ChordData, ChordChartOptions } from '../types.js';
-import type { ChartSetupResult } from './index.js';
+import type { ChartSetupResult, RenderContext } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
-import { buildTitle } from './common.js';
+import { buildTitle, resolveAppendToBody, resolveTooltipPosition } from './common.js';
 import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
 function chordTooltipSyncHtml(params: unknown, options: ChordChartOptions): string {
@@ -26,6 +26,7 @@ function chordTooltipSyncHtml(params: unknown, options: ChordChartOptions): stri
 export function resolveChordOptions(
   data: ChordData,
   options: ChordChartOptions,
+  ctx?: RenderContext,
 ): ChartSetupResult {
   const p = options.padding ?? 12;
 
@@ -69,6 +70,8 @@ export function resolveChordOptions(
     trigger: 'item',
     confine: true,
     show: options.tooltip?.enabled !== false,
+    appendToBody: resolveAppendToBody(options, ctx),
+    position: resolveTooltipPosition(options),
   };
   if (options.tooltip?.customHtml) {
     const customHtml = options.tooltip.customHtml;

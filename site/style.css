@@ -63,6 +63,6 @@ html[data-theme=dark] {
 
 /* override vue-site default styles */
 .site-content-inner {
-  max-width: 1200px;
+  max-width: 1200px !important;
   margin: 0 auto;
 }

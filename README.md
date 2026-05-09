@@ -529,6 +529,40 @@ Each chart type has its own options interface that extends the base `ChartOption
     customHtml?: (ctx: TooltipContext) => Promise<string>;
     /** Shown while `customHtml` is pending. Default: 'Loading…' */
     placeholder?: string;
+    /**
+     * Attach the tooltip DOM to `<body>` so it escapes ancestors with
+     * `overflow: hidden` (card / KPI / dialog containers).
+     *
+     * Auto-decided when omitted:
+     *   - Light DOM (`createChart(divEl, ...)`)  → true
+     *   - Shadow DOM (`<i-chart>` web component) → false
+     *
+     * Set explicitly only for edge cases — e.g. `<i-chart>` rendered
+     * inside a Vue `<Teleport>` where you want the tooltip in `<body>`
+     * regardless of shadow, or a light-DOM chart whose tooltip should
+     * stay glued to the host stacking context.
+     */
+    appendToBody?: boolean;
+    /**
+     * Pixel gap between the cursor and the nearest edge of the tooltip
+     * box.
+     *
+     * Defaults:
+     *   - `variant: 'spark'` (line / area / bar)  → 6 px
+     *     (tight default for KPI-card-sized charts; 20 px is too
+     *     much for a 96×48 box)
+     *   - all other charts                         → ECharts' built-in
+     *     20 px (existing charts keep original spacing)
+     *
+     * Pass any number to override either default. `0` is meaningful —
+     * the tooltip sits right at the cursor.
+     *
+     * Implementation: the library translates this into a `position`
+     * callback that mirrors ECharts' built-in edge-flip logic with
+     * your gap substituted for 20. `echarts.tooltip.position`
+     * (passthrough) still wins via the final deep merge.
+     */
+    cursorGap?: number;
   };
 
   // Advanced passthrough — for anything not covered above
@@ -537,9 +571,16 @@ Each chart type has its own options interface that extends the base `ChartOption
 ```
 
 > `legend` and `grid` are intentionally **not** on the base — only chart types
-> that actually render them expose the field. `legend` lives on `XYChartOptions`
-> and `PieChartOptions`; `grid` lives on `XYChartOptions`. Gauge, sankey, and
-> chord render neither.
+> that actually render them expose the field. `legend` lives on `XYChartOptions`,
+> `PieChartOptions`, and `RadarChartOptions`; `grid` lives on `XYChartOptions`.
+> Gauge, sankey, and chord render neither.
+>
+> The legend defaults to `type: 'scroll'` — long series lists paginate with
+> arrows instead of wrapping onto a second row. This keeps the chart-body
+> layout reserve (a single legend-row height) accurate regardless of how many
+> series are present. Pass `legend: { type: 'plain' }` to opt back into
+> native ECharts wrapping; you'll then need to bump `padding` (or move the
+> legend to a side edge) so wrapped rows don't overlap the plot area.
 
 ### `XYChartOptions` (shared by line / bar / area, extends `ChartOptions`)
 
@@ -639,7 +680,11 @@ Each chart type has its own options interface that extends the base `ChartOption
   sliceGap?: number;                  // gap between slices, in degrees
 
   // Pie is the only non-XY chart that renders a legend.
-  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
+  legend?: {
+    show?: boolean;
+    position?: 'top' | 'bottom' | 'left' | 'right';
+    type?: 'scroll' | 'plain';        // default: 'scroll' (paginates instead of wrapping)
+  };
 }
 ```
 
@@ -673,7 +718,11 @@ No chord-specific knobs today; reuses every field on the base `ChartOptions`.
   radius?: string | number;          // radar.radius, default: '65%'
 
   // Radar is a non-XY chart that still renders a legend (one entry per polygon).
-  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
+  legend?: {
+    show?: boolean;
+    position?: 'top' | 'bottom' | 'left' | 'right';
+    type?: 'scroll' | 'plain';        // default: 'scroll' (paginates instead of wrapping)
+  };
 }
 ```
 

@@ -83,7 +83,7 @@ describe('pie adapter color injection', () => {
       { name: 'A', value: 30 },
       { name: 'B', value: 70 },
     ];
-    const option = resolvePieOptions(data, {
+    const { option } = resolvePieOptions(data, {
       colorMap: { A: '#112233' },
     });
     const color = option.color as string[];

@@ -178,6 +178,44 @@ describe('radar adapter', () => {
       expect(xOf(right)).toBeLessThan(50);
     });
 
+    it('side legend pulls center further inward when series names are wide (vs. short)', () => {
+      // Same shape — only the series name lengths differ. The radar's
+      // side-legend reserve is now width-driven, so wider names must
+      // push center further away from the legend edge.
+      const shortNames: RadarData = {
+        indicators: sample.indicators,
+        series: [
+          { name: 'A', values: [1, 2, 3] },
+          { name: 'B', values: [2, 3, 4] },
+        ],
+      };
+      const longNames: RadarData = {
+        indicators: sample.indicators,
+        series: [
+          { name: 'A really really really wide series label one', values: [1, 2, 3] },
+          { name: 'A really really really wide series label two', values: [2, 3, 4] },
+        ],
+      };
+      const xOf = (option: Record<string, unknown>): number =>
+        parseInt(
+          String(((option.radar as Record<string, unknown>).center as string[])[0]).replace(
+            '%',
+            '',
+          ),
+          10,
+        );
+
+      const shortRight = resolveRadarOptions(shortNames, {
+        legend: { show: true, position: 'right' },
+      });
+      const longRight = resolveRadarOptions(longNames, {
+        legend: { show: true, position: 'right' },
+      });
+      // Right legend → center moves LEFT of 50%. Long labels need a wider
+      // slot, so the center must move FURTHER left.
+      expect(xOf(longRight)).toBeLessThan(xOf(shortRight));
+    });
+
     it('does not reserve legend space when the legend is hidden', () => {
       const hidden = resolveRadarOptions(sample, { legend: { show: false } })
         .radar as Record<string, unknown>;

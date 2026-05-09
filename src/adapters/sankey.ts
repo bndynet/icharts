@@ -1,8 +1,14 @@
 import type { SankeyData, SankeyChartOptions, SankeyVariant } from '../types.js';
+import type { RenderContext } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
-import { buildTitle, getTitleReserve } from './common.js';
+import {
+  buildTitle,
+  getTitleReserve,
+  resolveAppendToBody,
+  resolveTooltipPosition,
+} from './common.js';
 import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
 function sankeyTooltipSyncHtml(params: unknown, options: SankeyChartOptions): string {
@@ -29,6 +35,7 @@ function namesWithoutOutgoingLinks(links: SankeyData['links']): Set<string> {
 export function resolveSankeyOptions(
   data: SankeyData,
   options: SankeyChartOptions,
+  ctx?: RenderContext,
 ): Record<string, unknown> {
   const variant = (options.variant ?? 'default') as SankeyVariant;
   const orient = variant === 'vertical' ? 'vertical' : 'horizontal';
@@ -70,6 +77,8 @@ export function resolveSankeyOptions(
   const tooltip: Record<string, unknown> = {
     trigger: 'item',
     confine: true,
+    appendToBody: resolveAppendToBody(options, ctx),
+    position: resolveTooltipPosition(options),
   };
   if (options.tooltip?.customHtml) {
     const customHtml = options.tooltip.customHtml;
