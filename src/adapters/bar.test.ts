@@ -236,17 +236,39 @@ describe('bar adapter', () => {
       expect(yAxis.max).toBeUndefined();
     });
 
-    it('uses race.frameDuration for animationDurationUpdate (default 3000)', () => {
+    it('uses race.frameDuration for animationDurationUpdate (default 500)', () => {
+      // No ctx + no explicit value → fallback. See LineRaceOptions for the
+      // reasoning behind 500ms as the picked default.
       const defaultResult = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
         variant: 'race',
       });
-      expect(defaultResult.option.animationDurationUpdate).toBe(3000);
+      expect(defaultResult.option.animationDurationUpdate).toBe(500);
 
       const customResult = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
         variant: 'race',
         race: { frameDuration: 1000 },
       });
       expect(customResult.option.animationDurationUpdate).toBe(1000);
+    });
+
+    it('auto-measures animationDurationUpdate from ctx.observedFrameMs', () => {
+      // Engine threads the inter-update gap through RenderContext so callers
+      // don't have to mirror their setInterval value as race.frameDuration.
+      const { option } = resolveBarOptions(
+        frame([100, 200, 150, 80, 60]),
+        { variant: 'race' },
+        { observedFrameMs: 200 },
+      );
+      expect(option.animationDurationUpdate).toBe(200);
+    });
+
+    it('explicit race.frameDuration overrides ctx.observedFrameMs', () => {
+      const { option } = resolveBarOptions(
+        frame([100, 200, 150, 80, 60]),
+        { variant: 'race', race: { frameDuration: 2000 } },
+        { observedFrameMs: 200 },
+      );
+      expect(option.animationDurationUpdate).toBe(2000);
     });
 
     it('pins initial animationDuration to 0 and uses linear easing', () => {
@@ -268,21 +290,60 @@ describe('bar adapter', () => {
       expect(label.show).toBe(false);
     });
 
-    it('reserves grid.right headroom so value labels are not clipped', () => {
-      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
-        variant: 'race',
+    describe('adaptive label headroom', () => {
+      it('reserves grid.right so value labels are not clipped', () => {
+        const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+          variant: 'race',
+        });
+        const grid = option.grid as Record<string, unknown>;
+        // Floor (RACE_LABEL_MIN_PX) prevents anyone from going below ~32px;
+        // anything larger is fine — the exact value depends on whether a
+        // canvas is available for measurement.
+        expect(typeof grid.right).toBe('number');
+        expect(grid.right as number).toBeGreaterThanOrEqual(32);
       });
-      const grid = option.grid as Record<string, unknown>;
-      expect(grid.right).toBe(80);
-    });
 
-    it('respects an explicit options.grid.right (no override)', () => {
-      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
-        variant: 'race',
-        grid: { right: 24 },
+      it('respects an explicit options.grid.right (no override)', () => {
+        const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+          variant: 'race',
+          grid: { right: 24 },
+        });
+        const grid = option.grid as Record<string, unknown>;
+        expect(grid.right).toBe(24);
       });
-      const grid = option.grid as Record<string, unknown>;
-      expect(grid.right).toBe(24);
+
+      it('skips headroom when showValueLabel is false (nothing to make room for)', () => {
+        const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+          variant: 'race',
+          race: { showValueLabel: false },
+        });
+        const grid = option.grid as Record<string, unknown>;
+        // buildGrid's default right padding (no extra headroom)
+        expect(grid.right).toBe(12);
+      });
+
+      it('grows with longer value strings', () => {
+        const { option: narrow } = resolveBarOptions(frame([1, 2, 3, 4, 5]), {
+          variant: 'race',
+        });
+        const { option: wide } = resolveBarOptions(
+          frame([1234567890, 2345678901, 1, 1, 1]),
+          { variant: 'race' },
+        );
+        const narrowRight = (narrow.grid as Record<string, number>).right;
+        const wideRight = (wide.grid as Record<string, number>).right;
+        expect(wideRight).toBeGreaterThanOrEqual(narrowRight);
+      });
+
+      it('honors ctx.maxRaceGridRight as a monotonic floor', () => {
+        const { option } = resolveBarOptions(
+          frame([1, 2, 3, 4, 5]),
+          { variant: 'race' },
+          { maxRaceGridRight: 200 },
+        );
+        const grid = option.grid as Record<string, unknown>;
+        expect(grid.right).toBeGreaterThanOrEqual(200);
+      });
     });
 
     it('writes the resolved palette into option.color', () => {

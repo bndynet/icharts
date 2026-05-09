@@ -31,7 +31,8 @@ export interface ChartThemeColors {
 
   /**
    * Primary label color.
-   * Used for: chart title, legend text, pie/gauge/data labels, markPoint labels.
+   * Used for: chart title, legend text, pie/gauge/data labels, markPoint labels,
+   * bar/line value labels (including race value labels and line-race endLabels).
    */
   textPrimary: string;
 

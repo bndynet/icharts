@@ -36,7 +36,7 @@ src/
                       #   line.ts / bar.ts /
                       #   area.ts            → LineData/BarData/AreaData aliases of XYData,
                       #                        per-chart variants and *ChartOptions
-                      #                        (bar.ts also holds BarRaceOptions for the
+                      #                        (bar.ts / line.ts also hold *RaceOptions for the
                       #                        variant-specific race namespace)
                       #   pie.ts             → PieData, PieVariant, PieChartOptions, isPieData
                       #   gauge.ts           → GaugeData, GaugeVariant, GaugeChartOptions,
@@ -88,7 +88,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Architecture rules
 
-1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace.
+1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls) and `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations). See `src/adapters/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) for the canonical usage.
 2. **Reuse shared builders** — `src/adapters/common.ts` provides `buildTitle`, `buildLegend`, `buildGrid`, `buildXAxis`, `buildYAxis`, `buildTooltip`, etc. XY charts should use `src/adapters/series-utils.ts` for per-series options, mark lines/points, and y-axis index handling. Do **not** call `getCommonDefaults()` unless it is wired into the adapter pipeline (currently unused by built-in adapters).
 3. **Merge user overrides, then apply the resolved palette** — end adapter functions with:
    ```ts
@@ -232,8 +232,11 @@ Reference implementations:
 | Item tooltips + variants | `src/adapters/pie.ts` (`PieChartOptions`) |
 | Graph nodes/links | `src/adapters/sankey.ts` (`SankeyChartOptions`), `src/adapters/chord.ts` (`ChordChartOptions`) |
 | Single-metric | `src/adapters/gauge.ts` (`GaugeChartOptions`) |
-| Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` (`race` branch) |
-| Variant-specific sub-object (`race.topN`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`) |
+| Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` and `src/adapters/line.ts` (`race` branches) |
+| Variant-specific sub-object (`race.topN` / `race.frameDuration`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`), `src/types/line.ts` (`LineRaceOptions` → `LineChartOptions.race`) |
+| Streaming axis pinning (race) | `src/adapters/line.ts` auto-pins `xAxis.min` to `categories[0]` for time-axis race; users pin `max` themselves via `xAxis.max`. Without this, axis re-layout each frame compresses the line. |
+| Auto-measured race frame duration | `src/adapters/race-utils.ts` (`resolveRaceFrameDuration`) — priority: explicit `race.frameDuration` > `ctx.observedFrameMs` (clamped to `[80, 3000]` ms) > 500 ms fallback. Consumed by bar/line race resolvers so callers don't have to mirror their own `setInterval` value. `core.ts` measures the gap between consecutive `update()` calls via `performance.now()` and threads the value through `RenderContext`. |
+| Adaptive race label headroom | `src/adapters/race-utils.ts` (`resolveRaceLabelHeadroom`) — bar/line race resolvers measure the widest current-frame label (`String(value)` for bar, `"<name> <value>"` for line) via a cached `canvas.getContext('2d').measureText` (falls back to a char-count estimate when `document` is unavailable) and set `grid.right = max(measured + gap + padding, RACE_LABEL_MIN_PX, ctx.maxRaceGridRight)`. `core.ts` lifts the high-water mark from the resolved option each frame and feeds it back via `RenderContext.maxRaceGridRight` so the reserve grows monotonically — wide-label frames don't release space on subsequent narrow-label frames, which would otherwise jitter the plot area. Skip the calculation entirely when `race.showValueLabel === false`; honor any explicit `options.grid.right`. |
 
 **Chart-type options layout.** Each chart's options live on its own `XxxChartOptions extends ChartOptions` subtype (see step 1). The chart's **own general options** (those that always apply, regardless of variant) belong **flat** on the subtype — no separate named type, no wrapping sub-object. Examples: `BarChartOptions.barWidth` / `colorByCategory`, `PieChartOptions.sliceBorderRadius` / `innerRadius`, `GaugeChartOptions.gaugeWidth`. Prefix the field name when a generic word (`borderRadius`, `gap`, …) would be ambiguous at the top level — that's why pie's slice fields read `sliceBorderRadius` / `sliceGap` rather than bare `borderRadius` / `gap`.
 

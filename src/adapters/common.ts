@@ -37,6 +37,18 @@ const FONT_FAMILY =
 
 const CHART_DEFAULT_PADDING = 12;
 
+/**
+ * Treat NaN/undefined as "not set" for axis min/max. ECharts accepts numbers,
+ * date-parseable strings, or the magic strings `'dataMin'` / `'dataMax'`; a
+ * stray NaN (e.g. from a `Date.UTC(undefined, ...)` in user code) would
+ * collapse the axis to a single tick, so we skip writing it.
+ */
+function isAxisBound(value: unknown): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'number') return Number.isFinite(value);
+  return typeof value === 'string' && value.length > 0;
+}
+
 function getChartPadding(options: ChartOptions): number {
   return options.padding ?? CHART_DEFAULT_PADDING;
 }
@@ -195,6 +207,13 @@ export function buildXAxis(
     axis.data = data.categories;
   }
 
+  // min/max apply to value & time axes. Category axes derive their domain
+  // from `data`, so ECharts ignores these — passing them through is harmless.
+  // Treat NaN the same as unset; ECharts would otherwise collapse the axis
+  // to a single tick and stack all data on one pixel position.
+  if (isAxisBound(userAxis.min)) axis.min = userAxis.min;
+  if (isAxisBound(userAxis.max)) axis.max = userAxis.max;
+
   if (userAxis.name) {
     axis.name = userAxis.name;
     axis.nameLocation = 'center';
@@ -242,6 +261,12 @@ export function buildYAxis(options: XYChartOptions, count = 1): Record<string, u
       nameLocation: 'center',
       nameGap: 60,
     };
+
+    // min/max apply to every value-axis stack. Only the first axis honors
+    // user-supplied name / formatter, so we mirror that pattern here.
+    // NaN is treated as unset (see buildXAxis for the same reasoning).
+    if (i === 0 && isAxisBound(userAxis.min)) axis.min = userAxis.min;
+    if (i === 0 && isAxisBound(userAxis.max)) axis.max = userAxis.max;
 
     if (i === 0 && userAxis.name) {
       axis.name = userAxis.name;
@@ -431,16 +456,47 @@ const DATE_STRING_RE =
  *  - Unix timestamps: 10-digit (seconds) or 13-digit (milliseconds) numbers
  *  - Date strings: ISO 8601 and common variants (e.g. "2024-01-15", "2024/06/01 08:30")
  */
+/**
+ * Detect whether `categories` should be plotted on an ECharts time axis
+ * (`type: 'time'`) rather than a category axis.
+ *
+ * Heuristic — every entry must look time-like AND at least one entry must
+ * unambiguously anchor the array as a timestamp series:
+ *
+ *   - **strings**: matches {@link DATE_STRING_RE} (ISO-ish date format).
+ *   - **numbers**: either `0` (the unix epoch, freely accepted) or
+ *     `|v| >= 1e8` (≈ April 1973 in ms; ≈ year 5138 in seconds — safely
+ *     outside the range of categorical IDs / small enums).
+ *   - **anchor**: at least one entry must be a date string OR have
+ *     `|v| >= 1e9` so a lone `[0]` doesn't masquerade as time.
+ *
+ * Tradeoff vs. the previous "string length === 10 || 13" rule: that check
+ * silently fell over for sub-second-magnitude timestamps (e.g. `Date.UTC(1968,…)`
+ * is 11 digits, `Date.UTC(1970,0,1)` is exactly `0`). Streaming series that
+ * crossed the epoch flipped the axis from `time` to `category` mid-stream
+ * and collapsed every point onto one pixel column. The magnitude-based
+ * check above accepts the full plausible timestamp range.
+ *
+ * When in doubt, users should set `xAxis.dateFormat` — line/area adapters
+ * treat that as an explicit opt-in even when the heuristic would miss.
+ */
 export function isTimeCategories(categories: (string | number)[]): boolean {
   if (categories.length === 0) return false;
-  return categories.every((v) => {
+  let hasRealTimestamp = false;
+  const everyValid = categories.every((v) => {
     if (typeof v === 'number') {
-      const len = v.toString().length;
-      return len === 10 || len === 13;
+      if (v === 0) return true; // free pass; needs another entry to anchor
+      const abs = Math.abs(v);
+      if (abs < 1e8) return false;
+      if (abs >= 1e9) hasRealTimestamp = true;
+      return true;
     }
     if (typeof v === 'string') {
-      return DATE_STRING_RE.test(v.trim());
+      const ok = DATE_STRING_RE.test(v.trim());
+      if (ok) hasRealTimestamp = true;
+      return ok;
     }
     return false;
   });
+  return everyValid && hasRealTimestamp;
 }

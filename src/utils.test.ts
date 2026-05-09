@@ -68,7 +68,7 @@ describe('line adapter color injection', () => {
         { name: 'Cost', data: [5, 8] },
       ],
     };
-    const option = resolveLineOptions(data, {
+    const { option } = resolveLineOptions(data, {
       colorMap: { Revenue: '#aabbcc' },
     });
     const color = option.color as string[];

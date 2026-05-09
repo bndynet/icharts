@@ -1,6 +1,7 @@
 import type { BarData, BarChartOptions } from '../types.js';
-import type { ChartSetupResult } from './index.js';
+import type { ChartSetupResult, RenderContext } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
+import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './race-utils.js';
 import {
   buildTitle,
   buildLegend,
@@ -14,11 +15,12 @@ import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './series-utils.j
 export function resolveBarOptions(
   data: BarData,
   options: BarChartOptions,
+  ctx?: RenderContext,
 ): ChartSetupResult {
   const variant = options.variant ?? 'default';
 
   if (variant === 'race') {
-    return resolveBarRaceOptions(data, options);
+    return resolveBarRaceOptions(data, options, ctx);
   }
 
   const isTime = isTimeCategories(data.categories);
@@ -95,9 +97,6 @@ export function resolveBarOptions(
 // Race variant
 // ---------------------------------------------------------------------------
 
-/** Right-side grid padding (px) reserved for value labels in race variant. */
-const RACE_LABEL_HEADROOM = 80;
-
 /**
  * Builds an ECharts bar-race option from a single frame of {@link XYData}.
  *
@@ -114,9 +113,12 @@ const RACE_LABEL_HEADROOM = 80;
 function resolveBarRaceOptions(
   data: BarData,
   options: BarChartOptions,
+  ctx?: RenderContext,
 ): ChartSetupResult {
   const race = options.race ?? {};
-  const frameDuration = race.frameDuration ?? 3000;
+  // Auto-measured by default: matches the consumer's `chart.update()`
+  // cadence. Explicit `race.frameDuration` still wins.
+  const frameDuration = resolveRaceFrameDuration(race.frameDuration, ctx);
   const showValueLabel = race.showValueLabel ?? true;
   const firstSeries = data.series[0] ?? { name: '', data: [] };
   const seriesName = firstSeries.name;
@@ -129,11 +131,18 @@ function resolveBarRaceOptions(
 
   // Race labels sit *outside* the right end of each bar (position: 'right' +
   // valueAnimation). The default grid only reserves `padding` (≈12px) on the
-  // right which clips the digits. Reserve label headroom unless the user has
-  // explicitly set `grid.right` themselves.
+  // right which clips the digits. Reserve label headroom adaptively from
+  // the current frame's widest value string (canvas-measured when the DOM is
+  // available, char-count estimate otherwise), and let the engine's
+  // high-water mark (`ctx.maxRaceGridRight`) keep the reserve monotonic
+  // across frames so digit flips don't jitter the plot area.
+  // Skip entirely when labels are hidden — there's nothing to make room for.
   const grid = buildGrid(options, { legendShow: legendVisible });
-  if (options.grid?.right === undefined) {
-    grid.right = RACE_LABEL_HEADROOM;
+  if (options.grid?.right === undefined && showValueLabel) {
+    grid.right = resolveRaceLabelHeadroom(
+      firstSeries.data.map(formatRaceBarLabel),
+      ctx,
+    );
   }
 
   const raceSeries: Record<string, unknown> = {
@@ -190,6 +199,19 @@ function resolveBarRaceOptions(
     ? resolveColors(data.categories.map(String), options)
     : resolveColors([seriesName], options);
   return { option: merged, notMerge: false };
+}
+
+/**
+ * Mirrors the default text ECharts paints for a bar-race value label
+ * (`label.valueAnimation: true` without a custom formatter). We use it
+ * to drive the adaptive headroom calculation without having to wait for
+ * ECharts to render and measure.
+ *
+ * Null/undefined values produce an empty string so they contribute zero
+ * width — matching ECharts' own behavior of skipping the label.
+ */
+function formatRaceBarLabel(v: number | null | undefined): string {
+  return v === null || v === undefined ? '' : String(v);
 }
 
 // ---------------------------------------------------------------------------

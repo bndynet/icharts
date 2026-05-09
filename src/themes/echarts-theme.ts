@@ -8,11 +8,19 @@ import type { ChartThemeColors } from './types.js';
  *  background    → chart canvas background (transparent by default)
  *  surface       → tooltip bg, axis-pointer callout bg, pie-slice border
  *  surfaceText   → tooltip text, axis-pointer callout text
- *  textPrimary   → chart title, legend, pie labels, gauge detail (value), markPoint labels
+ *  textPrimary   → chart title, legend, pie labels, gauge detail (value),
+ *                  markPoint labels, bar/line value labels (incl. race value
+ *                  labels and line-race endLabels)
  *  textSecondary → axis tick labels, gauge title (label text e.g. "CPU")
- *  textSecondary → axis tick labels
  *  gridLine      → splitLine (grid rules)
  *  axisLine      → axis spine, tick marks, cursor crosshair
+ *
+ * Note on label colors: bar/line adapters intentionally do NOT set
+ * `series.label.color` / `series.endLabel.color`. ECharts deep-merges the
+ * series-type defaults below (`bar.label`, `line.label`, `line.endLabel`)
+ * into each series so themes drive the look. This keeps adapters
+ * theme-agnostic (they never read the active palette directly) and means
+ * a single theme switch repaints every data label on the chart.
  */
 export function buildEChartsTheme(
   colors: ChartThemeColors,
@@ -55,10 +63,20 @@ export function buildEChartsTheme(
       smooth: false,
       symbol: 'circle',
       symbolSize: 4,
+      // Data labels (`showLabel: true`) and race endLabels — both render
+      // against the chart canvas, so they need the on-background text
+      // color, not whatever ECharts' built-in default happens to be (which
+      // is unreadable on dark themes).
+      label:    { color: colors.textPrimary },
+      endLabel: { color: colors.textPrimary },
     },
 
     bar: {
       itemStyle: { barBorderWidth: 0 },
+      // Data labels (`showLabel: true`) and race value labels
+      // (`position: 'right'` + `valueAnimation`). Same rationale as line —
+      // labels live on the canvas and must follow the theme.
+      label: { color: colors.textPrimary },
     },
 
     pie: {

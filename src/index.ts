@@ -70,6 +70,7 @@ export {
   type TooltipContextEdge,
   type CreateAsyncTooltipFormatterOptions,
   type BarRaceOptions,
+  type LineRaceOptions,
   type ChartVariant,
   type LineVariant,
   type BarVariant,

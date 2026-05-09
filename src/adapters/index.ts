@@ -21,14 +21,43 @@ export interface ChartSetupResult {
 }
 
 /**
+ * Per-render context the engine passes to adapters alongside data/options.
+ *
+ * Carries lightweight signals derived from prior render passes so adapters
+ * can make better decisions without holding their own state:
+ *
+ *   - `observedFrameMs` — wall-clock gap between the last two `chart.update()`
+ *     calls. Race / streaming adapters use this to auto-size
+ *     `animationDurationUpdate` so callers don't have to mirror their own
+ *     `setInterval` value as `race.frameDuration`. `undefined` on the very
+ *     first `update()` (no prior call to measure against).
+ *   - `maxRaceGridRight` — high-water mark of the largest `grid.right` any
+ *     prior frame asked for. Race adapters mix this into their adaptive
+ *     label-headroom calculation (see `resolveRaceLabelHeadroom`) so the
+ *     reserved space grows monotonically as labels widen and never shrinks
+ *     back, avoiding plot-area jitter when label digits flip frame to frame.
+ *
+ * All fields are `undefined` during initial render from the constructor.
+ */
+export interface RenderContext {
+  observedFrameMs?: number;
+  maxRaceGridRight?: number;
+}
+
+/**
  * Contract every chart adapter must satisfy.
  *
  * `validate` -- returns true when `data` has the shape this adapter expects.
  * `resolve`  -- builds the ECharts option (and optional onInit hook).
+ *               `ctx` is optional; adapters that don't need it ignore the arg.
  */
 export interface ChartAdapter {
   validate(data: ChartData): boolean;
-  resolve(data: ChartData, options: ChartOptions): ChartSetupResult;
+  resolve(
+    data: ChartData,
+    options: ChartOptions,
+    ctx?: RenderContext,
+  ): ChartSetupResult;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +82,7 @@ export function resolveEChartsOption(
   type: string,
   data: ChartData,
   options: ChartOptions,
+  ctx?: RenderContext,
 ): ChartSetupResult {
   const adapter = adapterRegistry.get(type);
   if (!adapter) {
@@ -64,7 +94,7 @@ export function resolveEChartsOption(
         JSON.stringify(data).slice(0, 100),
     );
   }
-  return adapter.resolve(data, options);
+  return adapter.resolve(data, options, ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,9 +131,8 @@ import { resolveChordOptions } from './chord.js';
 
 registerAdapter(ChartType.Line, {
   validate: isXYData,
-  resolve: (data, options) => ({
-    option: resolveLineOptions(data as LineData, options as LineChartOptions),
-  }),
+  resolve: (data, options, ctx) =>
+    resolveLineOptions(data as LineData, options as LineChartOptions, ctx),
 });
 
 registerAdapter(ChartType.Area, {
@@ -115,8 +144,8 @@ registerAdapter(ChartType.Area, {
 
 registerAdapter(ChartType.Bar, {
   validate: isXYData,
-  resolve: (data, options) =>
-    resolveBarOptions(data as BarData, options as BarChartOptions),
+  resolve: (data, options, ctx) =>
+    resolveBarOptions(data as BarData, options as BarChartOptions, ctx),
 });
 
 registerAdapter(ChartType.Pie, {

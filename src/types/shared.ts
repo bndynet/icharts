@@ -49,6 +49,17 @@ export interface AxisOptions {
    * Example: 'YYYY-MM-DD HH:mm' (more detail than the tick labels)
    */
   cursorFormat?: string;
+  /**
+   * Pin the axis lower bound. Accepts a number, a date-parseable string, or
+   * one of ECharts' magic strings (`'dataMin'`, `'dataMax'`).
+   *
+   * Mainly useful for the `race` variant to lock the visible domain so the
+   * line doesn't "compress" each frame as new categories arrive. Ignored by
+   * category axes — those derive their domain from `data`.
+   */
+  min?: number | string;
+  /** Pin the axis upper bound. See {@link AxisOptions.min}. */
+  max?: number | string;
 }
 
 export interface SeriesOptions {

@@ -23,9 +23,15 @@ export interface BarRaceOptions {
    */
   topN?: number;
   /**
-   * Transition duration (ms) between consecutive frames. Should match the
-   * interval at which the consumer calls `chart.update(frame)`.
-   * Default: 3000.
+   * Transition duration (ms) between consecutive frames.
+   *
+   * Leave unset — the library auto-measures the interval between your
+   * `chart.update(frame)` calls and uses that as the animation duration
+   * (clamped to [80, 3000] ms). Pass an explicit value only to override
+   * the measured cadence (e.g. to deliberately slow down a fast stream
+   * for readability).
+   *
+   * Default for the very first transition (no prior tick to measure): 500ms.
    */
   frameDuration?: number;
   /**

@@ -77,7 +77,7 @@ chart.dispose();
 
 | Type   | `type` value | Variants |
 |--------|-------------|----------|
-| Line   | `line`   | `default`, `spark` |
+| Line   | `line`   | `default`, `spark`, `race` |
 | Bar    | `bar`    | `default`, `horizontal`, `spark`, `race` |
 | Area   | `area`   | `default`, `spark` |
 | Pie    | `pie`    | `default`, `doughnut`, `half-doughnut`, `nightingale` |
@@ -269,7 +269,7 @@ function frameFor(year: number) {
 
 const chart = createChart(el, 'bar', frameFor(1950), {
   variant: 'race',
-  race: { topN: 10, frameDuration: 1000 },
+  race: { topN: 10 },             // frameDuration auto-measured (see below)
   title: 'Population — 1950',
 });
 
@@ -287,7 +287,8 @@ Rules for the data you feed each frame:
 - Do **not** pre-sort. `realtimeSort: true` is on by default; just supply raw values for each racer in their registered order.
 - For racers that are absent in a given frame, use `0` (or `null`) rather than removing them from `categories`.
 - Use only `series[0]` — bar race shows a single ranked metric. Additional series are ignored.
-- Match your `setInterval` cadence to `race.frameDuration` (default 3000 ms) so the previous frame's animation finishes before the next one starts.
+- **Don't repeat your tick interval.** The library auto-measures the gap between `chart.update()` calls and uses it as the per-frame animation duration; just call `update()` on your own `setInterval` and the animation paces itself. Pass `race.frameDuration` only to override that (e.g. to deliberately slow a fast stream for readability).
+- **Right-side label headroom is automatic.** The plot area's `grid.right` is sized to the widest value string in the current frame (canvas-measured) and grows monotonically across frames so digit flips don't jitter the layout. Set `grid.right` explicitly to opt out, or `race.showValueLabel: false` to skip the reserve entirely.
 
 Race-specific options live under `race`:
 
@@ -296,13 +297,87 @@ Race-specific options live under `race`:
   variant: 'race',
   race: {
     topN?: number;            // visible bars (omit to show all); maps to yAxis.max = topN - 1
-    frameDuration?: number;   // ms between frames (default: 3000)
+    frameDuration?: number;   // override the auto-measured tick interval; clamped to [80, 3000] ms
     showValueLabel?: boolean; // animated value label at bar end (default: true)
   },
 }
 ```
 
 Add `colorByCategory: true` to give every racer its own color (matches the look of the official ECharts country-race demo). The library auto-hides the legend in that mode.
+
+### Line Race (Animated Multi-Line Trail Chart)
+
+`variant: 'race'` on a line chart turns repeated `chart.update(nextFrame)` calls into a smooth animation: each line extends with the new tail point and a tracking label at the line's leading edge ticks to the latest value.
+
+```ts
+const racers = ['China', 'India', 'USA', 'Nigeria', 'Pakistan'];
+
+function frameFor(year: number) {
+  const years = range(START_YEAR, year);            // [1960, 1961, …, year]
+  return {
+    categories: years,                              // grows by one each frame
+    series: racers.map((name) => ({
+      name,                                         // stable across frames
+      data: years.map((y) => historyLookup[name][y]), // trail up to `year`
+    })),
+  };
+}
+
+const chart = createChart(el, 'line', frameFor(1960), {
+  variant: 'race',                // frameDuration auto-measured from setInterval
+  title: 'Population — 1960',
+});
+
+let year = 1960;
+const timer = setInterval(() => {
+  year++;
+  if (year > 2030) { clearInterval(timer); return; }
+  chart.update(frameFor(year), { title: `Population — ${year}` });
+}, 500);
+```
+
+Rules for the data you feed each frame:
+
+- `series[i].name` is the racer identity — keep names **stable across frames**. ECharts diffs series by name to animate transitions; renaming a series will reset its trail.
+- Each frame typically carries the **full trail** (categories + each series's data extended by one point). Don't ship just the latest point — the chart needs the history to render the line.
+- **Don't repeat your tick interval.** The library auto-measures the gap between `chart.update()` calls and uses it as the per-frame animation duration; just call `update()` on your own `setInterval` and the animation paces itself. Pass `race.frameDuration` only when you want to override the measured cadence.
+- **Right-side end-label headroom is automatic.** The plot area's `grid.right` is sized to the widest `<seriesName> <value>` string in the current frame and grows monotonically as labels widen, so digit flips don't jitter the lines. Set `grid.right` explicitly to opt out, or `race.showValueLabel: false` to skip the reserve entirely.
+- A reasonable racer count is 3–8 lines. More lines work but end-labels start overlapping.
+
+Race-specific options live under `race`:
+
+```ts
+{
+  variant: 'race',
+  race: {
+    frameDuration?: number;   // override the auto-measured tick interval; clamped to [80, 3000] ms
+    showValueLabel?: boolean; // animated end-of-line label (default: true)
+  },
+}
+```
+
+#### Smooth streaming feel (axis pinning)
+
+By default, line race auto-pins `xAxis.min` to the first category **only when the categories are timestamps** (10-digit unix seconds, 13-digit unix ms, or ISO date strings). On a category axis (e.g. `[1960, 1961, …]` as plain 4-digit numbers, or strings like `'Q1'`), ECharts re-lays out the axis every frame and existing points slide horizontally — the line appears to "compress" instead of extend.
+
+For a truly smooth, ticker-style stream, do both:
+
+1. Pass categories as **timestamps** so the time-axis path kicks in.
+2. Pin `xAxis.max` yourself (the adapter only auto-pins `min`). With both edges fixed, existing points never move pixel-wise — only the new tail slides in.
+
+```ts
+const START = Date.UTC(1960, 0, 1);
+const END   = Date.UTC(2031, 0, 1);
+
+createChart(el, 'line', frameAt(1960), {
+  variant: 'race',
+  xAxis: { min: START, max: END, dateFormat: 'YYYY' },
+});
+```
+
+For **live streaming** with an unknown end-time, use a **sliding window**: keep a growing buffer of points, and update `xAxis.min` / `xAxis.max` to `[now - windowMs, now]` on every frame. Both edges slide in lock-step so points keep their absolute timestamp positions — that's the canonical heart-rate-monitor look. See the "Live Streaming" card on the Dynamic Data demo page for a full example.
+
+> **Trap — don't `shift()` per tick.** ECharts diffs line series by array **index**, not by timestamp. If you prune one point at the head every tick (e.g. `data.shift()` to keep the array bounded), every remaining index shifts by one, which morphs each point to its right neighbor's old position and fights the axis-slide animation. The visible symptom is a "shudder" at the leftmost edge once the line has filled the window. Fix: keep a generous buffer (e.g. 5× the visible window) and prune in rare, large batches — the dropped points are far off-screen by then, so the visible portion stays index-stable.
 
 ### Sankey Chart
 
@@ -430,10 +505,14 @@ Each chart type has its own options interface that extends the base `ChartOption
     dateFormat?: string;              // e.g. 'MM/DD', 'YYYY-MM-DD'
     cursorFormat?: string;            // axis-pointer label; falls back to dateFormat
     formatLabel?: (value: string | number, index: number) => string;
+    min?: number | string;            // pin lower bound (value/time axes; also 'dataMin')
+    max?: number | string;            // pin upper bound (value/time axes; also 'dataMax')
   };
   yAxis?: {
     name?: string;
     formatLabel?: (value: string | number, index: number) => string;
+    min?: number | string;
+    max?: number | string;
   };
 
   // Per-series overrides (keyed by series name, '*' applies to all)
@@ -456,7 +535,13 @@ Each chart type has its own options interface that extends the base `ChartOption
 
 ```ts
 {
-  variant?: 'default' | 'spark';
+  variant?: 'default' | 'spark' | 'race';
+
+  // Variant-specific sub-namespace — only consulted when `variant === 'race'`.
+  race?: {
+    frameDuration?: number;   // override the auto-measured tick interval; clamped to [80, 3000] ms
+    showValueLabel?: boolean; // animated end-of-line label, default: true
+  };
 }
 ```
 
@@ -477,7 +562,7 @@ Each chart type has its own options interface that extends the base `ChartOption
   // Variant-specific sub-namespace — only consulted when `variant === 'race'`.
   race?: {
     topN?: number;            // visible bars; maps to yAxis.max = topN - 1
-    frameDuration?: number;   // ms between frames, default: 3000
+    frameDuration?: number;   // override the auto-measured tick interval; clamped to [80, 3000] ms
     showValueLabel?: boolean; // animated value label at bar end, default: true
   };
 }
