@@ -47,6 +47,8 @@ const pieCard = ref<CardRef>();
 const doughnutCard = ref<CardRef>();
 const roseCard = ref<CardRef>();
 
+// Auto-disposed on unmount via the sentinel installed inside each chart's
+// container — see `LineAreaCharts.vue` for the full note.
 onMounted(() => {
   createChart(pieCard.value!.chartEl!, 'pie', pieData, { title: 'Browser Market Share' });
   createChart(doughnutCard.value!.chartEl!, 'pie', pieData, {

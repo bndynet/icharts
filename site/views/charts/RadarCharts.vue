@@ -77,6 +77,8 @@ const radarSkillsData = {
   ],
 };
 
+// Auto-disposed on unmount via the sentinel installed inside each chart's
+// container — see `LineAreaCharts.vue` for the full note.
 onMounted(() => {
   createChart(radarCard.value!.chartEl!, 'radar', radarData, { title: 'Budget vs Spending' });
   createChart(radarCircleCard.value!.chartEl!, 'radar', radarSkillsData, {

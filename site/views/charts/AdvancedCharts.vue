@@ -51,6 +51,8 @@ const mixedData = {
   ],
 };
 
+// Auto-disposed on unmount via the sentinel installed inside each chart's
+// container — see `LineAreaCharts.vue` for the full note.
 onMounted(() => {
   createChart(mixedCard.value!.chartEl!, 'line', mixedData, {
     title: 'Revenue vs Trend',

@@ -87,7 +87,10 @@ describe('pie adapter color injection', () => {
       colorMap: { A: '#112233' },
     });
     const color = option.color as string[];
-    expect(color[0]).toBe('#112233');
+    // Sorted by value desc → [B(70), A(30)], so A sits at slice index 1.
+    // ECharts pie maps `option.color[i]` to slice `i`, so the colorMap pin
+    // on "A" must land on palette[1] for the painted slice to match.
+    expect(color[1]).toBe('#112233');
     expect(color).toHaveLength(2);
   });
 });

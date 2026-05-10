@@ -141,7 +141,7 @@ createChart(el2, 'pie', [{ name: 'Profit', value: 30 }, { name: 'Revenue', value
 2. It walks `chartRegistry` and calls `update()` on every live chart
    so all of them re-resolve and re-render.
 
-### Pre-binding names
+### Pre-binding names (sticky pins)
 
 ```ts
 import { setColorMap } from '@bndynet/icharts';
@@ -161,17 +161,41 @@ With `consistentColors: false` the resolver path is
 For per-chart pins regardless of the global flag, use the chart's own
 `options.colorMap`.
 
-### Resetting between dashboards
+**Pins are sticky.** They survive both `switchTheme()` and `resetColorMap()`.
+Internally they live in a per-theme pinned map that is seeded back into
+ColorHub whenever the working colorMap is cleared. Concretely:
+
+```ts
+setColorMap({ Premium: '#FFD166' }, 'light');
+switchTheme('light');           // pin survives
+resetColorMap();                // pin still survives
+setColorMap({ Premium: '#000' });   // overwrites the pin
+// No public API removes a single pin — start a fresh app session if you
+// truly need to drop one.
+```
+
+This lets you call `setColorMap` once at app startup and forget about it;
+auto-assigned palette slots get wiped by page transitions but your pins
+do not.
+
+### Resetting between dashboards (now automatic)
 
 ```ts
 import { resetColorMap } from '@bndynet/icharts';
 
 resetColorMap();          // rebuild ColorHub; next chart starts at palette[0]
-resetColorMap('dark');    // clear only the 'dark' theme's accumulated map
+resetColorMap('dark');    // clear only the 'dark' theme's auto state
 ```
 
-Run this when navigating between dashboards in an SPA so colors picked
-up in dashboard A do not leak into dashboard B.
+`switchTheme(name)` **already** clears the target theme's auto-assigned
+entries before re-applying the theme, so most SPA pages do not need to
+call `resetColorMap()` directly — a page that mounts and calls
+`switchTheme(currentTheme)` automatically starts the consumed palette slot
+counter at 0 in the active theme. Use `resetColorMap()` explicitly when
+you want to wipe state mid-page without changing theme, or when you want
+to wipe **every** theme's auto state at once (the no-arg form).
+
+In both cases, entries previously written by `setColorMap` are preserved.
 
 ---
 
@@ -469,14 +493,26 @@ createChart(el3, 'bar',  /* … */);
 
 ### 11.2 SPA — clean state between dashboards
 
+Most SPA pages already call `switchTheme(currentTheme)` on mount (either
+directly, or indirectly through a site-level theme watcher). That call
+now clears the target theme's auto-assigned colorMap automatically, so
+dashboard A's name → color assignments cannot leak into dashboard B —
+no `resetColorMap()` needed:
+
 ```ts
 configure({ consistentColors: true });
-mountDashboardA();
+setColorMap({ Premium: '#FFD166' });   // sticky across switches
 
+mountDashboardA();                     // page mounts, calls switchTheme(...)
 unmountDashboardA();
-resetColorMap();   // forget A's name → color assignments
-mountDashboardB();
+mountDashboardB();                     // page mounts, calls switchTheme(...)
+                                       // → palette restarts at 0
+                                       // → Premium stays #FFD166 (pinned)
 ```
+
+If a page does *not* call `switchTheme` on mount (e.g. it reuses whatever
+theme is already active), call `resetColorMap()` manually to get the
+same effect, or wrap your mount in `switchTheme(getCurrentTheme().name)`.
 
 ### 11.3 One-off override on a single chart
 
@@ -525,9 +561,12 @@ document.addEventListener('toggle-theme', () => {
   resolved palette wins over `options.echarts.color`.
 - ✅ Register custom themes, call `configure({ consistentColors })`,
   and call `setColorMap` at application startup before creating any
-  chart.
-- ✅ Call `resetColorMap()` when navigating between dashboards in an
-  SPA to avoid color drift.
+  chart. `setColorMap` pins are sticky across `switchTheme` and
+  `resetColorMap`, so once-and-done is enough.
+- ✅ Rely on `switchTheme(name)` (called naturally by most SPA page
+  mounts) to clear the previous page's auto-assigned palette slots.
+  Only call `resetColorMap()` explicitly if you need to wipe state
+  without changing theme.
 
 ### Don't
 

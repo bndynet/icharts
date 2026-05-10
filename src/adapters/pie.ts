@@ -117,6 +117,15 @@ export function resolvePieOptions(
     ? [...data].sort((a, b) => b.value - a.value)
     : data;
 
+  // ECharts pie matches `option.color[i]` to `series.data[i]` by index, so
+  // the palette has to follow the SORTED slice order — not the original
+  // input order. Otherwise a `colorMap` pin on a name that the sort moves
+  // (e.g. Premium at value 420 trailing higher tiers) paints the wrong
+  // slice and its matching legend swatch. The legend's display order still
+  // follows `names` (the user-supplied order) so callers retain control of
+  // the legend layout independent of the painted slice order.
+  const sliceNames = sorted.map((d) => d.name);
+
   const tooltip: Record<string, unknown> = {
     trigger: 'item',
     confine: true,
@@ -144,7 +153,7 @@ export function resolvePieOptions(
   };
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
-  merged.color = resolveColors(names, options);
+  merged.color = resolveColors(sliceNames, options);
 
   return {
     option: merged,

@@ -50,6 +50,8 @@ const chordData = {
   ],
 };
 
+// Auto-disposed on unmount via the sentinel installed inside each chart's
+// container — see `LineAreaCharts.vue` for the full note.
 onMounted(() => {
   createChart(chordCard.value!.chartEl!, 'chord', chordData, {
     title: 'Team Collaboration',

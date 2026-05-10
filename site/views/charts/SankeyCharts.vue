@@ -72,6 +72,8 @@ const sankeyJourneyData = {
   ],
 };
 
+// Auto-disposed on unmount via the sentinel installed inside each chart's
+// container — see `LineAreaCharts.vue` for the full note.
 onMounted(() => {
   createChart(sankeyCard.value!.chartEl!, 'sankey', sankeyData, { title: 'Energy Flow' });
   createChart(sankeyVerticalCard.value!.chartEl!, 'sankey', sankeyJourneyData, {

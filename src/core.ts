@@ -3,6 +3,7 @@ import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
 import { resolveEChartsOption, type RenderContext } from './adapters/index.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
 import { chartRegistry } from './registry.js';
+import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
 
 /**
  * Core chart engine that manages an ECharts instance and provides the
@@ -69,6 +70,25 @@ export class IChart implements IChartInstance {
    * and keeps tooltips functional.
    */
   private _inShadowDom: boolean;
+  /**
+   * Set to `true` by the first successful {@link dispose} call. Guards
+   * the dispose body against double-execution — necessary because the
+   * `<i-chart>` web component's `disconnectedCallback` and our own
+   * sentinel-driven auto-dispose can both race to tear down the same
+   * instance when an `<i-chart>` element is removed from the document.
+   * ECharts' own dispose is idempotent internally but emits a console
+   * warning on the second call; skipping the redundant work is cleaner.
+   */
+  private _disposed = false;
+  /**
+   * Sentinel handle returned by {@link installSentinel}; held so
+   * {@link dispose} can detach the sentinel without triggering its own
+   * disconnect callback (which would re-enter dispose). `null` in
+   * environments without `customElements` / `document` — those rely on
+   * the registry's `pruneDetachedCharts` walk during the next theme or
+   * `consistentColors` change.
+   */
+  private _sentinel: SentinelHandle | null = null;
 
   constructor(
     container: HTMLElement,
@@ -87,6 +107,12 @@ export class IChart implements IChartInstance {
     this.ecInstance = echarts.init(container, this._activeTheme);
     chartRegistry.add(this);
     this._apply();
+    // Auto-dispose on container detach. Installed AFTER `_apply()` so a
+    // throwing adapter doesn't leave behind a sentinel whose disposer
+    // would race a half-initialized chart through `dispose()`. See
+    // disconnect-sentinel.ts for the full rationale (Vue Teleport
+    // self-healing, HMR, `<i-chart>` double-dispose ordering).
+    this._sentinel = installSentinel(container, () => this.dispose());
   }
 
   update(newData?: ChartData, newOptions?: AnyChartOptions): void {
@@ -126,6 +152,20 @@ export class IChart implements IChartInstance {
   }
 
   dispose(): void {
+    // Idempotent: see `_disposed` above. Both `<i-chart>`'s Lit
+    // disconnect path and our sentinel can fire dispose for the same
+    // instance during the same teardown — exit early on the second
+    // call rather than asking ECharts to dispose twice.
+    if (this._disposed) return;
+    this._disposed = true;
+    // Detach the sentinel first, *before* anything else can throw —
+    // its `remove()` clears the callback so the synchronous
+    // `disconnectedCallback` it triggers is a no-op. If we did this
+    // last, an `ecInstance.dispose()` throw would leak the sentinel
+    // (still living in `container`, still holding a closure over a
+    // disposed-but-still-registered chart).
+    this._sentinel?.remove();
+    this._sentinel = null;
     chartRegistry.delete(this);
     this.ecInstance.dispose();
   }

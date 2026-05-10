@@ -1,5 +1,5 @@
 <template>
-  <div class="dashboard">
+  <div class="dashboard" :class="{ 'is-scifi': activeTheme === 'dash-scifi' }">
 
     <!-- ── Header ──────────────────────────────────────────────────────── -->
     <header class="dash-header">
@@ -11,8 +11,26 @@
         </p>
       </div>
       <div class="dash-theme-block">
-        <span class="dash-theme-label">Dashboard theme</span>
-        <el-segmented v-model="activeTheme" :options="themeOptions" size="small" />
+        <div class="dash-theme-current">
+          <span class="dash-theme-current-label">Active palette</span>
+          <code class="dash-theme-current-name">{{ currentTheme.name || '—' }}</code>
+          <span
+            v-if="currentTheme.palette.length"
+            class="dash-theme-swatches"
+            :title="currentTheme.palette.join(', ')"
+          >
+            <span
+              v-for="(c, i) in currentTheme.palette"
+              :key="`${c}-${i}`"
+              class="dash-theme-swatch"
+              :style="{ background: c }"
+            />
+          </span>
+        </div>
+        <div class="dash-theme-block-row">
+          <span class="dash-theme-label">Dashboard theme</span>
+          <el-segmented v-model="activeTheme" :options="themeOptions" size="small" />
+        </div>
       </div>
     </header>
 
@@ -23,13 +41,17 @@
         single shared dataset. Enabled via
         <code class="dash-code">configure({ consistentColors: true })</code>,
         every series name keeps the same color across every chart. On top of
-        that, the <strong>Premium</strong> tier is pinned to
-        <span class="dash-pin-swatch" />
-        <code class="dash-code">#FFD166</code>
-        via a single shared
-        <code class="dash-code">colorMap</code>
-        passed to each chart. Switch the theme above to watch every other
-        color update while Premium stays the same gold everywhere.
+        that, the <strong>{{ Object.keys(PIN_COLOR_MAP)[0] }}</strong> tier is pinned via
+        <code class="dash-code">PIN_COLOR_MAP</code>
+        to
+        <span class="dash-pin-swatch" :style="{ background: PIN_COLOR_MAP.Trial }" />
+        <code class="dash-code">{{ PIN_COLOR_MAP.Trial }}</code>
+        on every chart (
+        <code class="dash-code">options.colorMap</code>
+        ). Switch the theme above to watch every other color update while Trial
+        keeps
+        <code class="dash-code">PIN_COLOR_MAP.Trial</code>
+        everywhere.
       </template>
     </el-alert>
 
@@ -57,7 +79,7 @@
       </el-card>
     </div>
 
-    <!-- ── Section: trend + share ─────────────────────────────────────────── -->
+    <!-- ── Section: monthly trend + Q4 winners ────────────────────────── -->
     <div class="dash-row dash-row-8-4">
       <el-card shadow="hover">
         <template #header>
@@ -72,16 +94,16 @@
       <el-card shadow="hover">
         <template #header>
           <div class="card-head">
-            <span>Annual revenue share</span>
-            <el-tag type="info" size="small" effect="plain">doughnut</el-tag>
+            <span>Q4 revenue ranking</span>
+            <el-tag type="info" size="small" effect="plain">bar · horizontal</el-tag>
           </div>
         </template>
-        <div ref="shareEl" class="chart-box-lg"></div>
+        <div ref="rankingEl" class="chart-box-lg"></div>
       </el-card>
     </div>
 
-    <!-- ── Section: 3-col grid ─────────────────────────────────────────────── -->
-    <div class="dash-row dash-row-three">
+    <!-- ── Section: cumulative + quarterly breakdown ──────────────────── -->
+    <div class="dash-row dash-row-1-1">
       <el-card shadow="hover">
         <template #header>
           <div class="card-head">
@@ -89,7 +111,7 @@
             <el-tag type="info" size="small" effect="plain">area · stacked</el-tag>
           </div>
         </template>
-        <div ref="cumulativeEl" class="chart-box"></div>
+        <div ref="cumulativeEl" class="chart-box-lg"></div>
       </el-card>
 
       <el-card shadow="hover">
@@ -99,21 +121,11 @@
             <el-tag type="info" size="small" effect="plain">bar · stacked</el-tag>
           </div>
         </template>
-        <div ref="quarterlyEl" class="chart-box"></div>
-      </el-card>
-
-      <el-card shadow="hover">
-        <template #header>
-          <div class="card-head">
-            <span>Q4 revenue ranking</span>
-            <el-tag type="info" size="small" effect="plain">bar · horizontal</el-tag>
-          </div>
-        </template>
-        <div ref="rankingEl" class="chart-box"></div>
+        <div ref="quarterlyEl" class="chart-box-lg"></div>
       </el-card>
     </div>
 
-    <!-- ── Section: sankey + 2 gauges ────────────────────────────────────── -->
+    <!-- ── Section: acquisition funnel + ops health ───────────────────── -->
     <div class="dash-row dash-row-8-4">
       <el-card shadow="hover">
         <template #header>
@@ -139,7 +151,7 @@
       </el-card>
     </div>
 
-    <!-- ── Section: chord + radar ────────────────────────────────────────── -->
+    <!-- ── Section: chord + radar ─────────────────────────────────────── -->
     <div class="dash-row dash-row-1-1">
       <el-card shadow="hover">
         <template #header>
@@ -162,8 +174,8 @@
       </el-card>
     </div>
 
-    <!-- ── Section: mixed + nightingale + half-doughnut ──────────────────── -->
-    <div class="dash-row dash-row-5-4-3">
+    <!-- ── Section: Premium vs Pro deep-dive · full width ─────────────── -->
+    <div class="dash-row dash-row-full">
       <el-card shadow="hover">
         <template #header>
           <div class="card-head">
@@ -172,6 +184,19 @@
           </div>
         </template>
         <div ref="mixedEl" class="chart-box-lg"></div>
+      </el-card>
+    </div>
+
+    <!-- ── Section: revenue mix · three circular views ────────────────── -->
+    <div class="dash-row dash-row-three">
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Annual revenue share</span>
+            <el-tag type="info" size="small" effect="plain">doughnut</el-tag>
+          </div>
+        </template>
+        <div ref="shareEl" class="chart-box-lg"></div>
       </el-card>
 
       <el-card shadow="hover">
@@ -205,6 +230,7 @@ import {
   configure,
   switchTheme,
   registerTheme,
+  getCurrentTheme,
   type IChartInstance,
 } from '@bndynet/icharts';
 import { useTheme } from '@bndynet/vue-site';
@@ -240,18 +266,13 @@ function registerDashboardThemes(): void {
   if (dashThemesRegistered) return;
   dashThemesRegistered = true;
 
-  registerTheme({
-    name: 'dash-ocean',
-    colorMode: 'light',
-    palette: ['#0ea5e9', '#14b8a6', '#8b5cf6', '#0891b2', '#f43f5e'],
-  });
-
-  registerTheme({
-    name: 'dash-midnight',
-    colorMode: 'dark',
-    palette: ['#60a5fa', '#22d3ee', '#a78bfa', '#34d399', '#f472b6'],
-  });
-
+  // Palettes are sized to comfortably cover every unique series / node name
+  // the dashboard renders (≈14 across KPI sparks, tier series, sankey nodes,
+  // chord nodes, mixed-chart "Growth Rate", etc.) with headroom to spare.
+  // Once `configure({ consistentColors: true })` exhausts the palette,
+  // ColorHub falls back to randomised hues (Math.random-based) and the same
+  // name picks a different color on every refresh — keeping the palette
+  // longer than the name list keeps assignments deterministic.
   registerTheme({
     name: 'dash-sunset',
     colorMode: 'light',
@@ -260,24 +281,71 @@ function registerDashboardThemes(): void {
       textSecondary: '#7c2d12',
       gridLine: '#ffedd5',
       axisLine: '#fdba74',
+      tooltipBackground: '#fff7ed',
+      tooltipBorderColor: '#fdba74',
+      tooltipTextColor: '#3b1d10',
     },
-    palette: ['#f97316', '#ef4444', '#ec4899', '#a855f7', '#0ea5e9'],
+    palette: [
+      '#fed7aa', '#fdba74', '#fb923c', '#f97316', '#ea580c',
+      '#c2410c', '#9a3412', '#7c2d12', '#fef3c7', '#fde68a',
+      '#fcd34d', '#fbbf24', '#f59e0b', '#d97706', '#b45309',
+      '#92400e', '#78350f', '#ffedd5', '#ffe4cc', '#ffd5a8',
+    ],
   });
 
   registerTheme({
-    name: 'dash-forest',
+    name: 'dash-blue',
     colorMode: 'dark',
     colors: {
-      surface: '#0a3622',
-      surfaceText: '#dcfce7',
-      textPrimary: '#dcfce7',
-      textSecondary: '#86efac',
-      gridLine: '#14532d',
-      axisLine: '#166534',
-      tooltipBackground: '#0a3622',
-      tooltipBorderColor: '#166534',
+      surface: '#0c1e3e',
+      surfaceText: '#dbeafe',
+      textPrimary: '#dbeafe',
+      textSecondary: '#93c5fd',
+      gridLine: '#1e3a8a',
+      axisLine: '#1e40af',
+      // Lifted one step above `surface` so the tooltip card is visually
+      // separated from the page background; border picks up a brighter
+      // palette blue so the outline reads cleanly on dark.
+      tooltipBackground: '#1e3a8a',
+      tooltipBorderColor: '#3b82f6',
+      tooltipTextColor: '#dbeafe',
     },
-    palette: ['#34d399', '#22d3ee', '#a3e635', '#5eead4', '#86efac'],
+    palette: [
+      '#60a5fa', '#38bdf8', '#22d3ee', '#818cf8', '#93c5fd',
+      '#3b82f6', '#0ea5e9', '#06b6d4', '#6366f1', '#7dd3fc',
+      '#2563eb', '#0284c7', '#0891b2', '#4f46e5', '#67e8f9',
+      '#1d4ed8', '#0369a1', '#0e7490', '#4338ca', '#a5b4fc',
+    ],
+  });
+
+  // Sci-Fi HUD palette. Paired with the `.dashboard.is-scifi` glassmorphism
+  // CSS below: ECharts canvases are already transparent by default
+  // (`colors.background === 'transparent'` in the built-in dark preset that
+  // this entry merges into), so chart paint sits directly on the glass
+  // card. `surface` is also transparent here so pie slice borders fade
+  // away, fusing slices into a continuous neon ring that matches the HUD
+  // aesthetic. Tooltip stays semi-opaque so values remain readable when
+  // the cursor lands over a busy region of the canvas.
+  registerTheme({
+    name: 'dash-scifi',
+    colorMode: 'dark',
+    colors: {
+      surface: 'transparent',
+      surfaceText: '#bef0ff',
+      textPrimary: '#bef0ff',
+      textSecondary: '#7ed5f0',
+      gridLine: 'rgba(0, 245, 255, 0.12)',
+      axisLine: 'rgba(0, 245, 255, 0.45)',
+      tooltipBackground: 'rgba(5, 18, 36, 0.92)',
+      tooltipBorderColor: '#00f5ff',
+      tooltipTextColor: '#e6faff',
+    },
+    palette: [
+      '#00f5ff', '#00ffaa', '#ff3dac', '#ffd166', '#38bdf8',
+      '#a855f7', '#ff8c42', '#5eead4', '#f472b6', '#facc15',
+      '#22d3ee', '#c084fc', '#fb7185', '#34d399', '#60a5fa',
+      '#e879f9', '#fbbf24', '#2dd4bf', '#f87171', '#818cf8',
+    ],
   });
 }
 
@@ -290,26 +358,40 @@ type DashThemeOption = {
   colorMode: 'light' | 'dark';
 };
 const themeOptions: DashThemeOption[] = [
-  { label: 'Ocean',    value: 'dash-ocean',    colorMode: 'light' },
-  { label: 'Midnight', value: 'dash-midnight', colorMode: 'dark'  },
   { label: 'Sunset',   value: 'dash-sunset',   colorMode: 'light' },
-  { label: 'Forest',   value: 'dash-forest',   colorMode: 'dark'  },
+  { label: 'Blue',     value: 'dash-blue',     colorMode: 'dark'  },
+  { label: 'Sci-Fi',   value: 'dash-scifi',    colorMode: 'dark'  },
 ];
 
-const activeTheme = ref<string>(
-  siteTheme.value === 'dark' ? 'dash-midnight' : 'dash-ocean',
-);
+// Start with no dashboard theme selected — the page inherits whichever site
+// theme (light/dark) is already active. The segmented control only applies a
+// dashboard palette once the user explicitly picks one.
+const activeTheme = ref<string>('');
+
+// Live snapshot of icharts' currently-active theme (name + palette), shown
+// above the segmented control. Refreshed manually after every event that can
+// change the global ColorHub state — local picks (`watch(activeTheme)`),
+// site-driven flips (`watch(siteTheme)`, fired by site.config.ts), and the
+// initial mount. Reading `getCurrentTheme()` directly inside a `computed`
+// would not react because it's an imperative call into the ColorHub
+// singleton — there's no Vue dependency to track.
+const currentTheme = ref<{ name: string; palette: string[] }>({
+  name: '',
+  palette: [],
+});
+function refreshCurrentTheme(): void {
+  const t = getCurrentTheme();
+  currentTheme.value = { name: t.name, palette: [...(t.palette ?? [])] };
+}
 
 // ── Shared dataset — every chart on the page reads from `monthly` ──────────
 const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
 const tiers    = ['Premium', 'Pro', 'Standard', 'Basic', 'Trial'];
 
-// One shared colorMap, one pin: every chart that names a "Premium" series or
-// slice renders it in this exact gold. `options.colorMap` sits above the
-// theme palette in the resolver priority chain, so this pin survives every
-// theme switch the dashboard supports.
-const PIN_COLOR_MAP = { Premium: '#FFD166' } as const;
+// One shared colorMap: pinned names → fixed colors. Passed as `options.colorMap`
+// on every chart; sits above the theme palette, so pins survive theme switches.
+const PIN_COLOR_MAP = { Trial: '#efefef' } as const;
 
 const monthly: Record<string, number[]> = {
   Premium:  [420, 455, 485, 515, 560, 600, 625, 660, 690, 720, 760, 810],
@@ -362,7 +444,7 @@ const kpis = [
     deltaPositiveIsGood: false,
     sparkType: 'line' as const,
     sparkName: 'Net Churn',
-    sparkData: [3.2, 3.1, 2.9, 2.8, 2.8, 2.6, 2.5, 2.4, 2.3, 2.3, 2.2, 2.1],
+    sparkData: [3.2, 3.1, 2.9, 2.8, 2.8, 2.6, 2.5, 2.2, 2.0, 1.1, 0.6, 0.1],
   },
 ];
 
@@ -403,7 +485,13 @@ let resizeHandler: (() => void) | null = null;
 onMounted(() => {
   registerDashboardThemes();
   configure({ consistentColors: true });
-  switchTheme(activeTheme.value);
+  // Don't force a dashboard theme on first paint — let the site's current
+  // light/dark theme drive the palette until the user picks one from the
+  // segmented control above.
+  if (activeTheme.value) {
+    switchTheme(activeTheme.value);
+  }
+  refreshCurrentTheme();
 
   // ── KPI sparklines ────────────────────────────────────────────────────
   kpis.forEach((kpi, i) => {
@@ -417,6 +505,7 @@ onMounted(() => {
       {
         variant: 'spark',
         series: { '*': { smooth: true, lineWidth: 2.5 } },
+        colors: [ i === 0 ? '#FF0000' : i === 1 ? '#00ff00' : '#0000ff'],
       },
     ));
   });
@@ -459,8 +548,7 @@ onMounted(() => {
   }));
 
   // Horizontal bar with one series + `colorByCategory: true` colors each
-  // bar by its tier name — that's how the Premium bar still picks up the
-  // pinned gold even though the only series is "Q4 revenue".
+  // bar by its tier name — the Trial bar picks up PIN_COLOR_MAP.Trial.
   track(createChart(rankingEl.value!, 'bar', {
     categories: tiers,
     series: [{ name: 'Q4 revenue', data: tiers.map((t) => quarterSum(monthly[t])[3]) }],
@@ -508,7 +596,7 @@ onMounted(() => {
   }));
 
   // ── Sankey: traffic source → trial signup → outcome tier ──────────────
-  // Premium appears as a sink node — pinned to gold via PIN_COLOR_MAP and
+  // Tier nodes use consistentColors; Trial is pinned via PIN_COLOR_MAP.
   // paintGraphNodes inside the sankey adapter.
   track(createChart(sankeyEl.value!, 'sankey', {
     nodes: [
@@ -552,7 +640,7 @@ onMounted(() => {
 
   // ── Chord: inter-tier movement (upgrades, downgrades, cross-tier) ─────
   // Same node names as the line/bar/pie charts, so consistentColors keeps
-  // every tier on the same color — and Premium stays gold via colorMap.
+  // every tier on the same color — Trial stays pinned via PIN_COLOR_MAP.
   track(createChart(chordEl.value!, 'chord', {
     nodes: [
       { name: 'Trial' },
@@ -614,13 +702,40 @@ onMounted(() => {
 // `site.config.ts` already watches `siteTheme` and calls
 // `switchTheme(siteMode)`, which would clobber our chart palette — so we
 // wait one tick for that watcher to run, then re-apply the dashboard theme.
+//
+// After the theme swap we MUST also resize every chart. Themes like
+// `dash-scifi` add the `.is-scifi` class on the dashboard root, which
+// changes card borders, backdrop-filter, corner-bracket pseudo-elements
+// and a few other geometry-affecting rules. ECharts canvases were sized
+// against the pre-toggle layout, so without an explicit resize their
+// pixel dimensions overflow the now-different card width — most visibly
+// on the last row, which has the tallest charts and so the largest
+// canvas mismatch. A real `window.resize` fixes it because ECharts hooks
+// that event globally. We wait one Vue tick (for the class to apply)
+// plus one rAF (for the browser to lay out the new CSS) before reading
+// `clientWidth`/`clientHeight`.
 watch(activeTheme, async (next) => {
+  if (!next) return;
   const meta = themeOptions.find((o) => o.value === next);
   if (meta && siteTheme.value !== meta.colorMode) {
     syncSiteTheme(meta.colorMode);
     await nextTick();
   }
   switchTheme(next);
+  refreshCurrentTheme();
+  await nextTick();
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  for (const c of charts) c.resize();
+});
+
+// site.config.ts watches `siteTheme` and calls icharts.switchTheme(siteMode)
+// whenever the user toggles light/dark via the sidebar. Mirror that change
+// in our header preview when no dashboard-specific theme is active —
+// otherwise the preview drifts out of sync with the rendered charts.
+watch(siteTheme, async () => {
+  await nextTick();
+  if (activeTheme.value) return;
+  refreshCurrentTheme();
 });
 
 onUnmounted(() => {
@@ -641,16 +756,27 @@ onUnmounted(() => {
   max-width: 1680px;
   margin: 0 auto;
   padding-bottom: 32px;
+  /* One 12-column master grid for the whole dashboard. Every row below is
+     a `subgrid` of these tracks, so column boundaries align vertically
+     across rows — without subgrid the per-row grids each divide their
+     own gap differently (a 3-col row consumes two 16px gaps, a 2-col row
+     only one) and boundaries that should sit at 2/3 width drift ~5px
+     apart. Row spacing is owned here too via `row-gap` so child rows
+     don't need their own `margin-bottom`. */
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  column-gap: 16px;
+  row-gap: 16px;
 }
 
 /* ── Header ───────────────────────────────────────────────────────────── */
 .dash-header {
+  grid-column: 1 / -1;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
   flex-wrap: wrap;
-  margin-bottom: 20px;
 }
 .dash-eyebrow {
   margin: 0;
@@ -674,6 +800,52 @@ onUnmounted(() => {
 }
 .dash-theme-block {
   display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+.dash-theme-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+.dash-theme-current-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--el-text-color-secondary);
+  font-weight: 700;
+}
+.dash-theme-current-name {
+  background: var(--el-fill-color-light);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, monospace;
+  color: var(--el-text-color-primary);
+}
+.dash-theme-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+}
+.dash-theme-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  flex: 0 0 auto;
+}
+.dash-theme-block-row {
+  display: flex;
   align-items: center;
   gap: 12px;
 }
@@ -687,7 +859,7 @@ onUnmounted(() => {
 
 /* ── Alert with pinned-color callout ──────────────────────────────────── */
 .dash-alert {
-  margin-bottom: 24px;
+  grid-column: 1 / -1;
 }
 .dash-code {
   background: var(--el-fill-color-light);
@@ -701,22 +873,22 @@ onUnmounted(() => {
   width: 12px;
   height: 12px;
   border-radius: 3px;
-  background: #FFD166;
   border: 1px solid rgba(0, 0, 0, 0.12);
   vertical-align: -1px;
   margin: 0 4px 0 2px;
 }
 
 /* ── KPI cards ────────────────────────────────────────────────────────── */
+/* Subgrid inherits the 12-col tracks from `.dashboard`. Each KPI card
+   spans 4 cols so the boundary at 4/12 and 8/12 lines up with the
+   `dash-row-8-4` boundary (8/12) one row below — that's the alignment
+   the previous non-subgrid layout was breaking. */
 .dash-kpi-grid {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 20px;
+  grid-template-columns: subgrid;
 }
-@media (max-width: 880px) {
-  .dash-kpi-grid { grid-template-columns: 1fr; }
-}
+.dash-kpi-grid > * { grid-column: span 4; }
 .dash-kpi-card .kpi-row {
   display: flex;
   align-items: center;
@@ -768,37 +940,34 @@ onUnmounted(() => {
 }
 
 /* ── Grids ────────────────────────────────────────────────────────────── */
+/* Every row below is a `subgrid` of the 12-col master grid defined on
+   `.dashboard`. Each card declares its width with `grid-column: span N`
+   so identical spans across rows produce identical column boundaries
+   (8/12 in `dash-row-8-4` aligns with 8/12 in `dash-kpi-grid`, etc.). */
 .dash-row {
+  grid-column: 1 / -1;
   display: grid;
-  gap: 16px;
-  margin-bottom: 16px;
+  grid-template-columns: subgrid;
 }
-.dash-row-8-4    { grid-template-columns: 2fr 1fr; }
-.dash-row-three  { grid-template-columns: repeat(3, 1fr); }
-.dash-row-1-1    { grid-template-columns: 1fr 1fr; }
-.dash-row-5-4-3  { grid-template-columns: 5fr 4fr 3fr; }
+.dash-row-8-4 > :nth-child(1) { grid-column: span 8; }
+.dash-row-8-4 > :nth-child(2) { grid-column: span 4; }
+.dash-row-three > *           { grid-column: span 4; }
+.dash-row-1-1 > *             { grid-column: span 6; }
+/* Single-card "feature" row — the card spans every column of the master
+   12-col grid. Used for the Premium-vs-Pro deep-dive between the
+   chord/radar pair and the closing three-pie row. */
+.dash-row-full > *            { grid-column: 1 / -1; }
 
-@media (max-width: 1280px) {
-  .dash-row-5-4-3 {
-    grid-template-columns: 1fr 1fr;
-  }
-  .dash-row-5-4-3 > :nth-child(3) {
+@media (max-width: 1100px) {
+  .dash-row-8-4 > *,
+  .dash-row-1-1 > * {
     grid-column: 1 / -1;
   }
 }
-@media (max-width: 1100px) {
-  .dash-row-8-4,
-  .dash-row-1-1 {
-    grid-template-columns: 1fr;
-  }
-}
 @media (max-width: 880px) {
-  .dash-row-three,
-  .dash-row-5-4-3 {
-    grid-template-columns: 1fr;
-  }
-  .dash-row-5-4-3 > :nth-child(3) {
-    grid-column: auto;
+  .dash-kpi-grid > *,
+  .dash-row-three > * {
+    grid-column: 1 / -1;
   }
 }
 
@@ -811,9 +980,6 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
-.chart-box {
-  height: 280px;
-}
 .chart-box-lg {
   height: 340px;
 }
@@ -828,5 +994,239 @@ onUnmounted(() => {
 .gauge-cell {
   flex: 1 1 0;
   min-height: 0;
+}
+
+/* ── Sci-Fi HUD theme ─────────────────────────────────────────────────── */
+/* Activated by `:class="{ 'is-scifi': activeTheme === 'dash-scifi' }"` on
+   the dashboard root. Everything below is intentionally scoped under
+   `.dashboard.is-scifi` so the regular Sunset/Blue/light/dark themes are
+   untouched. Pairs with the `dash-scifi` icharts theme (palette + tokens)
+   so chart canvases blend into the glass panels instead of painting an
+   opaque background on top of them. */
+
+/* Full-viewport background: a single procedurally-generated SVG artboard
+   (`site/assets/scifi-bg.svg`, 1920x1080) that bundles every layer of the
+   scene — deep-space gradient, three nebula glows (cyan / violet / pink),
+   a three-tier star field, a two-tier HUD grid, a reticle, a planet-limb
+   arc, telemetry tick scale, and corner tech-text labels. Keeping all the
+   artwork in one asset means the look is editable in any vector tool and
+   Vite hashes the URL for cache-busting on rebuild.
+
+   The bg is attached to a non-scoped `body:has(.dashboard.is-scifi)`
+   rule (in the second `<style>` block below) so it can paint **above**
+   vue-site's `.site-content` background-color, which would otherwise
+   eclipse anything painted as a `z-index: -1` descendant of `.dashboard`.
+   `background-attachment: fixed` keeps the artboard locked to the
+   viewport while the dashboard scrolls; `cover` sizes it aspect-correct.
+   Only the scanline overlay stays here as a `::before` because it needs
+   to live in the same stacking context as the glass cards (above the
+   bg, below the cards) and adds a subtle screen-blended ripple. */
+
+/* Static scanline overlay — fixed horizontal stripes at low alpha. Sits
+   above the bg but still behind cards. No animation to keep CPU idle
+   while ECharts is doing real work. */
+.dashboard.is-scifi::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 245, 255, 0.025) 3px,
+    transparent 4px
+  );
+  background-size: 100% 4px;
+  mix-blend-mode: screen;
+}
+/* All real dashboard content must sit above the scanline overlay. */
+.dashboard.is-scifi > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header typography: cyan glow on the title, brighter eyebrow / subtitle. */
+.dashboard.is-scifi .dash-eyebrow,
+.dashboard.is-scifi .dash-theme-current-label,
+.dashboard.is-scifi .dash-theme-label,
+.dashboard.is-scifi .kpi-label {
+  color: #5dd7f0;
+  text-shadow: 0 0 6px rgba(0, 245, 255, 0.4);
+}
+.dashboard.is-scifi .dash-h1 {
+  color: #e6faff;
+  text-shadow:
+    0 0 8px rgba(0, 245, 255, 0.55),
+    0 0 22px rgba(0, 245, 255, 0.25);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+}
+.dashboard.is-scifi .dash-subtitle,
+.dashboard.is-scifi .kpi-delta-cmp {
+  color: #93c6da;
+}
+.dashboard.is-scifi .kpi-value {
+  color: #e6faff;
+  text-shadow: 0 0 10px rgba(0, 245, 255, 0.5);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.dashboard.is-scifi .dash-theme-current-name {
+  background: rgba(0, 245, 255, 0.1);
+  color: #e6faff;
+  border: 1px solid rgba(0, 245, 255, 0.35);
+}
+.dashboard.is-scifi .dash-theme-swatches {
+  background: rgba(5, 18, 36, 0.5);
+  border-color: rgba(0, 245, 255, 0.3);
+}
+
+/* Alert: glass card with cyan accent. `:deep` is required because Element
+   Plus renders the alert's interior structure outside this component's
+   scope-id. */
+.dashboard.is-scifi :deep(.el-alert) {
+  background: rgba(5, 18, 36, 0.5);
+  border: 1px solid rgba(0, 245, 255, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  box-shadow: 0 0 18px rgba(0, 245, 255, 0.15);
+}
+.dashboard.is-scifi :deep(.el-alert .el-alert__content),
+.dashboard.is-scifi :deep(.el-alert .el-alert__description),
+.dashboard.is-scifi :deep(.el-alert .el-alert__title) {
+  color: #d6f0fa;
+}
+.dashboard.is-scifi .dash-code {
+  background: rgba(0, 245, 255, 0.12);
+  color: #e6faff;
+  border: 1px solid rgba(0, 245, 255, 0.3);
+}
+
+/* Glassmorphism cards. `position: relative` is required so the ::before
+   corner-brackets layer (below) anchors to the card. The negative
+   `backdrop-filter` chain falls back gracefully on browsers without
+   support — the rgba background still reads as a panel. */
+.dashboard.is-scifi :deep(.el-card) {
+  position: relative;
+  background: transparent;
+  border: 1px solid rgba(0, 245, 255, 0.28);
+  border-radius: 2px;
+  backdrop-filter: blur(2px) saturate(140%);
+  -webkit-backdrop-filter: blur(2px) saturate(140%);
+  box-shadow:
+    0 0 24px rgba(0, 245, 255, 0.12),
+    inset 0 0 30px rgba(0, 245, 255, 0.04);
+  overflow: visible;
+}
+.dashboard.is-scifi :deep(.el-card:hover) {
+  border-color: rgba(0, 245, 255, 0.55);
+  box-shadow:
+    0 0 32px rgba(0, 245, 255, 0.28),
+    inset 0 0 30px rgba(0, 245, 255, 0.06);
+}
+
+/* Four neon corner brackets drawn entirely with layered background-images
+   on the card's ::before — no extra DOM nodes needed. Eight layered
+   gradients = one horizontal + one vertical stroke per corner. Element
+   Plus's el-card doesn't use ::before itself, so we own this pseudo. */
+.dashboard.is-scifi :deep(.el-card)::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  z-index: 1;
+  background-image:
+    linear-gradient(#00f5ff, #00f5ff), linear-gradient(#00f5ff, #00f5ff),
+    linear-gradient(#00f5ff, #00f5ff), linear-gradient(#00f5ff, #00f5ff),
+    linear-gradient(#00f5ff, #00f5ff), linear-gradient(#00f5ff, #00f5ff),
+    linear-gradient(#00f5ff, #00f5ff), linear-gradient(#00f5ff, #00f5ff);
+  background-size:
+    18px 2px, 2px 18px,
+    18px 2px, 2px 18px,
+    18px 2px, 2px 18px,
+    18px 2px, 2px 18px;
+  background-position:
+    left top, left top,
+    right top, right top,
+    left bottom, left bottom,
+    right bottom, right bottom;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 4px rgba(0, 245, 255, 0.7));
+}
+
+/* Card header: HUD-style label bar — cyan underline, uppercase, tracked. */
+.dashboard.is-scifi :deep(.el-card__header) {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 245, 255, 0.14) 0%,
+    rgba(0, 245, 255, 0.04) 50%,
+    transparent 100%
+  );
+  border-bottom: 1px solid rgba(0, 245, 255, 0.3);
+  color: #d6f0fa;
+}
+.dashboard.is-scifi :deep(.el-card__header) .card-head {
+  color: #e6faff;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 12px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.dashboard.is-scifi :deep(.el-card__body) {
+  color: #d6f0fa;
+}
+
+/* Tags inside card headers: outlined neon pill instead of filled gray. */
+.dashboard.is-scifi :deep(.el-tag) {
+  background: rgba(0, 245, 255, 0.08);
+  border-color: rgba(0, 245, 255, 0.5);
+  color: #7ee9ff;
+  text-shadow: 0 0 4px rgba(0, 245, 255, 0.4);
+}
+
+/* Segmented control: glass background, glowing active pill. */
+.dashboard.is-scifi :deep(.el-segmented) {
+  background: rgba(5, 18, 36, 0.55);
+  border: 1px solid rgba(0, 245, 255, 0.3);
+  --el-segmented-item-selected-bg-color: rgba(0, 245, 255, 0.22);
+  --el-segmented-item-selected-color: #e6faff;
+  --el-segmented-color: #93c6da;
+}
+
+/* KPI delta colors keep success/danger semantics but glow on the dark bg. */
+.dashboard.is-scifi .kpi-delta.up   { color: #00ffaa; text-shadow: 0 0 6px rgba(0, 255, 170, 0.5); }
+.dashboard.is-scifi .kpi-delta.down { color: #ff3dac; text-shadow: 0 0 6px rgba(255, 61, 172, 0.5); }
+</style>
+
+<!--
+  Non-scoped (global) style block. Scoped CSS rewrites every selector with
+  the component's `data-v-<hash>` suffix, so a scoped rule can never reach
+  vue-site's `.site-content` wrapper (which is outside this component's
+  template and thus has no scope-id attribute). The wrapper has its own
+  opaque `background: var(--color-content-bg)` baked into vue-site's
+  stylesheet — without overriding it, any background we paint underneath
+  is eclipsed.
+
+  Painting the sci-fi artwork directly on `.site-content` (instead of on
+  `body` with a separate transparent override) is the cleaner solution:
+  one rule replaces two, the artwork is scoped to the actual content
+  area, and the sidebar / top nav keep their own chrome untouched.
+  `:has()` is supported in every evergreen browser, and the rule reverts
+  automatically when the user picks a non-sci-fi dashboard theme (the
+  `.is-scifi` class disappears, the selector no longer matches, and
+  vue-site's default `.site-content` background takes over again).
+  `background-attachment: fixed` sizes the artboard to the viewport
+  (not the `.site-content` box), so scrolling the dashboard leaves the
+  HUD locked in place — the cards float over a static scene.
+-->
+<style>
+.site-content:has(.dashboard.is-scifi) {
+  background-color: #03070f;
+  background-image: url('../assets/scifi-bg.svg');
+  background-size: cover;
+  background-position: bottom;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
 }
 </style>

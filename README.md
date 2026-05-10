@@ -49,9 +49,14 @@ const chart = createChart(
   { title: 'Quarterly Sales' }
 );
 
-// Update / resize / destroy later:
+// Update / resize later:
 chart.update(newData, newOptions);
 chart.resize();
+
+// Disposal is automatic — the chart releases itself the moment its
+// container leaves the DOM (e.g. when a Vue/React component unmounts).
+// Calling `chart.dispose()` explicitly is still supported and idempotent
+// for cases where you want to free resources eagerly.
 chart.dispose();
 ```
 
@@ -764,7 +769,7 @@ configure({ consistentColors: true });
 
 With this enabled, if "Revenue" is palette color #1 in a line chart, it will also be #1 in a pie chart, a bar chart, or any other chart on the page.
 
-**Pre-register specific name → color mappings:**
+**Pre-register specific name → color mappings (sticky pins):**
 
 ```ts
 import { setColorMap } from '@bndynet/icharts';
@@ -780,16 +785,26 @@ setColorMap({
 setColorMap({ 'Revenue': '#ff8fab' }, 'dark');
 ```
 
-**Reset when navigating between dashboards:**
+Pins set via `setColorMap` are **sticky**: they survive `switchTheme()` and
+`resetColorMap()`, so a single call at app startup is enough. The auto-
+assigned palette slots get wiped by SPA navigation, but your pinned colors
+do not.
+
+**Between-page state — usually automatic:**
+
+`switchTheme(name)` now clears the target theme's auto-assigned color
+slots as part of the switch, so most SPA pages do not need to call
+`resetColorMap()` directly — mounting a page that calls
+`switchTheme(currentTheme)` automatically restarts palette consumption
+at index 0, while preserving any `setColorMap` pins.
 
 ```ts
 import { resetColorMap } from '@bndynet/icharts';
 
-// Clear all accumulated name → color assignments
-resetColorMap();
-
-// Clear only a specific theme
-resetColorMap('dark');
+// Use these only if a page doesn't call switchTheme on mount, or to wipe
+// state mid-page without changing theme:
+resetColorMap();          // every theme — auto entries cleared, pins kept
+resetColorMap('dark');    // single theme — auto entries cleared, pins kept
 ```
 
 Per-chart `colors` and `colorMap` options always take highest priority regardless of the global setting.
@@ -821,7 +836,7 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `update(data?, options?)` | Re-render with new data / options |
 | `setTheme(name)` | Switch to a registered theme without re-creating the instance |
 | `resize()` | Trigger resize (e.g. after container size change) |
-| `dispose()` | Destroy the chart and free memory |
+| `dispose()` | Destroy the chart and free memory. Called automatically when the container leaves the DOM (idempotent — safe to call again). |
 | `getEChartsInstance()` | Access the underlying ECharts instance |
 
 ---

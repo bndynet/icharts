@@ -80,6 +80,8 @@ const hbarData = {
   series: [{ name: 'Share %', data: [65, 15, 12, 5, 3] }],
 };
 
+// Auto-disposed on unmount via the sentinel installed inside each chart's
+// container — see `LineAreaCharts.vue` for the full note.
 onMounted(() => {
   createChart(barCard.value!.chartEl!, 'bar', barData, { title: 'Quarterly Sales' });
   createChart(stackedBarCard.value!.chartEl!, 'bar', barData, { stacked: true, title: 'Stacked Revenue' });

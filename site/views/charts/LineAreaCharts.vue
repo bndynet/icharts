@@ -136,6 +136,10 @@ const timeTsData = {
   series: [{ name: 'Visits', data: [120, 145, 98, 167, 203, 180, 221] }],
 };
 
+// No manual cleanup needed — `IChart` installs a hidden sentinel custom
+// element in each container; the browser's `disconnectedCallback` fires the
+// moment Vue tears this view's DOM down, which auto-disposes every chart
+// and removes its global-registry entry. See `src/disconnect-sentinel.ts`.
 onMounted(() => {
   createChart(lineCard.value!.chartEl!, 'line', xyData, { title: 'Monthly Financials' });
   createChart(areaCard.value!.chartEl!, 'area', weekData, { title: 'Weekly Visits' });

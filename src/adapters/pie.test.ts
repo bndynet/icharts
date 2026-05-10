@@ -98,10 +98,41 @@ describe('pie adapter', () => {
         colorMap: { Premium: '#ffd166', Pro: '#118ab2' },
       });
       const colors = optOf(result).color as string[];
-      // Slices are sorted by value desc, but `option.color` follows the
-      // original `names` order so consistency with the legend holds.
-      expect(colors[0]).toBe('#ffd166');
-      expect(colors[1]).toBe('#118ab2');
+      // ECharts pie maps `option.color[i]` to `series.data[i]` by index, so
+      // the palette MUST follow the sorted slice order (the order ECharts
+      // actually paints). Sample sorted by value desc:
+      //   Standard(1240), Basic(1180), Pro(880), Premium(420), Trial(175)
+      // → Pro at index 2, Premium at index 3.
+      expect(colors[2]).toBe('#118ab2');
+      expect(colors[3]).toBe('#ffd166');
+    });
+
+    it('aligns palette index with the painted slice (colorMap pin survives autoSort)', () => {
+      // Regression: when `autoSort` reorders the slices, the palette must
+      // follow the sort or ECharts paints the wrong slice with the pinned
+      // color. Verify by checking that every name in `series.data` lands
+      // on the same index as its color in `option.color`.
+      const result = resolvePieOptions(sample, {
+        colorMap: { Premium: '#ffd166' },
+      });
+      const series = (optOf(result).series as Record<string, unknown>[])[0];
+      const sliceNames = (series.data as Array<{ name: string }>).map((d) => d.name);
+      const palette = optOf(result).color as string[];
+      const premiumIdx = sliceNames.indexOf('Premium');
+      expect(palette[premiumIdx]).toBe('#ffd166');
+    });
+
+    it('keeps palette aligned to data order when autoSort is false', () => {
+      // With sort off, slice order equals input order, so the palette
+      // matches the input order too — no behavior change vs. the sorted
+      // case from the user's perspective: the painted slice still gets
+      // its pinned color.
+      const result = resolvePieOptions(sample, {
+        autoSort: false,
+        colorMap: { Premium: '#ffd166' },
+      });
+      const palette = optOf(result).color as string[];
+      expect(palette[0]).toBe('#ffd166');
     });
 
     it('merges options.echarts last and lets the palette win on color', () => {
@@ -113,7 +144,9 @@ describe('pie adapter', () => {
         },
       });
       expect((optOf(result).series as Record<string, unknown>[])[0].selectedMode).toBe('single');
-      expect((optOf(result).color as string[])[0]).toBe('#aaaaaa');
+      // Premium sorts to index 3 by value desc; palette must pin that index
+      // to the colorMap entry (and override `echarts.color`).
+      expect((optOf(result).color as string[])[3]).toBe('#aaaaaa');
     });
   });
 
