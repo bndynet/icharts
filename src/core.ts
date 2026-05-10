@@ -1,5 +1,7 @@
 import * as echarts from 'echarts';
 import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
+import { ChartType } from './types/base.js';
+import { isGaugeData, mergeGaugeData } from './types/gauge.js';
 import { resolveEChartsOption, type RenderContext } from './adapters/index.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
 import { chartRegistry } from './registry.js';
@@ -116,7 +118,14 @@ export class IChart implements IChartInstance {
   }
 
   update(newData?: ChartData, newOptions?: AnyChartOptions): void {
-    if (newData !== undefined) this._data = newData;
+    if (newData !== undefined) {
+      this._data =
+        this._type === ChartType.Gauge &&
+        isGaugeData(this._data) &&
+        isGaugeData(newData)
+          ? mergeGaugeData(this._data, newData)
+          : newData;
+    }
     if (newOptions) this._options = { ...this._options, ...newOptions };
 
     // Sample the inter-update interval BEFORE re-rendering so adapters can

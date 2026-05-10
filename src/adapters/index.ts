@@ -191,6 +191,10 @@ registerAdapter(ChartType.Gauge, {
   validate: isGaugeData,
   resolve: (data, options, ctx) => ({
     option: resolveGaugeOptions(data as GaugeData, options as GaugeChartOptions, ctx),
+    // Merge successive frames so ECharts can animate pointer / progress /
+    // detail.valueAnimation when consumers drive live metrics via
+    // `chart.update({ value })` on an interval.
+    notMerge: false,
   }),
 });
 

@@ -125,6 +125,11 @@ Line, bar, and area share the same runtime shape. The library exports `LineData`
 { value: 72, max: 100, label: 'Score' }
 ```
 
+`chart.update()` on a gauge chart merges into the previous frame: omit
+`max` / `label` to keep them, include the key to override (`label: ''`
+clears the caption; `max: undefined` drops a custom max so the default
+`100` applies).
+
 ### Sankey — `SankeyData`
 
 ```ts
