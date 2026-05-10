@@ -11,18 +11,24 @@ import type { ChartThemeColors } from './types.js';
  *  textPrimary   → chart title, legend, pie labels, gauge detail (value),
  *                  radar indicator names (axisName), markPoint labels,
  *                  bar/line value labels (incl. race value labels and
- *                  line-race endLabels)
+ *                  line-race endLabels), graph/sankey/chord node + link labels
  *  textSecondary → axis tick labels, gauge title (label text e.g. "CPU")
  *  gridLine      → splitLine (grid rules), radar splitLine + alternating
  *                  splitArea bands
  *  axisLine      → axis spine, tick marks, cursor crosshair, radar axisLine
  *
- * Note on label colors: bar/line adapters intentionally do NOT set
- * `series.label.color` / `series.endLabel.color`. ECharts deep-merges the
- * series-type defaults below (`bar.label`, `line.label`, `line.endLabel`)
- * into each series so themes drive the look. This keeps adapters
- * theme-agnostic (they never read the active palette directly) and means
- * a single theme switch repaints every data label on the chart.
+ * Note on label colors: adapters intentionally do NOT set `series.label.color`
+ * / `series.endLabel.color` / `series.edgeLabel.color`. ECharts deep-merges
+ * the series-type defaults below (`bar.label`, `line.label`, `line.endLabel`,
+ * `pie.label`, `radar.axisName`, `graph.label`, `graph.edgeLabel`,
+ * `sankey.label`, `chord.label`, …) into each series so themes drive the look.
+ * This keeps adapters theme-agnostic (they never read the active palette
+ * directly) and means a single theme switch repaints every data label on the
+ * chart. AGENTS.md "Layout rule #6" documents this two-sided contract: any
+ * new chart whose adapter renders canvas-rendered text MUST add the matching
+ * `<seriesType>.<field>.color` entry here AND a regression test below in
+ * `echarts-theme.test.ts` — leaving the theme side unwired silently breaks
+ * dark-theme rendering for that chart.
  */
 export function buildEChartsTheme(
   colors: ChartThemeColors,
@@ -119,6 +125,22 @@ export function buildEChartsTheme(
         show: true,
         areaStyle: { color: ['transparent', colors.gridLine], opacity: 0.3 },
       },
+    },
+
+    // Graph-family series (network, sankey, chord). Each adapter emits
+    // `series.label` (and network additionally emits `series.edgeLabel`)
+    // without a `color` key, so ECharts' built-in default (a near-black
+    // shade) would be unreadable on dark themes. Mirror the pie/bar/line
+    // contract: theme owns the text color, adapters stay theme-agnostic.
+    graph: {
+      label:     { color: colors.textPrimary }, // network node labels
+      edgeLabel: { color: colors.textPrimary }, // network link labels (when showLinkLabel)
+    },
+    sankey: {
+      label: { color: colors.textPrimary }, // sankey node labels
+    },
+    chord: {
+      label: { color: colors.textPrimary }, // chord node labels (outside the ring)
     },
   };
 }

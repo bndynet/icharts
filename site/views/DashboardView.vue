@@ -36,22 +36,18 @@
 
     <el-alert type="success" :closable="false" show-icon class="dash-alert">
       <template #default>
-        Every one of the eight built-in chart types is rendered below — line,
-        area, bar, pie, gauge, sankey, chord and radar — all reading from a
-        single shared dataset. Enabled via
+        Each card below is a different built-in chart type, all fed from the
+        same SaaS revenue dataset. With
         <code class="dash-code">configure({ consistentColors: true })</code>,
-        every series name keeps the same color across every chart. On top of
-        that, the <strong>{{ Object.keys(PIN_COLOR_MAP)[0] }}</strong> tier is pinned via
-        <code class="dash-code">PIN_COLOR_MAP</code>
+        every series or node name keeps the same color across the dashboard.
+        The <strong>{{ Object.keys(PIN_COLOR_MAP)[0] }}</strong> tier is also
+        pinned via
+        <code class="dash-code">options.colorMap</code>
         to
         <span class="dash-pin-swatch" :style="{ background: PIN_COLOR_MAP.Trial }" />
-        <code class="dash-code">{{ PIN_COLOR_MAP.Trial }}</code>
-        on every chart (
-        <code class="dash-code">options.colorMap</code>
-        ). Switch the theme above to watch every other color update while Trial
-        keeps
-        <code class="dash-code">PIN_COLOR_MAP.Trial</code>
-        everywhere.
+        <code class="dash-code">{{ PIN_COLOR_MAP.Trial }}</code>.
+        Switch the theme above to watch other colors update while Trial stays
+        fixed.
       </template>
     </el-alert>
 
@@ -174,6 +170,29 @@
       </el-card>
     </div>
 
+    <!-- ── Section: tier movement · network (force + circular side-by-side) -->
+    <div class="dash-row dash-row-1-1">
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Tier movement · force layout</span>
+            <el-tag type="info" size="small" effect="plain">network</el-tag>
+          </div>
+        </template>
+        <div ref="networkForceEl" class="chart-box-lg"></div>
+      </el-card>
+
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Tier movement · circular layout</span>
+            <el-tag type="info" size="small" effect="plain">network · circular</el-tag>
+          </div>
+        </template>
+        <div ref="networkCircularEl" class="chart-box-lg"></div>
+      </el-card>
+    </div>
+
     <!-- ── Section: Premium vs Pro deep-dive · full width ─────────────── -->
     <div class="dash-row dash-row-full">
       <el-card shadow="hover">
@@ -234,6 +253,27 @@ import {
   type IChartInstance,
 } from '@bndynet/icharts';
 import { useTheme } from '@bndynet/vue-site';
+import {
+  months,
+  PIN_COLOR_MAP,
+  monthly,
+  quarterSum,
+  kpis,
+  tierMovement,
+  tierMovementNetwork,
+  acquisitionSankey,
+  radarFeatureUsage,
+  mixedGrowthRate,
+  trialOutcomes,
+  gaugeCsat,
+  gaugeUptime,
+  buildMonthlyTrend,
+  buildQuarterly,
+  buildAnnualShare,
+  buildQ4Ranking,
+  buildQ4Mix,
+  type DashboardKpi,
+} from './dashboard-data.js';
 
 const { theme: siteTheme } = useTheme();
 
@@ -384,71 +424,7 @@ function refreshCurrentTheme(): void {
   currentTheme.value = { name: t.name, palette: [...(t.palette ?? [])] };
 }
 
-// ── Shared dataset — every chart on the page reads from `monthly` ──────────
-const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
-const tiers    = ['Premium', 'Pro', 'Standard', 'Basic', 'Trial'];
-
-// One shared colorMap: pinned names → fixed colors. Passed as `options.colorMap`
-// on every chart; sits above the theme palette, so pins survive theme switches.
-const PIN_COLOR_MAP = { Trial: '#efefef' } as const;
-
-const monthly: Record<string, number[]> = {
-  Premium:  [420, 455, 485, 515, 560, 600, 625, 660, 690, 720, 760, 810],
-  Pro:      [310, 330, 345, 365, 380, 400, 420, 440, 460, 475, 495, 520],
-  Standard: [220, 235, 245, 260, 270, 285, 290, 300, 315, 325, 340, 355],
-  Basic:    [150, 160, 165, 170, 180, 190, 195, 205, 215, 220, 225, 235],
-  Trial:    [ 90, 100, 105, 110, 118, 125, 135, 142, 150, 158, 165, 175],
-};
-
-function quarterSum(d: number[]): number[] {
-  return [0, 1, 2, 3].map((q) => d.slice(q * 3, q * 3 + 3).reduce((a, b) => a + b, 0));
-}
-function yearTotal(d: number[]): number {
-  return d.reduce((a, b) => a + b, 0);
-}
-
-// ── KPI summary derived from the shared dataset ────────────────────────────
-const totalARR = tiers.reduce((s, t) => s + yearTotal(monthly[t]), 0); // $K
-const arrSpark = months.map((_, i) => tiers.reduce((s, t) => s + monthly[t][i], 0));
-
-// Each KPI shows a different spark chart type so the three cards read
-// differently at a glance — area for cumulative revenue, bar for discrete
-// monthly customer counts, line for the smooth rate trend.
-const kpis = [
-  {
-    key: 'arr',
-    label: 'Total ARR',
-    value: `$${(totalARR / 1000).toFixed(2)}M`,
-    delta: 18.2,
-    deltaPositiveIsGood: true,
-    sparkType: 'area' as const,
-    sparkName: 'Total ARR',
-    sparkData: arrSpark,
-  },
-  {
-    key: 'customers',
-    label: 'Active Customers',
-    value: '18,420',
-    delta: 9.4,
-    deltaPositiveIsGood: true,
-    sparkType: 'bar' as const,
-    sparkName: 'Active Customers',
-    sparkData: [12100, 12600, 13000, 13600, 14200, 14800, 15400, 16000, 16700, 17300, 17900, 18420],
-  },
-  {
-    key: 'churn',
-    label: 'Net Churn',
-    value: '2.1%',
-    delta: -0.6,
-    deltaPositiveIsGood: false,
-    sparkType: 'line' as const,
-    sparkName: 'Net Churn',
-    sparkData: [3.2, 3.1, 2.9, 2.8, 2.8, 2.6, 2.5, 2.2, 2.0, 1.1, 0.6, 0.1],
-  },
-];
-
-function kpiDeltaClass(k: typeof kpis[number]): 'up' | 'down' {
+function kpiDeltaClass(k: DashboardKpi): 'up' | 'down' {
   const goingUp = k.delta >= 0;
   return goingUp === k.deltaPositiveIsGood ? 'up' : 'down';
 }
@@ -467,8 +443,10 @@ const rankingEl      = ref<HTMLElement>();
 const sankeyEl       = ref<HTMLElement>();
 const csatGaugeEl    = ref<HTMLElement>();
 const uptimeGaugeEl  = ref<HTMLElement>();
-const chordEl        = ref<HTMLElement>();
-const radarEl        = ref<HTMLElement>();
+const chordEl            = ref<HTMLElement>();
+const networkForceEl     = ref<HTMLElement>();
+const networkCircularEl  = ref<HTMLElement>();
+const radarEl            = ref<HTMLElement>();
 const mixedEl        = ref<HTMLElement>();
 const nightingaleEl  = ref<HTMLElement>();
 const halfDoughnutEl = ref<HTMLElement>();
@@ -510,38 +488,27 @@ onMounted(() => {
     ));
   });
 
-  // ── Shared chart data derived from `monthly` ──────────────────────────
-  const monthlyTrend = {
-    categories: months,
-    series: tiers.map((t) => ({ name: t, data: monthly[t] })),
-  };
-  const quarterly = {
-    categories: quarters,
-    series: tiers.map((t) => ({ name: t, data: quarterSum(monthly[t]) })),
-  };
-  const annualShare = tiers.map((t) => ({ name: t, value: yearTotal(monthly[t]) }));
-
-  // ── Main charts ───────────────────────────────────────────────────────
-  track(createChart(trendEl.value!, 'line', monthlyTrend, {
+  // ── Main charts (data from `./dashboard-data.ts`) ─────────────────────
+  track(createChart(trendEl.value!, 'line', buildMonthlyTrend(), {
     colorMap: PIN_COLOR_MAP,
     series: { '*': { smooth: true, lineWidth: 2.5, showPoints: false } },
     legend: { position: 'bottom' },
   }));
 
-  track(createChart(shareEl.value!, 'pie', annualShare, {
+  track(createChart(shareEl.value!, 'pie', buildAnnualShare(), {
     colorMap: PIN_COLOR_MAP,
     variant: 'doughnut',
     legend: { show: true, position: 'right' },
   }));
 
-  track(createChart(cumulativeEl.value!, 'area', monthlyTrend, {
+  track(createChart(cumulativeEl.value!, 'area', buildMonthlyTrend(), {
     colorMap: PIN_COLOR_MAP,
     stacked: true,
     series: { '*': { smooth: true } },
     legend: { position: 'bottom' },
   }));
 
-  track(createChart(quarterlyEl.value!, 'bar', quarterly, {
+  track(createChart(quarterlyEl.value!, 'bar', buildQuarterly(), {
     colorMap: PIN_COLOR_MAP,
     stacked: true,
     legend: { position: 'bottom' },
@@ -549,21 +516,18 @@ onMounted(() => {
 
   // Horizontal bar with one series + `colorByCategory: true` colors each
   // bar by its tier name — the Trial bar picks up PIN_COLOR_MAP.Trial.
-  track(createChart(rankingEl.value!, 'bar', {
-    categories: tiers,
-    series: [{ name: 'Q4 revenue', data: tiers.map((t) => quarterSum(monthly[t])[3]) }],
-  }, {
+  track(createChart(rankingEl.value!, 'bar', buildQ4Ranking(), {
     colorMap: PIN_COLOR_MAP,
     variant: 'horizontal',
     colorByCategory: true,
   }));
 
   track(createChart(mixedEl.value!, 'line', {
-    categories: quarters,
+    categories: ['Q1', 'Q2', 'Q3', 'Q4'],
     series: [
       { name: 'Premium',     data: quarterSum(monthly.Premium) },
       { name: 'Pro',         data: quarterSum(monthly.Pro) },
-      { name: 'Growth Rate', data: [12, 16, 19, 23] },
+      { name: 'Growth Rate', data: [...mixedGrowthRate] },
     ],
   }, {
     colorMap: PIN_COLOR_MAP,
@@ -575,21 +539,7 @@ onMounted(() => {
     legend: { position: 'bottom' },
   }));
 
-  track(createChart(radarEl.value!, 'radar', {
-    indicators: [
-      { name: 'Reports',    max: 100 },
-      { name: 'API',        max: 100 },
-      { name: 'Support',    max: 100 },
-      { name: 'SLA',        max: 100 },
-      { name: 'Analytics',  max: 100 },
-      { name: 'Security',   max: 100 },
-    ],
-    series: [
-      { name: 'Premium',  values: [96, 92, 90, 95, 88, 94] },
-      { name: 'Pro',      values: [80, 82, 75, 78, 72, 80] },
-      { name: 'Standard', values: [60, 65, 60, 55, 55, 65] },
-    ],
-  }, {
+  track(createChart(radarEl.value!, 'radar', radarFeatureUsage, {
     colorMap: PIN_COLOR_MAP,
     filled: true,
     legend: { position: 'bottom' },
@@ -598,76 +548,40 @@ onMounted(() => {
   // ── Sankey: traffic source → trial signup → outcome tier ──────────────
   // Tier nodes use consistentColors; Trial is pinned via PIN_COLOR_MAP.
   // paintGraphNodes inside the sankey adapter.
-  track(createChart(sankeyEl.value!, 'sankey', {
-    nodes: [
-      { name: 'Organic Search' },
-      { name: 'Paid Ads' },
-      { name: 'Referral' },
-      { name: 'Direct' },
-      { name: 'Trial Signup' },
-      { name: 'Premium' },
-      { name: 'Pro' },
-      { name: 'Standard' },
-      { name: 'Basic' },
-      { name: 'Churned' },
-    ],
-    links: [
-      { source: 'Organic Search', target: 'Trial Signup', value: 1850 },
-      { source: 'Paid Ads',       target: 'Trial Signup', value: 1320 },
-      { source: 'Referral',       target: 'Trial Signup', value: 980 },
-      { source: 'Direct',         target: 'Trial Signup', value: 720 },
-      { source: 'Trial Signup', target: 'Premium',  value: 420 },
-      { source: 'Trial Signup', target: 'Pro',      value: 880 },
-      { source: 'Trial Signup', target: 'Standard', value: 1240 },
-      { source: 'Trial Signup', target: 'Basic',    value: 1180 },
-      { source: 'Trial Signup', target: 'Churned',  value: 1150 },
-    ],
-  }, {
+  track(createChart(sankeyEl.value!, 'sankey', acquisitionSankey, {
     colorMap: PIN_COLOR_MAP,
   }));
 
   // ── Two stacked percentage gauges in a single card ────────────────────
   // Gauges have no series name, so they pick colors straight from the
   // active theme palette — `colorMap` is irrelevant here.
-  track(createChart(csatGaugeEl.value!, 'gauge',
-    { value: 87, max: 100, label: 'CSAT' },
-    { variant: 'percentage' },
-  ));
-  track(createChart(uptimeGaugeEl.value!, 'gauge',
-    { value: 99.8, max: 100, label: 'Uptime' },
-    { variant: 'percentage' },
-  ));
+  track(createChart(csatGaugeEl.value!, 'gauge', gaugeCsat, { variant: 'percentage' }));
+  track(createChart(uptimeGaugeEl.value!, 'gauge', gaugeUptime, { variant: 'percentage' }));
 
   // ── Chord: inter-tier movement (upgrades, downgrades, cross-tier) ─────
   // Same node names as the line/bar/pie charts, so consistentColors keeps
   // every tier on the same color — Trial stays pinned via PIN_COLOR_MAP.
-  track(createChart(chordEl.value!, 'chord', {
-    nodes: [
-      { name: 'Trial' },
-      { name: 'Basic' },
-      { name: 'Standard' },
-      { name: 'Pro' },
-      { name: 'Premium' },
-    ],
-    links: [
-      { source: 'Trial',    target: 'Basic',    value: 320 },
-      { source: 'Trial',    target: 'Standard', value: 240 },
-      { source: 'Basic',    target: 'Standard', value: 180 },
-      { source: 'Basic',    target: 'Pro',      value: 95 },
-      { source: 'Standard', target: 'Pro',      value: 145 },
-      { source: 'Pro',      target: 'Premium',  value: 88 },
-      { source: 'Standard', target: 'Premium',  value: 32 },
-      { source: 'Premium',  target: 'Pro',      value: 24 },
-      { source: 'Pro',      target: 'Standard', value: 38 },
-    ],
-  }, {
+  track(createChart(chordEl.value!, 'chord', tierMovement, {
     colorMap: PIN_COLOR_MAP,
     tooltip: { formatValue: (v) => `${v} customers` },
   }));
 
+  // ── Network: cohort segments per tier (`category`), two layouts ───────
+  const networkTooltip = { formatValue: (v: number) => `${v} customers` };
+  track(createChart(networkForceEl.value!, 'network', tierMovementNetwork, {
+    colorMap: PIN_COLOR_MAP,
+    legend: { position: 'bottom' },
+    tooltip: networkTooltip,
+  }));
+  track(createChart(networkCircularEl.value!, 'network', tierMovementNetwork, {
+    colorMap: PIN_COLOR_MAP,
+    variant: 'circular',
+    legend: { position: 'right' },
+    tooltip: networkTooltip,
+  }));
+
   // ── Pie · nightingale variant — Q4 revenue mix per tier ───────────────
-  const q4Mix = tiers.map((t) => ({ name: t, value: quarterSum(monthly[t])[3] }));
-  track(createChart(nightingaleEl.value!, 'pie', q4Mix, {
+  track(createChart(nightingaleEl.value!, 'pie', buildQ4Mix(), {
     colorMap: PIN_COLOR_MAP,
     variant: 'nightingale',
     legend: { show: true, position: 'bottom' },
@@ -675,13 +589,7 @@ onMounted(() => {
 
   // ── Pie · half-doughnut variant — trial signup outcomes ───────────────
   // Mirrors the sankey's second stage so the story stays consistent.
-  track(createChart(halfDoughnutEl.value!, 'pie', [
-    { name: 'Premium',  value: 420 },
-    { name: 'Pro',      value: 880 },
-    { name: 'Standard', value: 1240 },
-    { name: 'Basic',    value: 1180 },
-    { name: 'Churned',  value: 1150 },
-  ], {
+  track(createChart(halfDoughnutEl.value!, 'pie', [...trialOutcomes], {
     colorMap: PIN_COLOR_MAP,
     variant: 'half-doughnut',
     legend: { show: true, position: 'bottom' },

@@ -13,6 +13,7 @@ export enum ChartType {
   Sankey = 'sankey',
   Chord = 'chord',
   Radar = 'radar',
+  Network = 'network',
 }
 
 // ---------------------------------------------------------------------------

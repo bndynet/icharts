@@ -15,4 +15,5 @@ export * from './gauge.js';
 export * from './sankey.js';
 export * from './chord.js';
 export * from './radar.js';
+export * from './network.js';
 export * from './instance.js';

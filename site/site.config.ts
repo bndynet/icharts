@@ -46,6 +46,11 @@ export default defineConfig({
           page: () => import('./views/charts/SankeyCharts.vue'),
         },
         {
+          label: 'Network',
+          icon: 'network',
+          page: () => import('./views/charts/NetworkCharts.vue'),
+        },
+        {
           label: 'Advanced',
           icon: 'sparkles',
           page: () => import('./views/charts/AdvancedCharts.vue'),

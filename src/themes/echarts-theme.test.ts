@@ -3,16 +3,21 @@ import { buildEChartsTheme } from './echarts-theme.js';
 import type { ChartThemeColors } from './types.js';
 
 /**
- * Locks in the contract that adapters rely on: bar/line/pie data labels
- * (including race value labels and line-race endLabels) get their color
- * from the THEME, not from each adapter. Without these series-type
- * defaults, switching to a dark theme would leave race labels rendered
- * in ECharts' built-in near-black default, which is illegible.
+ * Locks in the contract that adapters rely on: every chart family's
+ * canvas-rendered text (data labels, node labels, axis names) draws its
+ * color from the THEME, not from the adapter. Without these series-type
+ * defaults, switching to a dark theme would leave the text rendered in
+ * ECharts' built-in near-black default, which is illegible.
  *
- * The adapters intentionally do NOT set `label.color` / `endLabel.color`
- * — see `pie.ts` (`label.position` etc. with no color) for the canonical
- * pattern. Removing the entries below would silently break race mode on
- * any non-light theme.
+ * The adapters intentionally do NOT set `label.color` / `endLabel.color` /
+ * `edgeLabel.color` — see `pie.ts` / `network.ts` (`label.position` etc.
+ * with no color) for the canonical pattern. Removing the entries below
+ * would silently break the corresponding chart type on any non-light theme.
+ *
+ * AGENTS.md "Layout rule #6" documents the full two-sided contract;
+ * any new chart that emits canvas-rendered text MUST add a matching
+ * assertion here when wiring its `<seriesType>.<field>.color` into
+ * `echarts-theme.ts`.
  */
 const COLORS: ChartThemeColors = {
   background: '#0b1220',
@@ -51,6 +56,26 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.pie.label.color).toBe(COLORS.textPrimary);
   });
 
+  it('graph.label.color follows textPrimary (network node labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.graph.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('graph.edgeLabel.color follows textPrimary (network link labels when showLinkLabel)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.graph.edgeLabel.color).toBe(COLORS.textPrimary);
+  });
+
+  it('sankey.label.color follows textPrimary (sankey node labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.sankey.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('chord.label.color follows textPrimary (chord node labels around the ring)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.chord.label.color).toBe(COLORS.textPrimary);
+  });
+
   it('changing textPrimary changes every label color in lockstep', () => {
     const a = buildEChartsTheme({ ...COLORS, textPrimary: '#aaaaaa' }, PALETTE);
     const b = buildEChartsTheme({ ...COLORS, textPrimary: '#bbbbbb' }, PALETTE);
@@ -58,10 +83,18 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.line.label.color).toBe('#aaaaaa');
     expect(a.line.endLabel.color).toBe('#aaaaaa');
     expect(a.radar.axisName.color).toBe('#aaaaaa');
+    expect(a.graph.label.color).toBe('#aaaaaa');
+    expect(a.graph.edgeLabel.color).toBe('#aaaaaa');
+    expect(a.sankey.label.color).toBe('#aaaaaa');
+    expect(a.chord.label.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
     expect(b.line.endLabel.color).toBe('#bbbbbb');
     expect(b.radar.axisName.color).toBe('#bbbbbb');
+    expect(b.graph.label.color).toBe('#bbbbbb');
+    expect(b.graph.edgeLabel.color).toBe('#bbbbbb');
+    expect(b.sankey.label.color).toBe('#bbbbbb');
+    expect(b.chord.label.color).toBe('#bbbbbb');
   });
 
   it('radar.axisName.color follows textPrimary so indicator labels stay legible on dark themes', () => {

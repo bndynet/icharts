@@ -131,7 +131,16 @@ export function resolveEChartsOption(
 // Register built-in adapters
 // ---------------------------------------------------------------------------
 
-import { ChartType, isXYData, isPieData, isGaugeData, isSankeyData, isChordData, isRadarData } from '../types.js';
+import {
+  ChartType,
+  isXYData,
+  isPieData,
+  isGaugeData,
+  isSankeyData,
+  isChordData,
+  isRadarData,
+  isNetworkData,
+} from '../types.js';
 import type {
   LineData,
   BarData,
@@ -141,6 +150,7 @@ import type {
   SankeyData,
   ChordData,
   RadarData,
+  NetworkData,
   LineChartOptions,
   BarChartOptions,
   AreaChartOptions,
@@ -149,6 +159,7 @@ import type {
   SankeyChartOptions,
   ChordChartOptions,
   RadarChartOptions,
+  NetworkChartOptions,
 } from '../types.js';
 import { resolveLineOptions, resolveAreaOptions } from './line.js';
 import { resolveBarOptions } from './bar.js';
@@ -157,6 +168,7 @@ import { resolveGaugeOptions } from './gauge.js';
 import { resolveSankeyOptions } from './sankey.js';
 import { resolveChordOptions } from './chord.js';
 import { resolveRadarOptions } from './radar.js';
+import { resolveNetworkOptions } from './network.js';
 
 // Each built-in adapter narrows the generic `ChartData` / `ChartOptions` it
 // receives from the registry to its declared per-chart Data + Options pair.
@@ -215,5 +227,12 @@ registerAdapter(ChartType.Radar, {
   validate: isRadarData,
   resolve: (data, options, ctx) => ({
     option: resolveRadarOptions(data as RadarData, options as RadarChartOptions, ctx),
+  }),
+});
+
+registerAdapter(ChartType.Network, {
+  validate: isNetworkData,
+  resolve: (data, options, ctx) => ({
+    option: resolveNetworkOptions(data as NetworkData, options as NetworkChartOptions, ctx),
   }),
 });

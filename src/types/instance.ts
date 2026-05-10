@@ -9,6 +9,7 @@ import type { GaugeVariant, GaugeData, GaugeChartOptions } from './gauge.js';
 import type { SankeyVariant, SankeyData, SankeyChartOptions } from './sankey.js';
 import type { ChordData, ChordChartOptions } from './chord.js';
 import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
+import type { NetworkVariant, NetworkData, NetworkChartOptions } from './network.js';
 
 // ---------------------------------------------------------------------------
 // Aggregate unions
@@ -24,7 +25,8 @@ export type ChartVariant =
   | PieVariant
   | GaugeVariant
   | SankeyVariant
-  | RadarVariant;
+  | RadarVariant
+  | NetworkVariant;
 
 export type ChartData =
   | XYData
@@ -32,7 +34,8 @@ export type ChartData =
   | GaugeData
   | SankeyData
   | ChordData
-  | RadarData;
+  | RadarData
+  | NetworkData;
 
 /**
  * Discriminated union of every built-in chart's options type.
@@ -53,7 +56,8 @@ export type AnyChartOptions =
   | GaugeChartOptions
   | SankeyChartOptions
   | ChordChartOptions
-  | RadarChartOptions;
+  | RadarChartOptions
+  | NetworkChartOptions;
 
 // ---------------------------------------------------------------------------
 // Chart instance interface (returned by createChart)

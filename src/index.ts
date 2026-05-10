@@ -61,6 +61,9 @@ export {
   type RadarData,
   type RadarIndicator,
   type RadarDataSeries,
+  type NetworkData,
+  type NetworkNode,
+  type NetworkLink,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
   type XYChartOptions,
   type LineChartOptions,
@@ -71,6 +74,7 @@ export {
   type SankeyChartOptions,
   type ChordChartOptions,
   type RadarChartOptions,
+  type NetworkChartOptions,
   // Shared option building blocks
   type SeriesOptions,
   type LegendOptions,
@@ -92,9 +96,11 @@ export {
   type GaugeVariant,
   type SankeyVariant,
   type RadarVariant,
+  type NetworkVariant,
   isSankeyData,
   isChordData,
   isRadarData,
+  isNetworkData,
 } from './types.js';
 
 // Configuration
