@@ -88,8 +88,14 @@ export function resolveBarOptions(
   // Palette source switches based on colorByCategory: when enabled, derive
   // colors from category names (so ECharts colorBy:'data' picks per-bar
   // colors); otherwise use series names (one color per series).
+  // Horizontal bars reverse category data — palette order must match.
+  const categoryNames = data.categories.map(String);
+  const namesForPalette =
+    enableColorByCategory && isHorizontal
+      ? [...categoryNames].reverse()
+      : categoryNames;
   merged.color = enableColorByCategory
-    ? resolveColors(data.categories.map(String), options)
+    ? resolveColors(namesForPalette, options)
     : resolveColors(seriesNames, options);
   return { option: merged };
 }

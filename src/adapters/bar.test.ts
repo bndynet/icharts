@@ -135,6 +135,26 @@ describe('bar adapter', () => {
       expect(color[1]).toBe('#FF7139');
     });
 
+    it('aligns colorMap with reversed data when variant is horizontal', () => {
+      const tiers = ['Premium', 'Pro', 'Standard', 'Basic', 'Trial'];
+      const data: XYData = {
+        categories: tiers,
+        series: [{ name: 'Q4 revenue', data: [810, 520, 355, 280, 175] }],
+      };
+      const { option } = resolveBarOptions(data, {
+        variant: 'horizontal',
+        colorByCategory: true,
+        colorMap: { Trial: '#efefef' },
+      });
+      const series = (option.series as Record<string, unknown>[])[0];
+      const seriesData = series.data as { value: number }[];
+      const color = option.color as string[];
+      expect(seriesData[0].value).toBe(175);
+      expect(color[0]).toBe('#efefef');
+      expect(seriesData[4].value).toBe(810);
+      expect(color[4]).not.toBe('#efefef');
+    });
+
     it('is silently ignored when stacked: true', () => {
       const data: XYData = {
         categories: ['Q1', 'Q2'],
