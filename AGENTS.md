@@ -88,7 +88,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Architecture rules
 
-1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls) and `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations). See `src/adapters/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) for the canonical usage.
+1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls), `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations), and `containerWidth` / `containerHeight` (px reported by `ecInstance.getWidth()/getHeight()` each render — `undefined` when zero/non-finite — used by the gauge `percentage` variant to derive ring thickness and inner font sizes from the rendered viewport; `core.ts` re-applies on `resize()` so container-aware sizing re-flows). See `src/adapters/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) and `src/adapters/gauge.ts` (`autoSizePercentage`) for the canonical usage.
 2. **Reuse shared builders** — `src/adapters/common.ts` provides `buildTitle`, `buildLegend`, `buildGrid`, `buildXAxis`, `buildYAxis`, `buildTooltip`, etc. XY charts should use `src/adapters/series-utils.ts` for per-series options, mark lines/points, and y-axis index handling. Do **not** call `getCommonDefaults()` unless it is wired into the adapter pipeline (currently unused by built-in adapters).
 3. **Merge user overrides, then apply the resolved palette** — end adapter functions with:
    ```ts
@@ -208,17 +208,35 @@ Custom chart types written outside this repo can import the same helpers:
 
 ```ts
 import {
-  buildTitle,
-  buildLegend,
-  getTitleReserve,
-  getLegendReserve,
-  LEGEND_RESERVE,
-  type EdgeReserves,
-  type LegendOptions,
+ buildTitle,
+ buildLegend,
+ getTitleReserve,
+ getLegendReserve,
+ LEGEND_RESERVE,
+ computeStackedTextOffsets,
+ type EdgeReserves,
+ type LegendOptions,
+ type StackedTextOffsetsOptions,
+ type StackedTextOffsets,
 } from '@bndynet/icharts';
 ```
 
 See [docs/LAYOUT.md §6](docs/LAYOUT.md) for a full custom-adapter example.
+
+### Centered two-line text block (gauge ring / donut hole / KPI tile)
+
+`computeStackedTextOffsets({ primaryFontSize, secondaryFontSize, ... })`
+returns the pixel Y offsets that center a `(big number + caption)` block
+on a single anchor point and keep the *visible* glyph gap constant
+across font sizes — it subtracts the typographic padding that `canvas`
+`textBaseline: 'middle'` would otherwise add on top of the em-box gap.
+Currently used by `src/adapters/gauge.ts` (`percentage` variant) for
+the ring center text; reuse the same helper when the pie / future
+donut-hole adapter needs a center label and any custom adapter that
+renders a stacked `value + caption` block. Defaults: `visibleGapPx: 12`,
+`glyphPaddingEm: 0.15`, `showSecondary: true`. The helper rounds to
+one decimal using round-half-away-from-zero so mirror-symmetric inputs
+stay symmetric.
 
 ### Do not hardcode chart colors in adapters
 
@@ -299,11 +317,13 @@ Reference implementations:
 | Single-metric | `src/adapters/gauge.ts` (`GaugeChartOptions`) |
 | Body-centered chart composing title + legend reserves | `src/adapters/radar.ts` (`RadarChartOptions`) — uses `getTitleReserve(options)` + `getLegendReserve(..., RADAR_EDGE_GAP)` to shift `center` and shrink `radius` based on which edges are occupied. See [docs/LAYOUT.md §4.2](docs/LAYOUT.md). |
 | Body-centered chart consuming title-only reserve | `src/adapters/pie.ts`, `src/adapters/gauge.ts` — read `getTitleReserve(options).top` to shift the chart body below the title widget. |
+| Centered two-line text block (constant visible gap) | `src/adapters/gauge.ts` (`percentage` variant) — uses `computeStackedTextOffsets({ primaryFontSize, secondaryFontSize, showSecondary })` to stack a (big value + caption) pair around the ring center with typographic-padding compensation. Reuse for the future donut-hole label and any custom KPI adapter. |
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` and `src/adapters/line.ts` (`race` branches) |
 | Variant-specific sub-object (`race.topN` / `race.frameDuration`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`), `src/types/line.ts` (`LineRaceOptions` → `LineChartOptions.race`) |
 | Streaming axis pinning (race) | `src/adapters/line.ts` auto-pins `xAxis.min` to `categories[0]` for time-axis race; users pin `max` themselves via `xAxis.max`. Without this, axis re-layout each frame compresses the line. |
 | Auto-measured race frame duration | `src/adapters/race-utils.ts` (`resolveRaceFrameDuration`) — priority: explicit `race.frameDuration` > `ctx.observedFrameMs` (clamped to `[80, 3000]` ms) > 500 ms fallback. Consumed by bar/line race resolvers so callers don't have to mirror their own `setInterval` value. `core.ts` measures the gap between consecutive `update()` calls via `performance.now()` and threads the value through `RenderContext`. |
 | Adaptive race label headroom | `src/adapters/race-utils.ts` (`resolveRaceLabelHeadroom`) — bar/line race resolvers measure the widest current-frame label (`String(value)` for bar, `"<name> <value>"` for line) via a cached `canvas.getContext('2d').measureText` (falls back to a char-count estimate when `document` is unavailable) and set `grid.right = max(measured + gap + padding, RACE_LABEL_MIN_PX, ctx.maxRaceGridRight)`. `core.ts` lifts the high-water mark from the resolved option each frame and feeds it back via `RenderContext.maxRaceGridRight` so the reserve grows monotonically — wide-label frames don't release space on subsequent narrow-label frames, which would otherwise jitter the plot area. Skip the calculation entirely when `race.showValueLabel === false`; honor any explicit `options.grid.right`. |
+| Container-aware pixel sizing | `src/adapters/gauge.ts` (`autoSizePercentage`) — gauge `percentage` variant. ECharts gauge `axisLine.lineStyle.width`, `progress.width`, and `detail.fontSize` are pixel-only (no native `%`), so the adapter derives them from `ref = min(ctx.containerWidth, ctx.containerHeight)` with clamped ratios (ring ≈ 7.5 % of `ref`, detail ≈ 13.5 %, title ≈ 40 % of detail). When the engine can't supply usable dims (SSR, hidden card, jsdom without layout) the helper returns static fallbacks matching the pre-auto-sizing defaults so snapshots stay stable. Explicit `options.gaugeWidth` always wins. `core.ts` samples the dims via `ecInstance.getWidth()/getHeight()` each `_apply()` and re-applies from `resize()` so the gauge re-flows when the container changes size. |
 | Themed data labels (race + non-race) | `src/themes/echarts-theme.ts` registers `bar.label.color`, `line.label.color`, `line.endLabel.color` (all → `colors.textPrimary`). Bar/line adapters emit `label` / `endLabel` objects with `show` / `position` / `valueAnimation` / `formatter` only — never `color`. ECharts deep-merges the theme's series-type defaults so race value labels and `showLabel` data labels automatically follow the active theme; no per-adapter palette lookup. See Layout rule #6 for the full theme-owned-text-color contract and `src/themes/echarts-theme.test.ts` for the regression. |
 
 **Chart-type options layout.** Each chart's options live on its own `XxxChartOptions extends ChartOptions` subtype (see step 1). The chart's **own general options** (those that always apply, regardless of variant) belong **flat** on the subtype — no separate named type, no wrapping sub-object. Examples: `BarChartOptions.barWidth` / `colorByCategory`, `PieChartOptions.sliceBorderRadius` / `innerRadius`, `GaugeChartOptions.gaugeWidth`. Prefix the field name when a generic word (`borderRadius`, `gap`, …) would be ambiguous at the top level — that's why pie's slice fields read `sliceBorderRadius` / `sliceGap` rather than bare `borderRadius` / `gap`.

@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   LEGEND_RESERVE,
+  STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
+  STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
   buildLegend,
   buildSparkTooltip,
   buildTooltip,
+  computeStackedTextOffsets,
   getLegendReserve,
   getTitleReserve,
   resolveAppendToBody,
@@ -880,5 +883,125 @@ describe('getTitleReserve', () => {
     const title = getTitleReserve({ title: 'Sales' });
     const legend = getLegendReserve({ legend: { position: 'bottom' } }, true);
     expect(Object.keys(title).sort()).toEqual(Object.keys(legend).sort());
+  });
+});
+
+describe('computeStackedTextOffsets', () => {
+  // Re-implement the formula here so the tests assert "the helper does
+  // what the docblock says it does", not "the helper returns whatever
+  // it returned yesterday."
+  const expectedFor = (
+    primaryFs: number,
+    secondaryFs: number,
+    visibleGapPx = STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
+    glyphPaddingEm = STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
+  ): { primaryOffsetY: number; secondaryOffsetY: number } => {
+    const padding = glyphPaddingEm * (primaryFs + secondaryFs);
+    const emBoxGap = Math.max(0, visibleGapPx - padding);
+    const sign = (n: number) => (n < 0 ? -1 : 1);
+    const round1 = (n: number) => (sign(n) * Math.round(Math.abs(n) * 10)) / 10;
+    return {
+      primaryOffsetY: round1(-(emBoxGap + secondaryFs) / 2),
+      secondaryOffsetY: round1((primaryFs + emBoxGap) / 2),
+    };
+  };
+
+  it('centers the em-box of the (primary + secondary) block on the anchor', () => {
+    // Block bounding box is [primary_y - primary_fs/2, secondary_y + secondary_fs/2].
+    // Top and bottom must equal in magnitude (mirror around 0).
+    const primaryFs = 43;
+    const secondaryFs = 17;
+    const { primaryOffsetY, secondaryOffsetY } = computeStackedTextOffsets({
+      primaryFontSize: primaryFs,
+      secondaryFontSize: secondaryFs,
+    });
+    const top = primaryOffsetY - primaryFs / 2;
+    const bottom = secondaryOffsetY + secondaryFs / 2;
+    expect(top + bottom).toBeCloseTo(0, 1);
+  });
+
+  it('produces a constant ~12 px visible glyph gap across the auto-sized font range', () => {
+    // Visible gap = em-box gap + padding (the padding the helper just
+    // subtracted), so the rendered gap should track the configured target.
+    const cases: Array<{ primary: number; secondary: number; expected: number }> = [
+      { primary: 18, secondary: 10, expected: 12 },
+      { primary: 27, secondary: 11, expected: 12 },
+      { primary: 43, secondary: 17, expected: 12 },
+      // Very large fonts: em-box gap clamps to 0 (padding > visibleGapPx),
+      // so visible gap floors at the padding amount.
+      { primary: 72, secondary: 28, expected: 15 },
+    ];
+    for (const { primary, secondary, expected } of cases) {
+      const { primaryOffsetY, secondaryOffsetY } = computeStackedTextOffsets({
+        primaryFontSize: primary,
+        secondaryFontSize: secondary,
+      });
+      const emBoxGap = secondaryOffsetY - primaryOffsetY - (primary + secondary) / 2;
+      const visibleGap =
+        emBoxGap + STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM * (primary + secondary);
+      expect(visibleGap).toBeCloseTo(expected, 0);
+    }
+  });
+
+  it('matches the documented closed-form math at the demo card font sizes', () => {
+    // 43 / 17 → padding 9 → em_gap 3 → primary -10, secondary 23.
+    const result = computeStackedTextOffsets({
+      primaryFontSize: 43,
+      secondaryFontSize: 17,
+    });
+    expect(result).toEqual(expectedFor(43, 17));
+    expect(result).toEqual({ primaryOffsetY: -10, secondaryOffsetY: 23 });
+  });
+
+  it('honors a custom visibleGapPx target', () => {
+    const result = computeStackedTextOffsets({
+      primaryFontSize: 32,
+      secondaryFontSize: 12,
+      visibleGapPx: 6,
+    });
+    expect(result).toEqual(expectedFor(32, 12, 6));
+    // padding = 0.15 × 44 = 6.6 → em_gap = max(0, 6 - 6.6) = 0.
+    // primary = -(0 + 12)/2 = -6.   secondary = (32 + 0)/2 = 16.
+    expect(result).toEqual({ primaryOffsetY: -6, secondaryOffsetY: 16 });
+  });
+
+  it('honors a custom glyphPaddingEm (e.g. tighter-line font)', () => {
+    const result = computeStackedTextOffsets({
+      primaryFontSize: 40,
+      secondaryFontSize: 16,
+      glyphPaddingEm: 0.05,
+    });
+    expect(result).toEqual(expectedFor(40, 16, undefined, 0.05));
+    // padding = 0.05 × 56 = 2.8 → em_gap = 12 - 2.8 = 9.2.
+    // primary = -(9.2 + 16)/2 = -12.6.   secondary = (40 + 9.2)/2 = 24.6.
+    expect(result.primaryOffsetY).toBe(-12.6);
+    expect(result.secondaryOffsetY).toBe(24.6);
+  });
+
+  it('keeps the primary at the anchor when showSecondary is false', () => {
+    const result = computeStackedTextOffsets({
+      primaryFontSize: 43,
+      secondaryFontSize: 17,
+      showSecondary: false,
+    });
+    expect(result.primaryOffsetY).toBe(0);
+    // Secondary offset is still computed — callers that emit both
+    // elements unconditionally with the secondary hidden get a stable
+    // value rather than NaN / undefined.
+    expect(result.secondaryOffsetY).toBe(23);
+  });
+
+  it('rounds half away from zero so symmetric inputs stay symmetric', () => {
+    // Half-integer offsets must reflect across 0, not be biased by
+    // JS Math.round's round-toward-+∞ behavior on .5.
+    const result = computeStackedTextOffsets({
+      primaryFontSize: 36,
+      secondaryFontSize: 14,
+    });
+    // padding = 0.15 × 50 = 7.5 → em_gap = 4.5.
+    // primary = -(4.5 + 14)/2 = -9.25 → -9.3 (not -9.2).
+    // secondary = (36 + 4.5)/2 = 20.25 → 20.3.
+    expect(result.primaryOffsetY).toBe(-9.3);
+    expect(result.secondaryOffsetY).toBe(20.3);
   });
 });

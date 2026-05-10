@@ -1013,9 +1013,8 @@ onUnmounted(() => {
    Vite hashes the URL for cache-busting on rebuild.
 
    The bg is attached to a non-scoped `body:has(.dashboard.is-scifi)`
-   rule (in the second `<style>` block below) so it can paint **above**
-   vue-site's `.site-content` background-color, which would otherwise
-   eclipse anything painted as a `z-index: -1` descendant of `.dashboard`.
+   rule (second `<style>` block) so it fills the viewport once the
+   sidebar is hidden and `.site-content` is full-width / transparent.
    `background-attachment: fixed` keeps the artboard locked to the
    viewport while the dashboard scrolls; `cover` sizes it aspect-correct.
    Only the scanline overlay stays here as a `::before` because it needs
@@ -1208,25 +1207,33 @@ onUnmounted(() => {
   stylesheet — without overriding it, any background we paint underneath
   is eclipsed.
 
-  Painting the sci-fi artwork directly on `.site-content` (instead of on
-  `body` with a separate transparent override) is the cleaner solution:
-  one rule replaces two, the artwork is scoped to the actual content
-  area, and the sidebar / top nav keep their own chrome untouched.
-  `:has()` is supported in every evergreen browser, and the rule reverts
-  automatically when the user picks a non-sci-fi dashboard theme (the
-  `.is-scifi` class disappears, the selector no longer matches, and
-  vue-site's default `.site-content` background takes over again).
-  `background-attachment: fixed` sizes the artboard to the viewport
-  (not the `.site-content` box), so scrolling the dashboard leaves the
-  HUD locked in place — the cards float over a static scene.
+  Sci-fi mode paints the HUD on `body`, hides vue-site's sidebar, and
+  recenters the content column so `.dashboard` (max-width 1680px) can
+  sit in the middle of the viewport. `:has()` reverts on other themes.
 -->
 <style>
-.site-content:has(.dashboard.is-scifi) {
+body:has(.dashboard.is-scifi) {
   background-color: #03070f;
   background-image: url('../assets/scifi-bg.svg');
   background-size: cover;
-  background-position: bottom;
+  background-position: center;
   background-attachment: fixed;
   background-repeat: no-repeat;
+}
+
+body:has(.dashboard.is-scifi) .site-sidebar {
+  display: none;
+}
+
+.site-content:has(.dashboard.is-scifi) {
+  margin-left: 0;
+  background-color: transparent;
+}
+
+.site-content:has(.dashboard.is-scifi) .site-content-inner {
+  max-width: 1680px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 32px 40px 48px;
 }
 </style>

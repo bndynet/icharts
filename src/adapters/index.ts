@@ -47,15 +47,31 @@ export interface ChartSetupResult {
  *     `options.tooltip.appendToBody`. The engine sets this flag once at
  *     construction time — moving the host between shadow / light DOM
  *     after `init` isn't a supported scenario.
+ *   - `containerWidth` / `containerHeight` — px reported by
+ *     `ecInstance.getWidth()` / `getHeight()` at render time. Threaded
+ *     through every `_apply()` (including resize-triggered re-renders)
+ *     so adapters that need pixel-derived sizing can react to the
+ *     actual rendered viewport. Today the gauge `percentage` variant is
+ *     the canonical consumer: ECharts' `axisLine.lineStyle.width`,
+ *     `progress.width`, and `detail.fontSize` are pixel-only (no native
+ *     `%` support), so the adapter computes them from
+ *     `min(containerWidth, containerHeight)` when the consumer hasn't
+ *     set them. Both fields are `undefined` when the instance reports a
+ *     zero / non-finite size (SSR, display:none ancestors, jsdom
+ *     environments without layout) so adapters can fall back to static
+ *     defaults and keep snapshots stable.
  *
  * Frame-derived fields (`observedFrameMs`, `maxRaceGridRight`) are
- * `undefined` during the initial render from the constructor; container-
- * derived fields (`inShadowDom`) are populated from the very first render.
+ * `undefined` during the initial render from the constructor;
+ * container-derived fields (`inShadowDom`, `containerWidth`,
+ * `containerHeight`) are populated from the very first render.
  */
 export interface RenderContext {
   observedFrameMs?: number;
   maxRaceGridRight?: number;
   inShadowDom?: boolean;
+  containerWidth?: number;
+  containerHeight?: number;
 }
 
 /**
@@ -173,8 +189,8 @@ registerAdapter(ChartType.Pie, {
 
 registerAdapter(ChartType.Gauge, {
   validate: isGaugeData,
-  resolve: (data, options) => ({
-    option: resolveGaugeOptions(data as GaugeData, options as GaugeChartOptions),
+  resolve: (data, options, ctx) => ({
+    option: resolveGaugeOptions(data as GaugeData, options as GaugeChartOptions, ctx),
   }),
 });
 

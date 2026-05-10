@@ -702,6 +702,13 @@ Each chart type has its own options interface that extends the base `ChartOption
 }
 ```
 
+For the `percentage` variant, omitting `gaugeWidth` enables auto-sizing:
+the ring thickness and the inner number / label font sizes are derived
+from the rendered container — `min(width, height)` — so the gauge keeps
+balanced proportions across small KPI tiles and large hero cards, and
+re-flows when the chart resizes. An explicit `gaugeWidth` always wins.
+The `default` variant keeps fixed defaults regardless of container size.
+
 ### `SankeyChartOptions` (extends `ChartOptions`)
 
 ```ts

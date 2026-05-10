@@ -149,6 +149,15 @@ export class IChart implements IChartInstance {
 
   resize(): void {
     this.ecInstance.resize();
+    // Re-invoke the adapter so container-aware sizing (e.g. gauge
+    // `percentage` ring thickness / inner font size, both computed from
+    // `min(containerWidth, containerHeight)` in `RenderContext`) re-flows
+    // against the new viewport. Other adapters' resolved options don't
+    // depend on container dims, so this is a deterministic no-op for
+    // them. Race-frame timing (`_lastUpdateAt`) is intentionally
+    // untouched — only `update()` advances it — so a flurry of resize
+    // events can't poison `observedFrameMs`.
+    this._apply();
   }
 
   dispose(): void {
@@ -180,14 +189,30 @@ export class IChart implements IChartInstance {
   }
 
   private _apply(ctx?: RenderContext): void {
-    // `inShadowDom` is engine-owned: every render path must see it,
-    // even the ones (constructor, `setTheme`) that pass no caller ctx.
-    // Merging here keeps each call site terse and prevents the flag
-    // from being silently dropped when a future code path forgets to
-    // forward it.
+    // `inShadowDom` and container dims are engine-owned: every render
+    // path must see them, even the ones (constructor, `setTheme`,
+    // `resize`) that pass no caller ctx. Merging here keeps each call
+    // site terse and prevents the flags from being silently dropped
+    // when a future code path forgets to forward them.
+    //
+    // Container dims are sampled fresh each render so resize-triggered
+    // re-renders pick up the new viewport. Non-finite / zero readings
+    // (SSR, `display:none` ancestor, jsdom without layout) are
+    // surfaced as `undefined` so adapters can fall back to their
+    // static defaults rather than emit garbage sizes. `getWidth` /
+    // `getHeight` are probed defensively (optional call) so test
+    // doubles that don't bother implementing the full ECharts surface
+    // — see `src/core.test.ts` — keep working; real ECharts instances
+    // always implement them.
+    const w = this.ecInstance.getWidth?.();
+    const h = this.ecInstance.getHeight?.();
     const fullCtx: RenderContext = {
       ...ctx,
       inShadowDom: this._inShadowDom,
+      containerWidth:
+        typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : undefined,
+      containerHeight:
+        typeof h === 'number' && Number.isFinite(h) && h > 0 ? h : undefined,
     };
     const { option, onInit, notMerge } = resolveEChartsOption(
       this._type,

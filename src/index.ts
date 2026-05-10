@@ -25,7 +25,12 @@ export {
   getTitleReserve,
   getLegendReserve,
   LEGEND_RESERVE,
+  computeStackedTextOffsets,
+  STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
+  STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
   type EdgeReserves,
+  type StackedTextOffsetsOptions,
+  type StackedTextOffsets,
 } from './adapters/common.js';
 
 // Adapter registry (extensibility)

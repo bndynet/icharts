@@ -332,6 +332,137 @@ export function getLegendReserve(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Stacked text helpers
+// ---------------------------------------------------------------------------
+
+/** Default visible glyph-to-glyph gap (px) for {@link computeStackedTextOffsets}. */
+export const STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX = 12;
+/**
+ * Default typographic padding inside each em-box, as a fraction of em.
+ * Canvas `textBaseline: 'middle'` (the default for ECharts gauge `detail` /
+ * `title` and `graphic.elements[].text`) centers the em-box on the anchor,
+ * but the visible glyph occupies only the middle ~70 % of the em-box —
+ * the remaining ~15 % above + ~15 % below each line is empty padding
+ * (ascender / descender space). `0.15` is empirically tuned for the
+ * sans-serif stacks ECharts ships with.
+ */
+export const STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM = 0.15;
+
+/** Options accepted by {@link computeStackedTextOffsets}. */
+export interface StackedTextOffsetsOptions {
+  /** Font size (px) of the larger / upper line — e.g. the big "%" number. */
+  primaryFontSize: number;
+  /** Font size (px) of the smaller / lower line — e.g. the caption label. */
+  secondaryFontSize: number;
+  /**
+   * Target VISIBLE distance (px) between the bottom of the primary
+   * glyph and the top of the secondary glyph. Defaults to
+   * {@link STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX}.
+   *
+   * For very large fonts the em-box gap clamps to 0 (typographic
+   * padding alone already exceeds the target), so visible gap can grow
+   * past this value — but only by a few pixels at the auto-sized
+   * extremes, which still reads tight.
+   */
+  visibleGapPx?: number;
+  /**
+   * Typographic padding inside each em-box, expressed as a fraction of
+   * em. Defaults to {@link STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM}.
+   * Lower this when supplying a font with tighter line metrics (e.g.
+   * many monospace stacks) so the visible gap doesn't end up smaller
+   * than `visibleGapPx`; raise it for fonts with extra leading.
+   */
+  glyphPaddingEm?: number;
+  /**
+   * When `false`, the secondary line is treated as hidden and the
+   * primary line stays at the anchor (offset 0). The secondary offset
+   * is still computed (so callers that always emit an option object
+   * with `show: false` get a stable value), but the primary is no
+   * longer pulled upward to balance an absent neighbour. Defaults to
+   * `true`.
+   */
+  showSecondary?: boolean;
+}
+
+/** Result of {@link computeStackedTextOffsets}. */
+export interface StackedTextOffsets {
+  /** Y offset (px, signed) for the primary line — negative = above anchor. */
+  primaryOffsetY: number;
+  /** Y offset (px, signed) for the secondary line — positive = below anchor. */
+  secondaryOffsetY: number;
+}
+
+/**
+ * Round half away from zero to one decimal. `Math.round` rounds `.5`
+ * toward `+∞` (so `Math.round(-0.5) === 0`), which would break mirror
+ * symmetry for half-integer offsets like the −9.25 / 20.25 pair the
+ * gauge produces at default font sizes.
+ */
+function roundHalfAwayFromZero1(n: number): number {
+  const sign = n < 0 ? -1 : 1;
+  return (sign * Math.round(Math.abs(n) * 10)) / 10;
+}
+
+/**
+ * Compute pixel Y offsets for a two-line text block centered on a
+ * single anchor point. Designed for chart bodies that hold a
+ * (big-number + caption) stack — gauge `percentage` ring, donut hole,
+ * pie center label, KPI tiles via `registerAdapter()`.
+ *
+ * Math:
+ *
+ *   padding   = glyphPaddingEm × (primary_fs + secondary_fs)
+ *   em_gap    = max(0, visibleGapPx − padding)
+ *   primary_y = -(em_gap + secondary_fs) / 2     // above anchor
+ *   secondary_y = (primary_fs + em_gap) / 2      // below anchor
+ *
+ * Properties:
+ *
+ *   1) The block's em-box bounding box is geometrically symmetric
+ *      around the anchor — `primary_y - primary_fs/2 === -(secondary_y
+ *      + secondary_fs/2)` for any input — so the block stays centered
+ *      whether it sits on a gauge ring center or a donut hole.
+ *   2) The *visible* glyph gap (between the rendered glyph edges)
+ *      lands on `visibleGapPx` across the typical auto-sized font
+ *      range. Canvas `textBaseline: 'middle'` makes em-boxes ~15 %
+ *      taller than the visible glyph; the formula subtracts that
+ *      padding from the em-box gap so the rendered gap matches the
+ *      target. For very large fonts the em-box gap clamps to 0 and
+ *      visible gap can grow a few pixels past `visibleGapPx`.
+ *   3) When `showSecondary: false`, the primary alone sits at exact
+ *      anchor (offset 0); the secondary offset is still returned for
+ *      callers that emit both elements unconditionally with one
+ *      hidden.
+ *
+ * Returned offsets are rounded to one decimal (sub-pixel rendering
+ * precision isn't meaningful) using round-half-away-from-zero so
+ * mirror-symmetric inputs stay mirror-symmetric.
+ */
+export function computeStackedTextOffsets(
+  opts: StackedTextOffsetsOptions,
+): StackedTextOffsets {
+  const {
+    primaryFontSize,
+    secondaryFontSize,
+    visibleGapPx = STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
+    glyphPaddingEm = STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
+    showSecondary = true,
+  } = opts;
+
+  const padding = glyphPaddingEm * (primaryFontSize + secondaryFontSize);
+  const emBoxGap = Math.max(0, visibleGapPx - padding);
+
+  const primaryOffsetY = showSecondary
+    ? roundHalfAwayFromZero1(-(emBoxGap + secondaryFontSize) / 2)
+    : 0;
+  const secondaryOffsetY = roundHalfAwayFromZero1(
+    (primaryFontSize + emBoxGap) / 2,
+  );
+
+  return { primaryOffsetY, secondaryOffsetY };
+}
+
 function getLegendGridAdjustment(
   options: XYChartOptions,
   legendShow?: boolean,
