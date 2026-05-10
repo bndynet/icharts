@@ -9,7 +9,53 @@ export default defineConfig({
     {
       label: 'Charts',
       icon: 'chart-pie',
-      page: () => import('./views/ChartsView.vue'),
+      children: [
+        {
+          label: 'Line Area',
+          icon: 'chart-line',
+          page: () => import('./views/charts/LineAreaCharts.vue'),
+        },
+        {
+          label: 'Bar',
+          icon: 'chart-bar',
+          page: () => import('./views/charts/BarCharts.vue'),
+        },
+        {
+          label: 'Pie',
+          icon: 'chart-pie',
+          page: () => import('./views/charts/PieCharts.vue'),
+        },
+        {
+          label: 'Radar',
+          icon: 'radar',
+          page: () => import('./views/charts/RadarCharts.vue'),
+        },
+        {
+          label: 'Gauge',
+          icon: 'gauge',
+          page: () => import('./views/charts/GaugeCharts.vue'),
+        },
+        {
+          label: 'Chord',
+          icon: 'orbit',
+          page: () => import('./views/charts/ChordCharts.vue'),
+        },
+        {
+          label: 'Sankey',
+          icon: 'workflow',
+          page: () => import('./views/charts/SankeyCharts.vue'),
+        },
+        {
+          label: 'Advanced',
+          icon: 'sparkles',
+          page: () => import('./views/charts/AdvancedCharts.vue'),
+        },
+        {
+          label: 'Web Component',
+          icon: 'component',
+          page: () => import('./views/charts/WebComponentCharts.vue'),
+        },
+      ],
     },
     {
       label: 'Dashboard',

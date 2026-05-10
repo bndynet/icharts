@@ -124,8 +124,9 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Demo site
 
-- Interactive examples: `site/views/ChartsView.vue`
-- Add at least one demo card for new built-in types (template + `createChart` sample in `<pre v-pre>`).
+- Interactive examples: one page per chart family under `site/views/charts/<Family>Charts.vue` (uses `DemoCard` / `DemoGrid` from `site/components/`).
+- Add at least one `DemoCard` for new built-in types (template + `createChart` sample in `<pre v-pre>`).
+- Register new chart pages in `site/site.config.ts` under the **Charts** `children` array. Each `icon` must be a [Lucide](https://lucide.dev/icons) name in kebab-case — `@bndynet/vue-site` only renders icons from its bundled Lucide set (`chart-line` → `ChartLine`, etc.). Do **not** invent `chart-<type>` names unless they exist in Lucide (e.g. `chart-line`, `chart-bar`, `chart-pie` work; `chart-radar` does not). For other chart types use real Lucide names (`radar`, `gauge`, `workflow`, `component`, …) or omit `icon` / reuse a generic one like `chart-pie`.
 - Site watches the library via `site/site.config.ts` → `watchPackages` entry for `@bndynet/icharts`.
 
 ## Color / theme pipeline (read before adding charts)
@@ -395,10 +396,10 @@ registerAdapter(ChartType.Chord, {
 - [ ] Add **Data Formats** section with a TypeScript example.
 - [ ] Mention new `ChartOptions` fields if any.
 
-### 7. Demo (`site/views/ChartsView.vue`)
+### 7. Demo (`site/views/charts/` + `site/site.config.ts`)
 
-- [ ] Add an `el-card` demo with `createChart(el, '<type>', sampleData, options)`.
-- [ ] Include a collapsible code sample in `<pre v-pre>`.
+- [ ] Add `DemoCard`(s) in the appropriate `site/views/charts/<Family>Charts.vue` (create the file if needed) with `createChart(el, '<type>', sampleData, options)` and a `<pre v-pre>` code sample.
+- [ ] Add a **Charts** child in `site/site.config.ts` (`page` import + valid Lucide `icon`; see **Demo site** above).
 
 ### 8. Verification
 
