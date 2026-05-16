@@ -91,6 +91,24 @@ export class IChart implements IChartInstance {
    * `consistentColors` change.
    */
   private _sentinel: SentinelHandle | null = null;
+  /**
+   * Reference to the async-tooltip `dismiss` callback currently bound to
+   * the ECharts `hideTip` event. Re-bound on every `_apply()` because the
+   * adapter pipeline creates a fresh formatter closure (and a fresh
+   * `dismiss`) each resolve — we have to `off()` the previous reference
+   * before `on()`-ing the new one to avoid stacking listeners.
+   *
+   * When set, ECharts fires this on every tooltip dismissal so the
+   * formatter's HTML cache lives exactly for the duration of one
+   * tooltip session — a new hover after dismissal re-fetches fresh
+   * data, while rapid cursor motion within a session still dedupes
+   * down to a single `customHtml` call.
+   *
+   * `null` when the resolved option has no async-tooltip formatter
+   * (e.g. spark charts, gauge, or chart types whose adapter doesn't
+   * call `createAsyncTooltipFormatter`).
+   */
+  private _asyncTooltipDismiss: (() => void) | null = null;
 
   constructor(
     container: HTMLElement,
@@ -184,6 +202,10 @@ export class IChart implements IChartInstance {
     // disposed-but-still-registered chart).
     this._sentinel?.remove();
     this._sentinel = null;
+    // ECharts' own `dispose()` clears every listener internally, so we
+    // only need to drop our local reference — no `off('hideTip', ...)`
+    // call here (which would throw post-dispose on some ECharts builds).
+    this._asyncTooltipDismiss = null;
     chartRegistry.delete(this);
     this.ecInstance.dispose();
   }
@@ -231,7 +253,35 @@ export class IChart implements IChartInstance {
     );
     this._observeGridRight(option);
     this.ecInstance.setOption(option, notMerge ?? true);
+    this._rebindAsyncTooltipDismiss(option);
     onInit?.(this.ecInstance);
+  }
+
+  /**
+   * Wire `formatter.dismiss` (from {@link createAsyncTooltipFormatter}) to
+   * ECharts' `hideTip` event so the formatter's per-slice HTML cache is
+   * cleared whenever the tooltip closes. The cache then only deduplicates
+   * `customHtml` calls *within* a single tooltip session — next hover
+   * re-fetches fresh data.
+   *
+   * Idempotent across repeated `_apply()` calls: we detach the previous
+   * formatter's listener before attaching the new one, so re-renders
+   * (`update()`, `setTheme()`, `resize()`) never stack listeners.
+   */
+  private _rebindAsyncTooltipDismiss(option: unknown): void {
+    const next = extractAsyncTooltipDismiss(option);
+    if (next === this._asyncTooltipDismiss) return;
+    const ec = this.ecInstance as unknown as {
+      off?: (event: string, handler: (...args: unknown[]) => void) => void;
+      on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
+    if (this._asyncTooltipDismiss && typeof ec.off === 'function') {
+      ec.off('hideTip', this._asyncTooltipDismiss);
+    }
+    this._asyncTooltipDismiss = next;
+    if (next && typeof ec.on === 'function') {
+      ec.on('hideTip', next);
+    }
   }
 
   /**
@@ -249,4 +299,34 @@ export class IChart implements IChartInstance {
       this._maxGridRight = right;
     }
   }
+}
+
+/**
+ * Walk a resolved ECharts option for a `tooltip.formatter` produced by
+ * {@link createAsyncTooltipFormatter} (identified by the `dismiss`
+ * function property attached to the formatter callable). Tolerant of:
+ *
+ *   - `tooltip` being either an object (typical) or an array (when the
+ *     user passes multiple tooltip configurations through
+ *     `echarts.tooltip`),
+ *   - `formatter` being a plain string, undefined, or a function without
+ *     a `dismiss` property (e.g. a user-supplied formatter that bypasses
+ *     the async pipeline).
+ *
+ * Returns the first matching `dismiss` callback, or `null` when nothing
+ * async-tooltip-shaped is present.
+ */
+function extractAsyncTooltipDismiss(option: unknown): (() => void) | null {
+  const tooltip = (option as { tooltip?: unknown }).tooltip;
+  if (!tooltip) return null;
+  const candidates = Array.isArray(tooltip) ? tooltip : [tooltip];
+  for (const t of candidates) {
+    const fmt = (t as { formatter?: unknown } | undefined)?.formatter;
+    if (typeof fmt !== 'function') continue;
+    const maybeDismiss = (fmt as { dismiss?: unknown }).dismiss;
+    if (typeof maybeDismiss === 'function') {
+      return maybeDismiss as () => void;
+    }
+  }
+  return null;
 }

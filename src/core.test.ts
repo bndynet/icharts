@@ -20,6 +20,8 @@ vi.mock('echarts', () => ({
     dispose: vi.fn(),
     setTheme: vi.fn(),
     resize: vi.fn(),
+    on: vi.fn(),
+    off: vi.fn(),
   })),
   registerTheme: vi.fn(),
 }));
@@ -252,6 +254,136 @@ describe('IChart engine — race label headroom high-water mark', () => {
     });
     const chart = new IChart(fakeContainer(), 'no-grid-stub', stubData);
     expect(() => chart.update(stubData)).not.toThrow();
+    chart.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Async-tooltip dismiss wiring — the engine half of the cache-on-hideTip
+// behavior. The formatter half (createAsyncTooltipFormatter) is covered by
+// async-tooltip.test.ts. This block verifies that when an adapter emits a
+// tooltip.formatter with a `dismiss` property, the engine registers it as
+// a `hideTip` listener and re-binds (off → on) on each `_apply()` without
+// stacking listeners.
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — async tooltip dismiss wiring', () => {
+  it('binds tooltip.formatter.dismiss to hideTip when present on the resolved option', () => {
+    const dismiss = vi.fn();
+    const formatter = Object.assign(() => 'sync', { dismiss });
+    registerAdapter('async-tooltip-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: { tooltip: { formatter }, series: [] },
+      }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'async-tooltip-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      on: ReturnType<typeof vi.fn>;
+      off: ReturnType<typeof vi.fn>;
+    };
+
+    expect(ec.on).toHaveBeenCalledTimes(1);
+    expect(ec.on.mock.calls[0][0]).toBe('hideTip');
+    expect(ec.on.mock.calls[0][1]).toBe(dismiss);
+    chart.dispose();
+  });
+
+  it('re-binds on each _apply() with off-then-on (no listener stacking)', () => {
+    let currentFormatter: ((p: unknown) => string) & { dismiss: () => void } =
+      Object.assign(() => 'sync', { dismiss: vi.fn() });
+
+    registerAdapter('rebind-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: { tooltip: { formatter: currentFormatter }, series: [] },
+      }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'rebind-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      on: ReturnType<typeof vi.fn>;
+      off: ReturnType<typeof vi.fn>;
+    };
+
+    const first = currentFormatter.dismiss;
+    expect(ec.on).toHaveBeenCalledTimes(1);
+    expect(ec.on.mock.calls[0][1]).toBe(first);
+    expect(ec.off).not.toHaveBeenCalled();
+
+    // Simulate a new adapter resolve emitting a fresh formatter closure
+    // (which is what each update() / setTheme() / resize() does in
+    // production).
+    const second = vi.fn();
+    currentFormatter = Object.assign(() => 'sync', { dismiss: second });
+    chart.update(stubData);
+
+    expect(ec.off).toHaveBeenCalledTimes(1);
+    expect(ec.off.mock.calls[0][0]).toBe('hideTip');
+    expect(ec.off.mock.calls[0][1]).toBe(first);
+    expect(ec.on).toHaveBeenCalledTimes(2);
+    expect(ec.on.mock.calls[1][1]).toBe(second);
+
+    chart.dispose();
+  });
+
+  it('skips wiring when tooltip.formatter is missing or has no dismiss method', () => {
+    registerAdapter('plain-tooltip-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: { tooltip: { formatter: () => 'sync' }, series: [] },
+      }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'plain-tooltip-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      on: ReturnType<typeof vi.fn>;
+    };
+    expect(ec.on).not.toHaveBeenCalled();
+    chart.dispose();
+  });
+
+  it('skips wiring when the option has no tooltip at all', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      on: ReturnType<typeof vi.fn>;
+    };
+    expect(ec.on).not.toHaveBeenCalled();
+    chart.dispose();
+  });
+
+  it('detaches the old listener when subsequent renders no longer emit an async formatter', () => {
+    let withDismiss = true;
+    const dismiss = vi.fn();
+    registerAdapter('toggle-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: {
+          tooltip: withDismiss
+            ? { formatter: Object.assign(() => 'sync', { dismiss }) }
+            : { formatter: () => 'sync' },
+          series: [],
+        },
+      }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'toggle-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      on: ReturnType<typeof vi.fn>;
+      off: ReturnType<typeof vi.fn>;
+    };
+    expect(ec.on).toHaveBeenCalledTimes(1);
+
+    withDismiss = false;
+    chart.update(stubData);
+
+    expect(ec.off).toHaveBeenCalledTimes(1);
+    expect(ec.off.mock.calls[0][0]).toBe('hideTip');
+    expect(ec.off.mock.calls[0][1]).toBe(dismiss);
+    // No new `on` call — the new option has no dismiss to wire.
+    expect(ec.on).toHaveBeenCalledTimes(1);
+
     chart.dispose();
   });
 });

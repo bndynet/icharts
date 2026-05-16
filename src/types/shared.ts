@@ -157,6 +157,28 @@ export interface CreateAsyncTooltipFormatterOptions {
    * @default 'Loading…'
    */
   placeholder?: string;
+  /**
+   * Identity used to cache resolved tooltip HTML and dedupe concurrent
+   * `customHtml` loads. ECharts re-invokes the formatter on every mouse
+   * move — without caching, hovering inside a single slice / node / axis
+   * column reruns `customHtml` continuously and the user sees a repeating
+   * "loading" flicker.
+   *
+   * - Default extractor: keys axis-trigger payloads by `axisValue` and
+   *   item / edge payloads by `(dataType, seriesIndex, dataIndex, name)`.
+   *   This covers every built-in chart type that wires
+   *   {@link TooltipOptions.customHtml}.
+   * - Pass a function to customize (e.g. include extra fields the default
+   *   key elides, or coarsen across series).
+   * - Pass `false` to disable caching entirely — every formatter invocation
+   *   will re-fire `customHtml`. Use only when the async result genuinely
+   *   varies across mouse moves for the same data point.
+   *
+   * The cache lives for the lifetime of the formatter closure, which is
+   * recreated on every `setOption` resolve in the adapter pipeline. Stale
+   * data thus self-clears on chart updates.
+   */
+  cacheKey?: ((params: unknown) => string) | false;
 }
 
 export interface TooltipOptions {
