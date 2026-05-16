@@ -7,8 +7,12 @@ import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/text-measure.js';
  *
  * Token mapping:
  *  background    → chart canvas background (transparent by default)
- *  surface       → tooltip bg, axis-pointer callout bg, pie-slice border
+ *  surface       → tooltip bg, axis-pointer callout bg
  *  surfaceText   → tooltip text, axis-pointer callout text
+ *  itemDivider   → pie-slice border (and future sunburst sectors / treemap
+ *                  cells / sankey & network node borders); falls back to
+ *                  `surface` when undefined so themes registered before this
+ *                  token existed keep their previous behaviour
  *  textPrimary   → chart title, legend, pie labels, gauge detail (value),
  *                  radar indicator names (axisName), markPoint labels,
  *                  bar/line value labels (incl. race value labels and
@@ -109,7 +113,14 @@ export function buildEChartsTheme(
 
     pie: {
       label:     { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
-      itemStyle: { borderWidth: 1, borderColor: colors.surface },
+      // 1 px stroke that fakes a gap between adjacent slices. Pre-token,
+      // this read `colors.surface` directly, which silently broke on
+      // themes whose tooltip surface differs from the card background
+      // (e.g. `dash-scifi`'s `surface: 'transparent'` glassmorphism →
+      // slices fused into one continuous ring). `itemDivider` is the
+      // dedicated knob; `?? colors.surface` keeps every pre-existing
+      // user-registered theme behaviourally identical.
+      itemStyle: { borderWidth: 1, borderColor: colors.itemDivider ?? colors.surface },
     },
 
     gauge: {

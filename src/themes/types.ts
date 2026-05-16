@@ -57,6 +57,25 @@ export interface ChartThemeColors {
    */
   axisLine: string;
 
+  /**
+   * Color of the thin 1 px stroke between adjacent series data items —
+   * pie/doughnut/nightingale slices today, and future sunburst sectors,
+   * treemap cells, sankey/network node borders, etc.
+   *
+   * Should typically equal the chart's visible backdrop (usually the
+   * card / panel background) so adjacent items appear separated by a
+   * real gap rather than a coloured ring around each item.
+   *
+   * Falls back to {@link surface} when omitted — the built-in light /
+   * dark presets explicitly set this to the same value as `surface`
+   * (matching the typical card background) so the relationship is
+   * documented even though the result is identical. Override on themes
+   * whose card background differs from `surface` (e.g. glassmorphism
+   * panels where `surface` describes the *tooltip* surface, not the
+   * card).
+   */
+  itemDivider?: string;
+
   // ── Tooltip ────────────────────────────────────────────────────────────────
 
   /**

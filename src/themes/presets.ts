@@ -50,6 +50,13 @@ const LIGHT_COLORS: ChartThemeColors = {
   // Structure
   gridLine: '#f3f4f6', // barely visible rules
   axisLine: '#d1d5db', // slightly more prominent frame
+  // White card background is the dominant business-app default (Element
+  // Plus / Tailwind / Ant Design ship `#ffffff` panels), so a white 1 px
+  // pie-slice border reads as a true gap. Numerically equals `surface`
+  // here, but the two tokens are semantically independent — themes whose
+  // tooltip surface differs from their card background (see `dash-scifi`)
+  // override one without touching the other.
+  itemDivider: '#ffffff',
 
   // Tooltip — light popup consistent with the light background
   tooltipBackground: '#ffffff',
@@ -85,6 +92,12 @@ const DARK_COLORS: ChartThemeColors = {
   // dashboard background.
   gridLine: '#334155',
   axisLine: '#475569',
+  // Matches the slate-800 panel color most dark dashboards put behind
+  // their cards, so a 1 px pie-slice border reads as a true gap. Same
+  // value as `surface` here purely by coincidence (both happen to map
+  // to slate-800 in the canonical dark theme) — the two tokens are
+  // semantically independent (see ChartThemeColors.itemDivider).
+  itemDivider: '#1e293b',
 
   // Tooltip — slightly elevated surface to pop above the chart canvas
   tooltipBackground: '#1e293b',

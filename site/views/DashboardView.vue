@@ -368,12 +368,19 @@ function registerDashboardThemes(): void {
 
   // Sci-Fi HUD palette. Paired with the `.dashboard.is-scifi` glassmorphism
   // CSS below: ECharts canvases are already transparent by default
-  // (`colors.background === 'transparent'` in the built-in dark preset that
-  // this entry merges into), so chart paint sits directly on the glass
-  // card. `surface` is also transparent here so pie slice borders fade
-  // away, fusing slices into a continuous neon ring that matches the HUD
-  // aesthetic. Tooltip stays semi-opaque so values remain readable when
-  // the cursor lands over a busy region of the canvas.
+  // (`colors.background === 'transparent'` in the built-in dark preset
+  // that this entry merges into), so chart paint sits directly on the
+  // glass card. `surface` is also transparent so the axis-pointer
+  // callout fuses into the HUD instead of stamping a slate panel over
+  // it. `tooltipBackground` is set explicitly so values remain readable
+  // when the cursor lands over a busy region of the canvas.
+  //
+  // `itemDivider` is the dedicated knob for the 1 px stroke between
+  // adjacent pie slices. Tinted with a faint cyan so the doughnut still
+  // reads as segmented (matching the HUD's line-art aesthetic) rather
+  // than fusing into a continuous neon ring — set to `'transparent'` if
+  // you prefer the fused look. Decoupled from `surface` so this choice
+  // doesn't drag the axis-pointer callout along with it.
   registerTheme({
     name: 'dash-scifi',
     colorMode: 'dark',

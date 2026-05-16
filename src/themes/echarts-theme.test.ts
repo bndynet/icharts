@@ -197,6 +197,55 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     }
   });
 
+  // ---------------------------------------------------------------------
+  // itemDivider — the dedicated knob for pie-slice / future sunburst /
+  // treemap / sankey-node "fake-gap" strokes. Decoupled from `surface`
+  // (which is the tooltip surface) so themes whose card background
+  // differs from their tooltip background can drive each independently.
+  //
+  // Contract:
+  //   - When the theme defines `itemDivider`, pie.itemStyle.borderColor
+  //     follows it verbatim.
+  //   - When omitted, falls back to `surface` so every theme that
+  //     existed before this token shipped keeps its previous behaviour.
+  //
+  // This is the structural counterpart to the label-color contract
+  // above (AGENTS.md "Layout rule #6"): adapters MUST NOT set
+  // `series.itemStyle.borderColor` from the active palette; the theme
+  // owns it so a single `setTheme(...)` repaints every pie at once.
+  // ---------------------------------------------------------------------
+
+  it('pie.itemStyle.borderColor follows itemDivider when defined', () => {
+    const colors: ChartThemeColors = { ...COLORS, itemDivider: '#ff00ff' };
+    const theme = buildEChartsTheme(colors, PALETTE);
+    expect(theme.pie.itemStyle.borderColor).toBe('#ff00ff');
+  });
+
+  it('pie.itemStyle.borderColor falls back to surface when itemDivider is omitted', () => {
+    // `COLORS` deliberately omits `itemDivider` — passing it directly
+    // exercises the fallback path that any custom theme written
+    // against the older type would hit. The meta-assertion below pins
+    // that fact so the test fails fast if a future maintainer adds
+    // `itemDivider` to the shared fixture and silently invalidates
+    // this branch of the contract.
+    expect((COLORS as { itemDivider?: string }).itemDivider).toBeUndefined();
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.pie.itemStyle.borderColor).toBe(COLORS.surface);
+  });
+
+  it('changing itemDivider repaints pie.itemStyle.borderColor without touching surface-driven surfaces', () => {
+    const a = buildEChartsTheme({ ...COLORS, itemDivider: '#111111' }, PALETTE);
+    const b = buildEChartsTheme({ ...COLORS, itemDivider: '#222222' }, PALETTE);
+    expect(a.pie.itemStyle.borderColor).toBe('#111111');
+    expect(b.pie.itemStyle.borderColor).toBe('#222222');
+    // `surface`-driven surfaces (tooltip bg + axis-pointer callout bg)
+    // must NOT have moved — they read `surface`, not `itemDivider`.
+    expect(a.tooltip.backgroundColor).toBe(b.tooltip.backgroundColor);
+    expect(a.tooltip.axisPointer.label.backgroundColor).toBe(
+      b.tooltip.axisPointer.label.backgroundColor,
+    );
+  });
+
   it('radar grid lines stay in lockstep with XY axis grid lines (shared tokens)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     // Spokes / frame line — same `axisLine` token both places.

@@ -204,6 +204,7 @@ Both reserve helpers return the same `EdgeReserves` shape so adapters that need 
  - `bar.label.color` → `textPrimary` (covers `showLabel` **and** race value labels)
  - `line.label.color`, `line.endLabel.color` → `textPrimary` (covers `showLabel` **and** line-race tracking labels)
  - `pie.label.color` → `textPrimary`
+ - `pie.itemStyle.borderColor` → `itemDivider` (fallback: `surface`) — 1 px stroke between adjacent pie slices; dedicated knob so themes whose card background differs from their tooltip surface (e.g. `dash-scifi`'s glassmorphism) can drive each independently
  - `gauge.title.color` → `textSecondary` (descriptive label, e.g. "CPU"), `gauge.detail.color` → `textPrimary` (the value), `gauge.axisLabel.color` → `textSecondary`
  - `markPoint.label.color` → `textPrimary`
  - `radar.axisName.color` → `textPrimary` (indicator labels)
