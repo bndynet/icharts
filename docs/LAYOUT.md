@@ -143,8 +143,14 @@ by `padding + reserve`:
 This is what `buildGrid()` does internally — it consumes
 `getTitleReserve(options).top` for the top edge and
 `getLegendReserve(...)` for whichever edge the legend lives on, then
-adds `padding` to non-zero reserves. Adapters call `buildGrid`, not
-the reserve helpers directly:
+adds `padding` to non-zero reserves. When **both** a title and a
+top-positioned legend are present, the top edge composes them
+additively (`p + title.top + legend.top`), so the stack reads
+**title → legend → chart body**. `buildLegend()` shifts the top
+legend's own `top` anchor below the title for the same reason —
+otherwise the legend widget would render on top of the title text.
+
+Adapters call `buildGrid`, not the reserve helpers directly:
 
 ```ts
 // in src/adapters/bar.ts (or line/area)

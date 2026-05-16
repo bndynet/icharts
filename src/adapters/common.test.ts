@@ -4,6 +4,7 @@ import {
   STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
   STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
   buildLegend,
+  compileRichText,
   buildSparkTooltip,
   buildTooltip,
   computeStackedTextOffsets,
@@ -21,6 +22,7 @@ import { resolveRadarOptions } from './radar.js';
 import { deepMerge } from '../utils.js';
 
 const EMPTY = { top: 0, bottom: 0, left: 0, right: 0 };
+const SIDE_GAP = 8;
 
 // Title geometry: fontSize + padding*2 + TITLE_CHART_GAP
 // Defaults: fontSize=14, padding=8, gap=8 → 14 + 16 + 8 = 38
@@ -51,11 +53,11 @@ describe('getLegendReserve', () => {
     });
     expect(getLegendReserve({ legend: { position: 'left' } }, true)).toEqual({
       ...EMPTY,
-      left: LEGEND_RESERVE,
+      left: LEGEND_RESERVE + SIDE_GAP,
     });
     expect(getLegendReserve({ legend: { position: 'right' } }, true)).toEqual({
       ...EMPTY,
-      right: LEGEND_RESERVE,
+      right: LEGEND_RESERVE + SIDE_GAP,
     });
   });
 
@@ -66,7 +68,37 @@ describe('getLegendReserve', () => {
     });
     expect(getLegendReserve({ legend: { position: 'right' } }, true, 10)).toEqual({
       ...EMPTY,
-      right: LEGEND_RESERVE + 10,
+      right: LEGEND_RESERVE + 10 + SIDE_GAP,
+    });
+  });
+
+  it('uses legend.height for top/bottom reserve when provided', () => {
+    expect(
+      getLegendReserve({ legend: { position: 'top', height: 52 } }, true),
+    ).toEqual({
+      ...EMPTY,
+      top: 52,
+    });
+    expect(
+      getLegendReserve({ legend: { position: 'bottom', height: 44 } }, true),
+    ).toEqual({
+      ...EMPTY,
+      bottom: 44,
+    });
+  });
+
+  it('uses legend.width for left/right reserve when provided', () => {
+    expect(
+      getLegendReserve({ legend: { position: 'left', width: 96 } }, true),
+    ).toEqual({
+      ...EMPTY,
+      left: 96 + SIDE_GAP,
+    });
+    expect(
+      getLegendReserve({ legend: { position: 'right', width: 80 } }, true),
+    ).toEqual({
+      ...EMPTY,
+      right: 80 + SIDE_GAP,
     });
   });
 
@@ -146,12 +178,12 @@ describe('getLegendReserve', () => {
     expect(withGap.right - noGap.right).toBe(24);
   });
 
-  it('side-legend slot falls back to LEGEND_RESERVE when names is empty or omitted', () => {
+  it('side-legend slot keeps a fixed body gap when names is empty or omitted', () => {
     expect(getLegendReserve({ legend: { position: 'right' } }, true, 0, []).right).toBe(
-      LEGEND_RESERVE,
+      LEGEND_RESERVE + SIDE_GAP,
     );
     expect(getLegendReserve({ legend: { position: 'right' } }, true).right).toBe(
-      LEGEND_RESERVE,
+      LEGEND_RESERVE + SIDE_GAP,
     );
   });
 });
@@ -193,6 +225,444 @@ describe('buildLegend', () => {
     expect(legend.bottom).toBe(12); // CHART_DEFAULT_PADDING
     expect(legend.left).toBe('center');
     expect(legend.orient).toBe('horizontal');
+  });
+
+  it('forwards legend.height and legend.width into ECharts legend block', () => {
+    const legend = buildLegend(['A'], {
+      legend: { position: 'right', height: 72, width: 140 },
+    });
+    expect(legend.height).toBe(72);
+    expect(legend.width).toBe(140);
+  });
+
+  // -------------------------------------------------------------------------
+  // `legend.formatLabel` — typed entry point that maps to ECharts native
+  // `legend.formatter`. Verified at three layers:
+  //   1. buildLegend wires it through and only emits `formatter` when set.
+  //   2. The wrapper passes the entry index alongside the name.
+  //   3. The wrapper is defensive — bad return / throws fall back to name.
+  // The width-measurement integration with getLegendReserve is covered in
+  // a dedicated describe block below.
+  // -------------------------------------------------------------------------
+
+  it('formatLabel: wires the user function into ECharts legend.formatter', () => {
+    const legend = buildLegend(['Pro', 'Free'], {
+      legend: { formatLabel: (n) => `★ ${n}` },
+    });
+    const f = legend.formatter as (name: string) => string;
+    expect(typeof f).toBe('function');
+    expect(f('Pro')).toBe('★ Pro');
+    expect(f('Free')).toBe('★ Free');
+  });
+
+  it('formatLabel: compiles RichTextSpec into formatter string + legend.textStyle.rich', () => {
+    const legend = buildLegend(['Chrome'], {
+      legend: {
+        formatLabel: (n) => ({
+          segments: [
+            { text: n, width: 120 },
+            { text: '53 (65.2%)', width: 88, align: 'right' },
+          ],
+        }),
+      },
+    });
+    const f = legend.formatter as (name: string) => string;
+    const out = f('Chrome');
+    expect(out).toContain('{__ich_legend_0_0|Chrome}');
+    expect(out).toContain('{__ich_legend_0_1|53 (65.2%)}');
+
+    const textStyle = legend.textStyle as Record<string, unknown>;
+    const rich = textStyle.rich as Record<string, Record<string, unknown>>;
+    expect(rich.__ich_legend_0_0.width).toBe(120);
+    expect(rich.__ich_legend_0_1.width).toBe(88);
+    expect(rich.__ich_legend_0_1.align).toBe('right');
+  });
+
+  it('formatLabel: passes the zero-based entry index alongside the name', () => {
+    const seen: Array<[string, number]> = [];
+    const legend = buildLegend(['A', 'B', 'C'], {
+      legend: {
+        formatLabel: (n, i) => {
+          seen.push([n, i]);
+          return n;
+        },
+      },
+    });
+    const f = legend.formatter as (name: string) => string;
+    ['A', 'B', 'C'].forEach((n) => f(n));
+    expect(seen).toEqual([
+      ['A', 0],
+      ['B', 1],
+      ['C', 2],
+    ]);
+  });
+
+  it('formatLabel: omits formatter when not provided (preserves echarts.legend.formatter passthrough)', () => {
+    const legend = buildLegend(['A'], {});
+    expect(legend.formatter).toBeUndefined();
+  });
+
+  it('formatLabel: falls back to the raw name when the user function throws', () => {
+    const legend = buildLegend(['A'], {
+      legend: {
+        formatLabel: () => {
+          throw new Error('boom');
+        },
+      },
+    });
+    const f = legend.formatter as (name: string) => string;
+    expect(f('A')).toBe('A');
+  });
+
+  it('formatLabel: falls back to the raw name when the user function returns a non-string', () => {
+    const legend = buildLegend(['A'], {
+      // Force a non-string return at runtime — type system would catch this,
+      // but a real consumer could `return undefined` accidentally from an
+      // early-exit lookup. The wrapper must keep the legend usable.
+      legend: { formatLabel: (() => undefined) as unknown as (n: string) => string },
+    });
+    const f = legend.formatter as (name: string) => string;
+    expect(f('A')).toBe('A');
+  });
+
+  // Names with duplicates: `buildLegend` eagerly pre-compiles each entry once
+  // to collect RichTextSpec style maps, then the runtime formatter resolves by
+  // name. For duplicate names this means the callback may observe multiple
+  // valid indices during pre-compilation. The contract we care about is:
+  // "doesn't crash and never feeds an invalid index".
+  it('formatLabel: handles duplicate names without crashing', () => {
+    const seen: Array<[string, number]> = [];
+    const legend = buildLegend(['A', 'A'], {
+      legend: {
+        formatLabel: (n, i) => {
+          seen.push([n, i]);
+          return n;
+        },
+      },
+    });
+    const f = legend.formatter as (name: string) => string;
+    expect(() => f('A')).not.toThrow();
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(([name]) => name === 'A')).toBe(true);
+    expect(seen.every(([, index]) => index >= 0)).toBe(true);
+  });
+});
+
+describe('compileRichText', () => {
+  it('compiles RichTextSpec into formatter text + rich map', () => {
+    const compiled = compileRichText(
+      {
+        segments: [
+          { text: 'Name', width: 120 },
+          { text: '53 (65.2%)', width: 88, align: 'right' },
+        ],
+      },
+      'test',
+    );
+    expect(compiled.text).toContain('{__ich_test_0|Name}');
+    expect(compiled.text).toContain('{__ich_test_1|53 (65.2%)}');
+    expect(compiled.rich?.__ich_test_0?.width).toBe(120);
+    expect(compiled.rich?.__ich_test_1?.align).toBe('right');
+    expect(compiled.measuredWidthPx).toBeGreaterThanOrEqual(208);
+  });
+});
+
+describe('buildLegend + buildGrid: title vs top-legend stacking', () => {
+  // Regression for "legend at `position: 'top'` overlaps the title": the
+  // title widget anchors at `top: chartPadding` and used to share that
+  // anchor with the top-legend, so both rendered at the same y.
+  // Additionally `buildGrid`'s `deepMerge(base, legendArea, ...)` let
+  // `legendArea.top` silently replace the title-only `base.top`, so the
+  // chart body slid up under the title when both were present.
+  it('top legend shifts below the title when a title is present', () => {
+    const noTitle = buildLegend(['A', 'B'], {
+      legend: { show: true, position: 'top' },
+    });
+    const withTitle = buildLegend(['A', 'B'], {
+      title: 'Sales',
+      legend: { show: true, position: 'top' },
+    });
+    // Without a title the top legend keeps its bare-padding anchor (12 px).
+    expect(noTitle.top).toBe(12);
+    // With a title the legend's anchor is pushed below the title widget
+    // (12 px padding + 38 px title widget height = 50 px). The shift uses
+    // the same `getTitleHeight` math the grid path consumes, so title and
+    // grid stay in sync.
+    expect(withTitle.top).toBe(12 + DEFAULT_TITLE_HEIGHT);
+  });
+
+  it('non-top legend positions ignore the title (unchanged)', () => {
+    // Bottom / left / right legends don't share the title's top-edge anchor,
+    // so they keep their previous coordinates whether or not a title exists.
+    const bottom = buildLegend(['A'], { title: 'X', legend: { show: true, position: 'bottom' } });
+    const left = buildLegend(['A'], { title: 'X', legend: { show: true, position: 'left' } });
+    const right = buildLegend(['A'], { title: 'X', legend: { show: true, position: 'right' } });
+    expect(bottom.bottom).toBe(12);
+    expect(bottom.top).toBeUndefined();
+    expect(left.left).toBe(12);
+    expect(left.top).toBe('center');
+    expect(right.right).toBe(12);
+    expect(right.top).toBe('center');
+  });
+
+  it('grid.top composes title height + top-legend reserve (XY charts)', () => {
+    // Truth table for the top edge — every combination of {title, top legend}
+    // must be the sum of the active reserves plus padding. Before the fix,
+    // the (title + top-legend) cell silently equaled the legend-only cell
+    // because `deepMerge` dropped the title slot.
+    const data = {
+      categories: ['Q1'],
+      series: [
+        { name: 'A', data: [10] },
+        { name: 'B', data: [5] },
+      ],
+    };
+    const noTitleNoLegend = resolveBarOptions(data, { legend: { show: false } })
+      .option.grid as Record<string, unknown>;
+    const titleOnly = resolveBarOptions(data, { title: 'X', legend: { show: false } })
+      .option.grid as Record<string, unknown>;
+    const topLegendOnly = resolveBarOptions(data, {
+      legend: { show: true, position: 'top' },
+    }).option.grid as Record<string, unknown>;
+    const both = resolveBarOptions(data, {
+      title: 'X',
+      legend: { show: true, position: 'top' },
+    }).option.grid as Record<string, unknown>;
+
+    expect(noTitleNoLegend.top).toBe(12);
+    expect(titleOnly.top).toBe(12 + DEFAULT_TITLE_HEIGHT);
+    // padding (12) + LEGEND_RESERVE (36)
+    expect(topLegendOnly.top).toBe(12 + 36);
+    // padding (12) + title widget height (38) + LEGEND_RESERVE (36)
+    expect(both.top).toBe(12 + DEFAULT_TITLE_HEIGHT + 36);
+  });
+
+  it('bottom / side legends with a title preserve the title reserve on the top edge', () => {
+    // Sanity: the new top-edge composition must not break charts where the
+    // legend lives elsewhere — `grid.top` for a title-only chart must equal
+    // the title-only case regardless of whether `legend.show` is true.
+    const data = {
+      categories: ['Q1'],
+      series: [{ name: 'A', data: [10] }],
+    };
+    const bottomLegend = resolveBarOptions(data, {
+      title: 'X',
+      legend: { show: true, position: 'bottom' },
+    }).option.grid as Record<string, unknown>;
+    const rightLegend = resolveBarOptions(data, {
+      title: 'X',
+      legend: { show: true, position: 'right' },
+    }).option.grid as Record<string, unknown>;
+    expect(bottomLegend.top).toBe(12 + DEFAULT_TITLE_HEIGHT);
+    expect(rightLegend.top).toBe(12 + DEFAULT_TITLE_HEIGHT);
+  });
+});
+
+describe('buildGrid + side-edge legend width (XY charts)', () => {
+  // Regression for the bar/right-legend overlap bug: `buildGrid` used to
+  // pass `getLegendReserve(options, show)` without `names`, so for
+  // `position: 'left' | 'right'` the right reserve stayed at the bare
+  // 36 px floor regardless of how wide the labels actually were. That
+  // bug was invisible with the default `seriesName` labels (short, ≤ 36
+  // px) but became severe once `legend.formatLabel` started appending
+  // values — e.g. "{n|North}{v|  $250}" rendered as "North  $250"
+  // overflowed the legend area onto the bars.
+  it('reserves bottom row-height for the default bottom legend (single-line slot)', () => {
+    const grid = resolveBarOptions(
+      {
+        categories: ['Q1', 'Q2'],
+        series: [
+          { name: 'Sales', data: [10, 20] },
+          { name: 'Costs', data: [5, 8] },
+        ],
+      },
+      { legend: { show: true } }, // default position = 'bottom'
+    ).option.grid as Record<string, unknown>;
+    // padding (12) + LEGEND_RESERVE (36) = 48
+    expect(grid.bottom).toBe(48);
+    // Right edge stays at the bare chart padding when the legend lives
+    // on the bottom — no side-edge reserve to add.
+    expect(grid.right).toBe(12);
+  });
+
+  it('grows grid.right to fit the widest series-name label on a right legend', () => {
+    // Bare names — no formatLabel. The right reserve must already widen
+    // past the 36 px floor when the label is wider than the floor.
+    const grid = resolveBarOptions(
+      {
+        categories: ['Q1', 'Q2'],
+        series: [
+          { name: 'A really really wide series name', data: [10, 20] },
+        ],
+      },
+      { legend: { show: true, position: 'right' } },
+    ).option.grid as Record<string, unknown>;
+    // padding (12) + LEGEND_RESERVE floor (36) = 48 — the reserve must
+    // be STRICTLY larger because the label visibly exceeds 36 px.
+    expect(grid.right as number).toBeGreaterThan(48);
+  });
+
+  it('grows grid.right with legend.formatLabel (the bar rich-text regression)', () => {
+    // Same data, same chart, two legend strategies — the formatted side
+    // must reserve strictly more right-edge space than the raw side.
+    const data = {
+      categories: ['Q1', 'Q2'],
+      series: [
+        { name: 'A', data: [10, 20] },
+        { name: 'B', data: [5, 8] },
+      ],
+    };
+    const raw = resolveBarOptions(data, {
+      legend: { show: true, position: 'right' },
+    }).option.grid as Record<string, unknown>;
+    const formatted = resolveBarOptions(data, {
+      legend: {
+        show: true,
+        position: 'right',
+        formatLabel: (n) => `${n} — a much wider formatted label with appended value`,
+      },
+    }).option.grid as Record<string, unknown>;
+    expect(formatted.right as number).toBeGreaterThan(raw.right as number);
+  });
+
+  it('strips rich-text markup before measuring (bar rich-text demo case)', () => {
+    // The bar/rich-text demo formatter returns `{n|name}{v|  $...}`
+    // segments. `buildGrid` must measure the visible glyph extent
+    // (after stripping `{n|`, `{v|`, `}`) — otherwise the literal style
+    // keys would inflate the slot beyond what's actually drawn.
+    const data = {
+      categories: ['Mon', 'Tue'],
+      series: [{ name: 'North', data: [100, 200] }],
+    };
+    const plain = resolveBarOptions(data, {
+      legend: { show: true, position: 'right', formatLabel: (n) => `${n}` },
+    }).option.grid as Record<string, unknown>;
+    const rich = resolveBarOptions(data, {
+      legend: { show: true, position: 'right', formatLabel: (n) => `{n|${n}}` },
+    }).option.grid as Record<string, unknown>;
+    // The rendered text is identical after stripping, so the right
+    // reserve must match — proving we measured the stripped string, not
+    // the literal source.
+    expect(rich.right).toBe(plain.right);
+  });
+});
+
+describe('getLegendReserve + formatLabel integration', () => {
+  // The whole point of measuring formatted strings (instead of raw names)
+  // for side legends is that a label like `(n) => `${n}  ${value(n)}` `
+  // visibly extends past the raw name's pixel width — the reserve must
+  // grow with it, otherwise the formatted text bleeds into the chart body.
+  it('measures the FORMATTED label width on side legends, not the raw name', () => {
+    const names = ['A', 'B'];
+    const raw = getLegendReserve({ legend: { position: 'right' } }, true, 0, names);
+    const formatted = getLegendReserve(
+      {
+        legend: {
+          position: 'right',
+          formatLabel: (n) => `${n} — 12,345,678 (87.5%)`,
+        },
+      },
+      true,
+      0,
+      names,
+    );
+    expect(formatted.right).toBeGreaterThan(raw.right);
+  });
+
+  it('honors RichTextSpec segment width for side-legend reserve math', () => {
+    const names = ['Chrome'];
+    const plain = getLegendReserve(
+      { legend: { position: 'right', formatLabel: () => 'Chrome 53 (65.2%)' } },
+      true,
+      0,
+      names,
+    );
+    const columns = getLegendReserve(
+      {
+        legend: {
+          position: 'right',
+          formatLabel: () => ({
+            segments: [
+              { text: 'Chrome', width: 120 },
+              { text: '53 (65.2%)', width: 88, align: 'right' },
+            ],
+          }),
+        },
+      },
+      true,
+      0,
+      names,
+    );
+    expect(columns.right).toBeGreaterThan(plain.right);
+  });
+
+  // Top/bottom legends use a fixed row-height slot. formatLabel must NOT
+  // grow that slot regardless of how wide the formatted string is —
+  // otherwise the chart layout would jitter every time a value changes.
+  it('top/bottom legends ignore formatLabel width (constant row-height slot)', () => {
+    const raw = getLegendReserve({ legend: { position: 'bottom' } }, true, 0, ['A']);
+    const formatted = getLegendReserve(
+      {
+        legend: {
+          position: 'bottom',
+          formatLabel: (n) => `${n} — 12,345,678 (87.5%)`,
+        },
+      },
+      true,
+      0,
+      ['A'],
+    );
+    expect(formatted.bottom).toBe(raw.bottom);
+  });
+
+  // Rich-text segments (`{key|text}`) are stripped before measurement so
+  // the style keys don't inflate the slot past the visible glyph extent.
+  // Without the strip, `{n|Pro}{v|  $1,200}` would be measured as if the
+  // literal "{n|", "}", "{v|" characters were drawn.
+  it('strips rich-text markup before measuring (style keys are invisible)', () => {
+    const names = ['Pro'];
+    const richA = getLegendReserve(
+      { legend: { position: 'right', formatLabel: (n) => `{n|${n}}` } },
+      true,
+      0,
+      names,
+    );
+    const plain = getLegendReserve(
+      { legend: { position: 'right', formatLabel: (n) => n } },
+      true,
+      0,
+      names,
+    );
+    // After stripping `{n|` and `}` the measured text is identical to plain.
+    expect(richA.right).toBe(plain.right);
+  });
+
+  // A throwing formatter must not blow up the layout computation either —
+  // the reserve helper should keep using the raw name for the entry that
+  // failed (matches the buildLegend fallback so the legend and the reserve
+  // agree on what gets drawn).
+  it('falls back to raw name width when formatLabel throws', () => {
+    const names = ['A really wide label'];
+    const reserveOk = getLegendReserve(
+      { legend: { position: 'right' } },
+      true,
+      0,
+      names,
+    );
+    const reserveThrowing = getLegendReserve(
+      {
+        legend: {
+          position: 'right',
+          formatLabel: () => {
+            throw new Error('boom');
+          },
+        },
+      },
+      true,
+      0,
+      names,
+    );
+    expect(reserveThrowing.right).toBe(reserveOk.right);
   });
 });
 

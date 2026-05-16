@@ -149,6 +149,24 @@ describe('pie adapter', () => {
       // to the colorMap entry (and override `echarts.color`).
       expect((optOf(result).color as string[])[3]).toBe('#aaaaaa');
     });
+
+    it('threads legend.formatLabel into the resolved option', () => {
+      // Builds an in-memory value lookup so the formatter can attach the
+      // slice's value next to the name — the canonical "show more info"
+      // use case the LegendOptions JSDoc documents.
+      const valueByName = new Map(sample.map((d) => [d.name, d.value]));
+      const result = resolvePieOptions(sample, {
+        legend: {
+          show: true,
+          formatLabel: (name) => `${name} (${valueByName.get(name)})`,
+        },
+      });
+      const legend = optOf(result).legend as Record<string, unknown>;
+      const formatter = legend.formatter as (name: string) => string;
+      expect(typeof formatter).toBe('function');
+      expect(formatter('Pro')).toBe('Pro (880)');
+      expect(formatter('Premium')).toBe('Premium (420)');
+    });
   });
 
   // -------------------------------------------------------------------------

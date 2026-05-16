@@ -78,9 +78,14 @@ export default defineConfig({
       page: () => import('./views/DynamicDataView.vue'),
     },
     {
-      label: 'Tooltip',
+      label: 'Custom Tooltip',
       icon: 'message-square-text',
-      page: () => import('./views/TooltipView.vue'),
+      page: () => import('./views/CustomTooltipView.vue'),
+    },
+    {
+      label: 'Custom Legend',
+      icon: 'tag',
+      page: () => import('./views/CustomLegendView.vue'),
     },
   ],
   env: {

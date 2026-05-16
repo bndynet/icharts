@@ -245,6 +245,20 @@ describe('radar adapter', () => {
       // resolved palette replaces user-supplied echarts.color
       expect(option.color).toEqual(['#aaaaaa', '#bbbbbb']);
     });
+
+    it('threads legend.formatLabel into the resolved option', () => {
+      const option = resolveRadarOptions(sample, {
+        legend: {
+          show: true,
+          formatLabel: (name) => `[${name}]`,
+        },
+      });
+      const legend = option.legend as Record<string, unknown>;
+      const formatter = legend.formatter as (n: string) => string;
+      expect(typeof formatter).toBe('function');
+      expect(formatter('Budget')).toBe('[Budget]');
+      expect(formatter('Actual')).toBe('[Actual]');
+    });
   });
 
   describe('isRadarData', () => {

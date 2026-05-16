@@ -42,7 +42,9 @@ export function resolveLineOptions(
     legend: isSpark
       ? { show: false }
       : buildLegend(seriesNames, options),
-    grid: isSpark ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false } : buildGrid(options),
+    grid: isSpark
+      ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
+      : buildGrid(options, { names: seriesNames }),
     xAxis: isSpark
       ? [{ show: false, type: isTime ? 'time' : 'category', data: isTime ? undefined : data.categories, boundaryGap: false }]
       : buildXAxis(data, options, isTime),
@@ -133,7 +135,7 @@ function resolveLineRaceOptions(
   // value-digit flips don't jitter the plot area.
   // Skip entirely when end labels are hidden — there's nothing to make
   // room for.
-  const grid = buildGrid(options);
+  const grid = buildGrid(options, { names: seriesNames });
   if (options.grid?.right === undefined && showValueLabel) {
     const labels = data.series.map((s) =>
       formatRaceLineLabel(s.name, s.data[s.data.length - 1] as number | null | undefined),
@@ -221,7 +223,9 @@ export function resolveAreaOptions(
     legend: isSpark
       ? { show: false }
       : buildLegend(seriesNames, options),
-    grid: isSpark ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false } : buildGrid(options),
+    grid: isSpark
+      ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
+      : buildGrid(options, { names: seriesNames }),
     xAxis: isSpark
       ? [{ show: false, type: isTime ? 'time' : 'category', data: isTime ? undefined : data.categories, boundaryGap: false }]
       : buildXAxis(data, options, isTime),

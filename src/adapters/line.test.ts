@@ -49,6 +49,24 @@ describe('line adapter', () => {
       expect(option.animationDurationUpdate).toBeUndefined();
       expect(option.animationEasingUpdate).toBeUndefined();
     });
+
+    it('threads legend.formatLabel into the resolved legend', () => {
+      // Append the last value next to each series name — closure captures
+      // the data shape so the formatter stays a pure (name) => string fn.
+      const lastByName = new Map(
+        defaultFrame.series.map((s) => [s.name, s.data[s.data.length - 1]]),
+      );
+      const { option } = resolveLineOptions(defaultFrame, {
+        legend: {
+          formatLabel: (name) => `${name}: ${lastByName.get(name)}`,
+        },
+      });
+      const legend = option.legend as Record<string, unknown>;
+      const formatter = legend.formatter as (n: string) => string;
+      expect(typeof formatter).toBe('function');
+      const expectedFirst = `${defaultFrame.series[0].name}: ${lastByName.get(defaultFrame.series[0].name)}`;
+      expect(formatter(defaultFrame.series[0].name)).toBe(expectedFirst);
+    });
   });
 
   describe('race variant', () => {

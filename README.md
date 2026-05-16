@@ -714,6 +714,17 @@ Each chart type has its own options interface that extends the base `ChartOption
 > series are present. Pass `legend: { type: 'plain' }` to opt back into
 > native ECharts wrapping; you'll then need to bump `padding` (or move the
 > legend to a side edge) so wrapped rows don't overlap the plot area.
+>
+> Customize each entry's text via `legend.formatLabel: (name, index) => string`.
+> Maps to ECharts' native `legend.formatter` and is the typed entry point
+> for "show more info next to each entry" use cases — appending values,
+> units, status, or rich-text segments. Returns plain strings or ECharts
+> rich-text (`{key|text}`); paired with `echarts.legend.textStyle.rich`
+> when you want multi-style labels. Side-edge legends (`position: 'left'`
+> / `'right'`) automatically re-measure with the formatted text so long
+> values don't bleed into the chart body. See the **Custom Legend**
+> page in the demo site for runnable examples across line / bar / pie /
+> radar / network.
 
 ### `XYChartOptions` (shared by line / bar / area, extends `ChartOptions`)
 
@@ -817,6 +828,7 @@ Each chart type has its own options interface that extends the base `ChartOption
     show?: boolean;
     position?: 'top' | 'bottom' | 'left' | 'right';
     type?: 'scroll' | 'plain';        // default: 'scroll' (paginates instead of wrapping)
+    formatLabel?: (name: string, index: number) => string; // customize legend entry text
   };
 }
 ```
@@ -862,6 +874,7 @@ No chord-specific knobs today; reuses every field on the base `ChartOptions`.
     show?: boolean;
     position?: 'top' | 'bottom' | 'left' | 'right';
     type?: 'scroll' | 'plain';        // default: 'scroll' (paginates instead of wrapping)
+    formatLabel?: (name: string, index: number) => string; // customize legend entry text
   };
 }
 ```
@@ -907,6 +920,7 @@ No chord-specific knobs today; reuses every field on the base `ChartOptions`.
     show?: boolean;                // default: true iff data has categories
     position?: 'top' | 'bottom' | 'left' | 'right';
     type?: 'scroll' | 'plain';
+    formatLabel?: (name: string, index: number) => string; // customize category text
   };
 }
 ```

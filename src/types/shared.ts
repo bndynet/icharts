@@ -19,9 +19,85 @@ export interface TitleOptions {
   padding?: number;
 }
 
+/**
+ * Rich-text style object passed through to ECharts `*.rich.<key>`.
+ *
+ * Exposes common style keys as typed fields while keeping an index signature
+ * so callers can use additional ECharts rich-text properties without waiting
+ * for a library type update.
+ */
+export interface RichTextStyle {
+  color?: string;
+  fontStyle?: 'normal' | 'italic' | 'oblique';
+  fontWeight?: string | number;
+  fontFamily?: string;
+  fontSize?: number;
+  lineHeight?: number;
+  width?: number;
+  height?: number;
+  align?: 'left' | 'center' | 'right';
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+  padding?: number | number[];
+  backgroundColor?: string | Record<string, unknown>;
+  borderColor?: string;
+  borderWidth?: number;
+  borderRadius?: number | number[];
+  shadowColor?: string;
+  shadowBlur?: number;
+  shadowOffsetX?: number;
+  shadowOffsetY?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * One rich-text fragment. `text` is required; style is optional.
+ *
+ * - `style: string` references a key in `RichTextSpec.styles`.
+ * - `style: RichTextStyle` inlines the style for this segment.
+ * - `width` / `align` / `verticalAlign` are shorthand for the same rich style
+ *   fields and merge on top of `style`.
+ */
+export interface RichTextSegment {
+  text: string;
+  style?: string | RichTextStyle;
+  width?: number;
+  align?: 'left' | 'center' | 'right';
+  verticalAlign?: 'top' | 'middle' | 'bottom';
+}
+
+/**
+ * Structured rich-text payload that the library compiles into ECharts'
+ * `{key|text}` formatter string plus matching `rich` style map.
+ */
+export interface RichTextSpec {
+  segments: RichTextSegment[];
+  styles?: Record<string, RichTextStyle>;
+}
+
+/** Formatter input accepted by rich-text aware formatters. */
+export type RichTextInput = string | RichTextSpec;
+
 export interface LegendOptions {
   show?: boolean;
   position?: 'top' | 'bottom' | 'left' | 'right';
+  /**
+   * Legend layout height in pixels.
+   *
+   * - `position: 'top' | 'bottom'`: used as the legend slot reserve height
+   *   (fallback: `LEGEND_RESERVE`).
+   * - `position: 'left' | 'right'`: forwarded to ECharts but reserve width is
+   *   still controlled by `width` (or text measurement when `width` is unset).
+   */
+  height?: number;
+  /**
+   * Legend layout width in pixels.
+   *
+   * - `position: 'left' | 'right'`: used as the legend slot reserve width
+   *   (fallback: measured widest label + non-text budget).
+   * - `position: 'top' | 'bottom'`: forwarded to ECharts; reserve height is
+   *   still controlled by `height` (or `LEGEND_RESERVE` when unset).
+   */
+  width?: number;
   /**
    * How the legend behaves when the entries don't fit on a single row/column.
    *
@@ -35,6 +111,39 @@ export interface LegendOptions {
    *   land on top of the plot area.
    */
   type?: 'scroll' | 'plain';
+  /**
+   * Customize the text rendered for each legend entry.
+   *
+   * Receives the **series / slice / node / category name** (the same string
+   * the library passes as `legend.data[i]`) plus its zero-based index and
+   * returns the display label. Accepts plain strings OR a structured
+   * {@link RichTextSpec}; the latter is auto-compiled to ECharts rich text
+   * (`{key|text}` + `legend.textStyle.rich`) by `buildLegend`.
+   *
+   * Common use cases:
+   *  - append realtime values, units, or status to each entry, e.g.
+   *    `(n) => `${n}  ${valueByName[n] ?? '—'}` `
+   *  - localize / truncate long names
+   *  - return {@link RichTextSpec} segments so callers can align columns /
+   *    widths without hand-authoring rich-text keys
+   *  - inject raw ECharts rich-text segments (`{key|text}`) manually when
+   *    paired with `options.echarts.legend.textStyle.rich`
+   *
+   * Constraints:
+   *  - Text-only (string or `RichTextSpec`) — no DOM / HTML. Legend text is
+   *    rendered on canvas in ECharts; HTML belongs in `tooltip.customHtml`.
+   *  - Newlines (`\n`) in the returned string DO render, but the layout
+   *    reserve helpers (`getLegendReserve` / `buildGrid`) assume a single
+   *    legend row (LEGEND_RESERVE = 36 px). Multi-line labels will overlap
+   *    the chart body — increase `padding` or move the legend to a side
+   *    edge in that case.
+   *  - Side-edge legends (`position: 'left' | 'right'`) automatically
+   *    re-measure with the **formatted** label width so long values don't
+   *    bleed into the chart body.
+   *  - When `formatLabel` throws, the entry falls back to the raw name
+   *    (so a single bad lookup can't blank out the entire legend).
+   */
+  formatLabel?: (name: string, index: number) => RichTextInput;
 }
 
 export interface GridOptions {

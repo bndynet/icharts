@@ -48,7 +48,7 @@ export function resolveBarOptions(
     legend: enableColorByCategory ? { show: false } : baseLegend,
     grid: isSpark
       ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
-      : buildGrid(options, { legendShow: legendVisible }),
+      : buildGrid(options, { legendShow: legendVisible, names: seriesNames }),
     tooltip: isSpark
       ? buildSparkTooltip(options, ctx)
       : buildTooltip(options, 'axis', 'shadow', isTime, ctx),
@@ -145,7 +145,13 @@ function resolveBarRaceOptions(
   // high-water mark (`ctx.maxRaceGridRight`) keep the reserve monotonic
   // across frames so digit flips don't jitter the plot area.
   // Skip entirely when labels are hidden — there's nothing to make room for.
-  const grid = buildGrid(options, { legendShow: legendVisible });
+  //
+  // Race shows a single series; the legend (if shown) renders that one
+  // entry. Forward the name so a side-edge legend gets a width-based slot.
+  const grid = buildGrid(options, {
+    legendShow: legendVisible,
+    names: seriesName ? [seriesName] : undefined,
+  });
   if (options.grid?.right === undefined && showValueLabel) {
     grid.right = resolveRaceLabelHeadroom(
       firstSeries.data.map(formatRaceBarLabel),

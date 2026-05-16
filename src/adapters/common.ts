@@ -3,6 +3,10 @@ import type {
   XYChartOptions,
   TitleOptions,
   LegendOptions,
+  RichTextInput,
+  RichTextSpec,
+  RichTextSegment,
+  RichTextStyle,
   GridOptions,
   AxisOptions,
   XYData,
@@ -100,6 +104,12 @@ function getChartPadding(options: ChartOptions): number {
   return options.padding ?? CHART_DEFAULT_PADDING;
 }
 
+function getPositiveLegendSize(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : undefined;
+}
+
 export function getCommonDefaults(): Record<string, unknown> {
   return {
     textStyle: {
@@ -171,9 +181,17 @@ export function buildLegend(
   const show = legend.show ?? true;
   const position = legend.position ?? 'bottom';
   const p = getChartPadding(options);
+  // Title + top-legend would both anchor at `top: p` and visually
+  // overlap (the legend lands ON the title text). Shift the top-position
+  // legend below the title widget so the stack reads title → legend →
+  // chart body. Side/bottom legends are unaffected because they don't
+  // share the title's top-edge anchor. `getTitleHeight` returns 0 when
+  // no title is set, so the legend keeps its old `top: p` anchor for
+  // title-less charts.
+  const titleHeight = getTitleHeight(options);
 
   const positionMap: Record<string, Record<string, unknown>> = {
-    top: { top: p, left: 'center', orient: 'horizontal' },
+    top: { top: p + titleHeight, left: 'center', orient: 'horizontal' },
     bottom: { bottom: p, left: 'center', orient: 'horizontal' },
     left: { top: 'center', left: p, orient: 'vertical' },
     right: { top: 'center', right: p, orient: 'vertical' },
@@ -187,7 +205,7 @@ export function buildLegend(
   // wrapped rows would land on top of the chart body. Users who want
   // wrapping can opt back in via `options.legend.type = 'plain'` (and
   // are then responsible for adjusting `padding` accordingly).
-  return {
+  const out: Record<string, unknown> = {
     show,
     type: legend.type ?? 'scroll',
     data: names,
@@ -198,11 +216,217 @@ export function buildLegend(
     pageIconSize: 12,
     ...positionMap[position],
   };
+  const legendHeight = getPositiveLegendSize(legend.height);
+  if (legendHeight !== undefined) out.height = legendHeight;
+  const legendWidth = getPositiveLegendSize(legend.width);
+  if (legendWidth !== undefined) out.width = legendWidth;
+
+  // Wire `legend.formatLabel` into ECharts' native `legend.formatter`.
+  // Two reasons for the safe-wrap:
+  //   1. A buggy formatter shouldn't blank out the entire legend with
+  //      `[object Object]` / `undefined` — falling back to the raw name
+  //      degrades gracefully (the swatch + name still render).
+  //   2. ECharts re-invokes `formatter` on every legend hover / resize, so
+  //      a throwing formatter would also spam the console.
+  // We only emit `formatter` when the user actually provided one — keeping
+  // the field undefined preserves the `options.echarts.legend.formatter`
+  // passthrough as a separate, last-deepMerge escape hatch.
+  if (legend.formatLabel) {
+    const fn = legend.formatLabel;
+    const indexOf = new Map(names.map((n, i) => [n, i]));
+    const compiledByIndex = names.map((name, i) =>
+      safeFormatLegendLabel(fn, name, i, `legend_${i}`),
+    );
+    const rich = mergeCompiledRichStyles(compiledByIndex);
+    if (Object.keys(rich).length > 0) {
+      out.textStyle = { rich };
+    }
+    out.formatter = (name: string): string => {
+      const i = indexOf.get(name);
+      if (i === undefined) {
+        return safeFormatLegendLabel(fn, name, 0, 'legend_fallback').text;
+      }
+      return compiledByIndex[i].text;
+    };
+  }
+
+  return out;
+}
+
+export interface CompiledRichText {
+  text: string;
+  plainText: string;
+  rich?: Record<string, RichTextStyle>;
+  measuredWidthPx?: number;
+}
+
+function isRichTextSpec(value: unknown): value is RichTextSpec {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('segments' in value)) return false;
+  return Array.isArray((value as { segments?: unknown }).segments);
+}
+
+function normalizeSegmentStyle(
+  segment: RichTextSegment,
+  styles?: Record<string, RichTextStyle>,
+): RichTextStyle | undefined {
+  const referenced =
+    typeof segment.style === 'string' ? styles?.[segment.style] : undefined;
+  const inline =
+    typeof segment.style === 'object' && segment.style !== null
+      ? segment.style
+      : undefined;
+
+  const out: RichTextStyle = {
+    ...(referenced ?? {}),
+    ...(inline ?? {}),
+  };
+  if (segment.width !== undefined) out.width = segment.width;
+  if (segment.align !== undefined) out.align = segment.align;
+  if (segment.verticalAlign !== undefined) out.verticalAlign = segment.verticalAlign;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function measureRichSpecWidth(spec: RichTextSpec): number {
+  const lineWidths = [0];
+  for (const segment of spec.segments) {
+    const style = normalizeSegmentStyle(segment, spec.styles);
+    const fixed =
+      typeof style?.width === 'number' && Number.isFinite(style.width)
+        ? style.width
+        : undefined;
+    const lines = segment.text.split('\n');
+    lines.forEach((line, lineIndex) => {
+      const lineWidth =
+        fixed ?? measureMaxTextWidth([line], DEFAULT_LABEL_FONT);
+      if (lineIndex === 0) {
+        lineWidths[lineWidths.length - 1] += lineWidth;
+      } else {
+        lineWidths.push(lineWidth);
+      }
+    });
+  }
+  return Math.ceil(Math.max(...lineWidths, 0));
+}
+
+export function compileRichText(
+  input: RichTextInput,
+  keyPrefix: string,
+): CompiledRichText {
+  if (typeof input === 'string') {
+    return {
+      text: input,
+      plainText: stripRichTextMarkup(input),
+    };
+  }
+
+  if (!isRichTextSpec(input) || input.segments.length === 0) {
+    return { text: '', plainText: '' };
+  }
+
+  const rich: Record<string, RichTextStyle> = {};
+  const tokens: string[] = [];
+  const plain: string[] = [];
+  input.segments.forEach((segment, segmentIndex) => {
+    const style = normalizeSegmentStyle(segment, input.styles);
+    plain.push(segment.text);
+    if (!style) {
+      tokens.push(segment.text);
+      return;
+    }
+    const key = `__ich_${keyPrefix}_${segmentIndex}`;
+    rich[key] = style;
+    tokens.push(`{${key}|${segment.text}}`);
+  });
+
+  return {
+    text: tokens.join(''),
+    plainText: plain.join(''),
+    rich: Object.keys(rich).length > 0 ? rich : undefined,
+    measuredWidthPx: measureRichSpecWidth(input),
+  };
+}
+
+function mergeCompiledRichStyles(
+  labels: ReadonlyArray<CompiledRichText>,
+): Record<string, RichTextStyle> {
+  const out: Record<string, RichTextStyle> = {};
+  for (const label of labels) {
+    if (!label.rich) continue;
+    Object.assign(out, label.rich);
+  }
+  return out;
+}
+
+/**
+ * Invoke a user-supplied `LegendOptions.formatLabel`, swallowing thrown
+ * errors and invalid returns. Returns the raw `name` on any failure
+ * so a bad formatter degrades to "legend looks like the default" rather
+ * than "legend renders garbage".
+ *
+ * Module-scoped so {@link buildLegend} and {@link getLegendReserve} (which
+ * also needs to evaluate the formatter — to measure formatted label width
+ * for side legends) reach for the same defensive wrapper.
+ */
+function safeFormatLegendLabel(
+  formatLabel: (name: string, index: number) => RichTextInput,
+  name: string,
+  index: number,
+  keyPrefix: string,
+): CompiledRichText {
+  try {
+    const out = formatLabel(name, index);
+    if (typeof out === 'string' || isRichTextSpec(out)) {
+      return compileRichText(out, keyPrefix);
+    }
+    return compileRichText(name, keyPrefix);
+  } catch {
+    return compileRichText(name, keyPrefix);
+  }
+}
+
+/**
+ * Approximate the rendered (visible) width of an ECharts legend label
+ * after stripping rich-text markup. Returns the input unchanged when no
+ * `{key|...}` segments are present — `measureMaxTextWidth` then sees the
+ * same string ECharts will paint.
+ *
+ * Side legends size their slot via `measureTextWidth`. Without this
+ * strip, a rich-text label like `{n|Pro}{v|  $1,200}` would be measured
+ * including the literal style keys (`{n|` / `}` etc.) and overshoot —
+ * widening the legend slot far beyond what's actually drawn.
+ */
+function stripRichTextMarkup(label: string): string {
+  if (!label.includes('{') || !label.includes('|')) return label;
+  return label.replace(/\{[^|{}]+\|/g, '').replace(/\}/g, '');
+}
+
+function measureCompiledLabelWidth(label: CompiledRichText): number {
+  if (label.measuredWidthPx !== undefined) return label.measuredWidthPx;
+  return measureMaxTextWidth(label.plainText.split('\n'), DEFAULT_LABEL_FONT);
 }
 
 export interface BuildGridOverrides {
   /** When the adapter hides the legend (e.g. bar `colorByCategory`), pass `false` so grid padding matches. */
   legendShow?: boolean;
+  /**
+   * Series names that will appear in the legend.
+   *
+   * Required for accurate **side-edge** reserves: when `legend.position` is
+   * `'left'` or `'right'`, the legend slot must fit the widest label —
+   * otherwise the plot area extends underneath the legend column. Without
+   * this, the grid path falls back to the bare 36 px row-height floor
+   * (correct for top / bottom, far too narrow for side legends), which
+   * was visibly broken once `legend.formatLabel` started widening labels
+   * with appended values.
+   *
+   * Pass the same `names` you hand to {@link buildLegend} so the
+   * formatter (if any) is evaluated against the same list.
+   *
+   * Top / bottom legends ignore this field — their slot is a fixed row
+   * height regardless of label width.
+   */
+  names?: ReadonlyArray<string>;
 }
 
 export function buildGrid(
@@ -210,16 +434,20 @@ export function buildGrid(
   overrides?: BuildGridOverrides,
 ): Record<string, unknown> {
   const grid: GridOptions = options.grid ?? {};
-  const legendArea = getLegendGridAdjustment(options, overrides?.legendShow);
-  // Route through getTitleReserve so the grid path and body-centered
-  // adapters (radar / pie / gauge) ask the same question of the title
-  // widget. `.top` is the title widget height; `padding` is added here
-  // because grid edges are absolute pixels (see EdgeReserves docs).
-  const titleHeight = getTitleReserve(options).top;
+  // `getLegendGridAdjustment` now owns the full top-edge math (it
+  // composes title height + legend reserve), so the base only carries
+  // `padding` on every edge. The helper still emits one edge per active
+  // reserve; missing edges fall back to base `padding`, preserving the
+  // single-component cases (title-only, bottom-legend-only, etc.).
+  const legendArea = getLegendGridAdjustment(
+    options,
+    overrides?.legendShow,
+    overrides?.names,
+  );
   const p = getChartPadding(options);
   return deepMerge(
     {
-      top: p + titleHeight,
+      top: p,
       left: p,
       right: p,
       bottom: p,
@@ -254,6 +482,8 @@ export const LEGEND_RESERVE = 36;
  * closely enough that the body never lands underneath the labels.
  */
 const SIDE_LEGEND_NON_TEXT_PX = 30;
+/** Extra breathing room (px) between side legends and chart body. */
+const SIDE_LEGEND_BODY_GAP = 8;
 
 /**
  * Pixel reserves at each canvas edge. Empty edges are `0`.
@@ -333,7 +563,8 @@ export function getTitleReserve(options: ChartOptions): EdgeReserves {
  * @param names optional series names that will appear in the legend.
  *   When the legend is on `'left'` / `'right'`, the slot width is
  *   computed as `widestLabel + swatch/icon/gap` (≥ {@link LEGEND_RESERVE}),
- *   so vertical legends with long labels don't overlap the chart body.
+ *   then expanded by a small fixed body gap so side legends never sit flush
+ *   against the chart body.
  *   Omit for the XY grid path (where the legend defaults to the bottom
  *   edge and one row of height is the right reserve regardless of label
  *   width).
@@ -347,21 +578,45 @@ export function getLegendReserve(
   if (!showLegend) return { ...EMPTY_EDGES };
   const position = options.legend?.position ?? 'bottom';
   const isSide = position === 'left' || position === 'right';
+  const explicitHeight = getPositiveLegendSize(options.legend?.height);
+  const explicitWidth = getPositiveLegendSize(options.legend?.width);
 
   let slot: number;
-  if (isSide && names && names.length > 0) {
+  if (isSide && explicitWidth !== undefined) {
+    slot = explicitWidth + extraGap;
+  } else if (!isSide && explicitHeight !== undefined) {
+    slot = explicitHeight + extraGap;
+  } else if (isSide && names && names.length > 0) {
     // Vertical legend on a side edge — the slot must be at least as wide
     // as the widest label plus swatch / icon / chart-gap. Falling back to
     // a fixed 36 px (the row-height reserve for horizontal legends) lets
     // the legend land on top of the chart body in narrow cards, which is
     // exactly what bit us with the pie / doughnut `position: 'right'`
     // case before this helper became name-aware.
-    const widest = measureMaxTextWidth(names, DEFAULT_LABEL_FONT);
+    //
+    // When the user supplies `legend.formatLabel`, run each name through
+    // the (defensive) formatter first so the measured strings match what
+    // ECharts will actually paint — otherwise a label like
+    // `(n) => `${n}  ${value(n)}` ` would be under-measured by exactly
+    // the appended " 1,234,567" tail and bleed into the chart body.
+    // Rich-text markup is stripped before measurement so style segment
+    // keys (`{n|`, `}`) don't inflate the width past the visible glyphs.
+    const fn = options.legend?.formatLabel;
+    const widest = fn
+      ? Math.max(
+        ...names.map((n, i) =>
+          measureCompiledLabelWidth(
+            safeFormatLegendLabel(fn, n, i, `legend_reserve_${i}`),
+          )),
+        0,
+      )
+      : measureMaxTextWidth(names, DEFAULT_LABEL_FONT);
     slot =
       Math.max(LEGEND_RESERVE, Math.ceil(widest) + SIDE_LEGEND_NON_TEXT_PX) + extraGap;
   } else {
     slot = LEGEND_RESERVE + extraGap;
   }
+  if (isSide) slot += SIDE_LEGEND_BODY_GAP;
 
   switch (position) {
     case 'top':
@@ -511,16 +766,34 @@ export function computeStackedTextOffsets(
 function getLegendGridAdjustment(
   options: XYChartOptions,
   legendShow?: boolean,
+  names?: ReadonlyArray<string>,
 ): Record<string, unknown> {
   const show = legendShow ?? options.legend?.show ?? true;
-  const reserves = getLegendReserve(options, show);
+  // Forward `names` so side-edge legends (`position: 'left' | 'right'`)
+  // size their slot to fit the widest formatted label — without this the
+  // bare 36 px floor is far too narrow and the plot area lands underneath
+  // the legend column (the bug `legend.formatLabel` exposed for XY charts
+  // with right-side legends, e.g. bar with rich-text entries).
+  const reserves = getLegendReserve(options, show, 0, names);
   // Grid bottom/top etc. are absolute pixel coordinates from the
   // canvas edge, so the grid must pull back by `padding + reserve`
   // (the radar/pie path doesn't add `padding` because their percent
   // center math against the full canvas already absorbs it).
   const p = getChartPadding(options);
+  // Top edge composes the title widget height with the legend's top
+  // reserve so a chart with BOTH a title and a top-positioned legend
+  // clears the full stack: title → legend → chart body. Without this
+  // composition the `deepMerge` in `buildGrid` would let `legendArea.top`
+  // (`p + LEGEND_RESERVE`) silently replace the title-only `base.top`
+  // (`p + titleHeight`), dropping the title's reserve and letting the
+  // plot area slide up under the title (the visible overlap bug).
+  // When only one of the two is present the math degrades to either
+  // `p + titleHeight` (title-only) or `p + reserves.top` (legend-only),
+  // matching the previous behavior.
+  const titleTop = getTitleReserve(options).top;
   const out: Record<string, unknown> = {};
-  if (reserves.top > 0) out.top = p + reserves.top;
+  const topReserve = titleTop + reserves.top;
+  if (topReserve > 0) out.top = p + topReserve;
   if (reserves.bottom > 0) out.bottom = p + reserves.bottom;
   if (reserves.left > 0) out.left = p + reserves.left;
   if (reserves.right > 0) out.right = p + reserves.right;

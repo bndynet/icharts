@@ -491,6 +491,19 @@ describe('network adapter', () => {
       expect((on.legend as Record<string, unknown>).show).toBe(true);
     });
 
+    it('threads legend.formatLabel into the category legend formatter', () => {
+      const option = resolveNetworkOptions(sample, {
+        legend: {
+          formatLabel: (name) => `Cat: ${name}`,
+        },
+      });
+      const legend = option.legend as Record<string, unknown>;
+      const formatter = legend.formatter as (n: string) => string;
+      expect(typeof formatter).toBe('function');
+      expect(formatter('Team A')).toBe('Cat: Team A');
+      expect(formatter('Team B')).toBe('Cat: Team B');
+    });
+
     it('applies a category palette when categories exist', () => {
       const option = resolveNetworkOptions(sample, {
         colorMap: { 'Team A': '#aa0000', 'Team B': '#00aa00' },

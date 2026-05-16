@@ -38,6 +38,27 @@ describe('bar adapter', () => {
       expect(result.option).toBeDefined();
       expect(result.notMerge).toBeUndefined();
     });
+
+    it('threads legend.formatLabel into the resolved legend', () => {
+      const data: XYData = {
+        categories: ['Q1', 'Q2'],
+        series: [
+          { name: 'Sales', data: [10, 20] },
+          { name: 'Costs', data: [5, 8] },
+        ],
+      };
+      const { option } = resolveBarOptions(data, {
+        legend: {
+          show: true,
+          formatLabel: (n) => `${n}!`,
+        },
+      });
+      const legend = option.legend as Record<string, unknown>;
+      const formatter = legend.formatter as (n: string) => string;
+      expect(typeof formatter).toBe('function');
+      expect(formatter('Sales')).toBe('Sales!');
+      expect(formatter('Costs')).toBe('Costs!');
+    });
   });
 
   describe('bar sizing options', () => {

@@ -24,6 +24,7 @@ export {
   buildAxisTooltipContext,
   getTitleReserve,
   getLegendReserve,
+  compileRichText,
   getLabelFontSize,
   DEFAULT_LABEL_FONT_SIZE,
   LEGEND_RESERVE,
@@ -31,6 +32,7 @@ export {
   STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
   STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
   type EdgeReserves,
+  type CompiledRichText,
   type StackedTextOffsetsOptions,
   type StackedTextOffsets,
 } from './adapters/common.js';
@@ -84,6 +86,10 @@ export {
   // Shared option building blocks
   type SeriesOptions,
   type LegendOptions,
+  type RichTextInput,
+  type RichTextSpec,
+  type RichTextSegment,
+  type RichTextStyle,
   type GridOptions,
   type AxisOptions,
   type TooltipOptions,
