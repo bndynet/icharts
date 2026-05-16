@@ -33,6 +33,9 @@ export interface RichTextStyle {
   fontFamily?: string;
   fontSize?: number;
   lineHeight?: number;
+  overflow?: 'none' | 'truncate' | 'break' | 'breakAll';
+  lineOverflow?: 'truncate';
+  ellipsis?: string;
   width?: number;
   height?: number;
   align?: 'left' | 'center' | 'right';

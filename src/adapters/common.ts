@@ -284,7 +284,56 @@ function normalizeSegmentStyle(
   if (segment.width !== undefined) out.width = segment.width;
   if (segment.align !== undefined) out.align = segment.align;
   if (segment.verticalAlign !== undefined) out.verticalAlign = segment.verticalAlign;
-  return Object.keys(out).length > 0 ? out : undefined;
+  if (Object.keys(out).length === 0) return undefined;
+
+  // Rich-text labels in legends are usually width-constrained columns. Default
+  // to truncation so long names don't spill into neighboring columns unless
+  // the caller explicitly opts into wrapping/breaking behavior.
+  if (out.overflow === undefined) out.overflow = 'truncate';
+  if (out.ellipsis === undefined) out.ellipsis = '…';
+  return out;
+}
+
+function truncateLineToWidth(
+  line: string,
+  widthPx: number,
+  ellipsis: string,
+): string {
+  if (widthPx <= 0) return '';
+  if (measureMaxTextWidth([line], DEFAULT_LABEL_FONT) <= widthPx) return line;
+
+  let suffix = ellipsis;
+  if (suffix && measureMaxTextWidth([suffix], DEFAULT_LABEL_FONT) > widthPx) {
+    suffix = '';
+  }
+  const target = widthPx - measureMaxTextWidth([suffix], DEFAULT_LABEL_FONT);
+  if (target <= 0) return suffix;
+
+  let lo = 0;
+  let hi = line.length;
+  let best = '';
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const candidate = line.slice(0, mid);
+    if (measureMaxTextWidth([candidate], DEFAULT_LABEL_FONT) <= target) {
+      best = candidate;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return `${best}${suffix}`;
+}
+
+function applySegmentOverflowDefaults(text: string, style?: RichTextStyle): string {
+  if (!style) return text;
+  if (style.overflow !== 'truncate') return text;
+  if (typeof style.width !== 'number' || !Number.isFinite(style.width)) return text;
+  const ellipsis = typeof style.ellipsis === 'string' ? style.ellipsis : '…';
+  return text
+    .split('\n')
+    .map((line) => truncateLineToWidth(line, style.width as number, ellipsis))
+    .join('\n');
 }
 
 function measureRichSpecWidth(spec: RichTextSpec): number {
@@ -329,14 +378,15 @@ export function compileRichText(
   const plain: string[] = [];
   input.segments.forEach((segment, segmentIndex) => {
     const style = normalizeSegmentStyle(segment, input.styles);
-    plain.push(segment.text);
+    const text = applySegmentOverflowDefaults(segment.text, style);
+    plain.push(text);
     if (!style) {
-      tokens.push(segment.text);
+      tokens.push(text);
       return;
     }
     const key = `__ich_${keyPrefix}_${segmentIndex}`;
     rich[key] = style;
-    tokens.push(`{${key}|${segment.text}}`);
+    tokens.push(`{${key}|${text}}`);
   });
 
   return {

@@ -363,7 +363,52 @@ describe('compileRichText', () => {
     expect(compiled.text).toContain('{__ich_test_1|53 (65.2%)}');
     expect(compiled.rich?.__ich_test_0?.width).toBe(120);
     expect(compiled.rich?.__ich_test_1?.align).toBe('right');
+    expect(compiled.rich?.__ich_test_0?.overflow).toBe('truncate');
+    expect(compiled.rich?.__ich_test_0?.ellipsis).toBe('…');
     expect(compiled.measuredWidthPx).toBeGreaterThanOrEqual(208);
+  });
+
+  it('preserves explicit overflow/ellipsis from segment style', () => {
+    const compiled = compileRichText(
+      {
+        segments: [
+          {
+            text: 'Wrapped Label',
+            style: { width: 120, overflow: 'break', ellipsis: '~~' },
+          },
+        ],
+      },
+      'explicit',
+    );
+    expect(compiled.rich?.__ich_explicit_0?.overflow).toBe('break');
+    expect(compiled.rich?.__ich_explicit_0?.ellipsis).toBe('~~');
+  });
+
+  it('truncates width-constrained segments with default overflow behavior', () => {
+    const compiled = compileRichText(
+      {
+        segments: [{ text: 'SuperLongLegendLabel', width: 40 }],
+      },
+      'truncate_default',
+    );
+    expect(compiled.text).toContain('{__ich_truncate_default_0|');
+    expect(compiled.text).not.toContain('SuperLongLegendLabel');
+    expect(compiled.text).toContain('…}');
+  });
+
+  it('does not truncate when overflow is explicitly non-truncate', () => {
+    const compiled = compileRichText(
+      {
+        segments: [
+          {
+            text: 'SuperLongLegendLabel',
+            style: { width: 40, overflow: 'break' },
+          },
+        ],
+      },
+      'no_truncate',
+    );
+    expect(compiled.text).toContain('{__ich_no_truncate_0|SuperLongLegendLabel}');
   });
 });
 
