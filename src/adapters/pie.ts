@@ -11,6 +11,7 @@ import {
   type EdgeReserves,
   buildTitle,
   buildLegend,
+  getLabelFontSize,
   getLegendReserve,
   getTitleReserve,
   resolveAppendToBody,
@@ -442,6 +443,7 @@ function buildPieSeries(
       show: showSliceLabel,
       position: 'outside',
       formatter: '{b}: {d}%',
+      fontSize: getLabelFontSize(options),
     },
   };
 

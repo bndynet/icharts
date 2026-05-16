@@ -9,6 +9,7 @@ import {
   buildXAxis,
   buildTooltip,
   buildSparkTooltip,
+  getLabelFontSize,
   isTimeCategories,
 } from './common.js';
 import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './series-utils.js';
@@ -163,6 +164,10 @@ function resolveBarRaceOptions(
       show: showValueLabel,
       position: 'right',
       valueAnimation: true,
+      // `ChartOptions.labelFontSize` — race value label is canvas-
+      // rendered text, so it must follow the same global knob as the
+      // non-race `showLabel` path below.
+      fontSize: getLabelFontSize(options),
     },
     itemStyle: { borderRadius: [0, 4, 4, 0] },
   };
@@ -262,6 +267,7 @@ function buildBarSeries(
       series.label = {
         show: true,
         position: so.labelPosition ?? 'outside',
+        fontSize: getLabelFontSize(options),
       };
     }
 

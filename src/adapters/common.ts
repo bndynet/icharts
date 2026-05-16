@@ -23,7 +23,11 @@ import type { RenderContext } from './index.js';
 type WithLegend = ChartOptions & { legend?: LegendOptions };
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { deepMerge } from '../utils.js';
-import { DEFAULT_LABEL_FONT, measureMaxTextWidth } from './text-measure.js';
+import {
+  DEFAULT_LABEL_FONT,
+  DEFAULT_LABEL_FONT_SIZE,
+  measureMaxTextWidth,
+} from './text-measure.js';
 
 // ---------------------------------------------------------------------------
 // Default font stack
@@ -38,6 +42,47 @@ const FONT_FAMILY =
 // ---------------------------------------------------------------------------
 
 const CHART_DEFAULT_PADDING = 12;
+
+/**
+ * Re-exported from `text-measure.ts` (the deepest primitive — defining
+ * the constant there avoids a circular import, since `common.ts` already
+ * imports `measureMaxTextWidth` / `DEFAULT_LABEL_FONT` from it). The
+ * canonical adapter-facing entry stays in `common.ts` so adapters import
+ * the layout-shared helpers from one place.
+ *
+ * Single source of truth for "what does an unset label look like" —
+ * consumed by:
+ *
+ *   - {@link getLabelFontSize} (adapter-side override entry point — reads
+ *     `options.labelFontSize` first, falls back to this constant).
+ *   - `src/themes/echarts-theme.ts` (theme-side fallback baked into each
+ *     `<seriesType>.label.fontSize`, so an adapter that forgets to emit
+ *     a label fontSize still renders at this size).
+ *   - `src/adapters/text-measure.ts` `DEFAULT_LABEL_FONT` (canvas
+ *     measureText font string — `${DEFAULT_LABEL_FONT_SIZE}px sans-serif`).
+ *
+ * The two-sided contract for label fontSize is documented in AGENTS.md
+ * "Layout rule #6"; in short: theme + this constant give every chart a
+ * uniform 12 px baseline, and adapters always emit
+ * `fontSize: getLabelFontSize(options)` so that
+ * `ChartOptions.labelFontSize` actually takes effect at the series level.
+ */
+export { DEFAULT_LABEL_FONT_SIZE } from './text-measure.js';
+
+/**
+ * Resolve the effective label fontSize for an adapter:
+ *
+ *   `options.labelFontSize ?? DEFAULT_LABEL_FONT_SIZE`
+ *
+ * The single entry point adapters should call when emitting any
+ * `series.label.fontSize` / `series.edgeLabel.fontSize` / similar
+ * canvas-rendered text size. Keeps the per-adapter fallback logic out
+ * of the resolve functions so a future "themed default fontSize" stays
+ * a one-file change.
+ */
+export function getLabelFontSize(options: ChartOptions): number {
+  return options.labelFontSize ?? DEFAULT_LABEL_FONT_SIZE;
+}
 
 /**
  * Treat NaN/undefined as "not set" for axis min/max. ECharts accepts numbers,

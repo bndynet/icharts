@@ -622,6 +622,28 @@ Each chart type has its own options interface that extends the base `ChartOption
   colors?: string[];                 // override color palette
   colorMap?: Record<string, string>; // pin series/node names to specific colors
 
+  /**
+   * Global font size (px) for data labels and edge labels across every
+   * chart type that renders them.
+   *
+   * Applies to:
+   *   - line / bar / area `series.label` (when `showLabel: true`) +
+   *     line-race tracking labels (`endLabel`) + bar-race value labels
+   *   - pie slice labels
+   *   - sankey / chord / tree node labels (parent + leaf for tree)
+   *   - network node `series.label` and `series.edgeLabel` (when
+   *     `showLinkLabel: true`)
+   *
+   * Does NOT apply to:
+   *   - gauge `title` / `detail` inner text (container auto-sized by
+   *     the `percentage` variant)
+   *   - radar `axisName` (indicator names, not data labels)
+   *   - `markPoint.label`
+   *
+   * Default: 12.
+   */
+  labelFontSize?: number;
+
   // Tooltip
   tooltip?: {
     enabled?: boolean;

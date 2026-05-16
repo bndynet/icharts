@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { XYData } from '../types.js';
 import { resolveBarOptions } from './bar.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
 
 const racers = ['USA', 'China', 'India', 'Brazil', 'Japan'];
 
@@ -421,6 +422,52 @@ describe('bar adapter', () => {
         expect(color[0]).toBe('#3c3b6e');
         expect(color[1]).toBe('#de2910');
       });
+    });
+  });
+
+  describe('labelFontSize propagation', () => {
+    // Two paths emit a `series.label`: `showLabel: true` on a non-race
+    // bar, and the always-on race value label. The global knob must
+    // drive both; if either branch falls back to ECharts' built-in 12 px
+    // default, users who shrink/enlarge labels see inconsistent sizing
+    // across variants.
+
+    it('non-race series.label.fontSize defaults to DEFAULT_LABEL_FONT_SIZE when showLabel: true', () => {
+      const { option } = resolveBarOptions(singleSeriesData, {
+        series: { '*': { showLabel: true } },
+      });
+      const series = (option.series as Record<string, unknown>[])[0];
+      const label = series.label as Record<string, unknown>;
+      expect(label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+    });
+
+    it('non-race series.label.fontSize honors ChartOptions.labelFontSize', () => {
+      const { option } = resolveBarOptions(singleSeriesData, {
+        labelFontSize: 18,
+        series: { '*': { showLabel: true } },
+      });
+      const series = (option.series as Record<string, unknown>[])[0];
+      const label = series.label as Record<string, unknown>;
+      expect(label.fontSize).toBe(18);
+    });
+
+    it('race series.label.fontSize defaults to DEFAULT_LABEL_FONT_SIZE', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+      });
+      const series = (option.series as Record<string, unknown>[])[0];
+      const label = series.label as Record<string, unknown>;
+      expect(label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+    });
+
+    it('race series.label.fontSize honors ChartOptions.labelFontSize', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+        labelFontSize: 20,
+      });
+      const series = (option.series as Record<string, unknown>[])[0];
+      const label = series.label as Record<string, unknown>;
+      expect(label.fontSize).toBe(20);
     });
   });
 });

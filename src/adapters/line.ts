@@ -9,6 +9,7 @@ import {
   buildYAxis,
   buildTooltip,
   buildSparkTooltip,
+  getLabelFontSize,
   isTimeCategories,
 } from './common.js';
 import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './race-utils.js';
@@ -158,6 +159,7 @@ function resolveLineRaceOptions(
     }
   }
 
+  const labelFontSize = getLabelFontSize(options);
   const series = buildLineSeries(data, options, isTime, false);
   for (const s of series) {
     s.showSymbol = false;
@@ -165,6 +167,10 @@ function resolveLineRaceOptions(
       s.endLabel = {
         show: true,
         valueAnimation: true,
+        // `ChartOptions.labelFontSize` — line-race tracking labels are
+        // canvas-rendered text, same contract as the non-race `showLabel`
+        // path inside `buildLineSeries` below.
+        fontSize: labelFontSize,
         formatter: (params: { seriesName?: string; value?: unknown }) => {
           const raw = params.value;
           const v = Array.isArray(raw) ? raw[raw.length - 1] : raw;
@@ -317,6 +323,7 @@ function buildLineSeries(
       series.label = {
         show: true,
         position: so.labelPosition ?? 'top',
+        fontSize: getLabelFontSize(options),
       };
     }
 

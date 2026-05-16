@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { PieData, PieChartOptions, PieVariant } from '../types.js';
 import { isPieData } from '../types.js';
 import { resolvePieOptions, __test } from './pie.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
 
 const { computeEdgeReserves, computePieLayout } = __test;
 
@@ -453,6 +454,18 @@ describe('pie adapter', () => {
 
     it('rejects gauge-shaped data', () => {
       expect(isPieData({ value: 42, max: 100 } as unknown as PieData)).toBe(false);
+    });
+  });
+
+  describe('labelFontSize propagation', () => {
+    it('series.label.fontSize defaults to DEFAULT_LABEL_FONT_SIZE', () => {
+      const result = resolvePieOptions(sample, {});
+      expect(labelOf(result).fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+    });
+
+    it('series.label.fontSize honors ChartOptions.labelFontSize', () => {
+      const result = resolvePieOptions(sample, { labelFontSize: 18 });
+      expect(labelOf(result).fontSize).toBe(18);
     });
   });
 });

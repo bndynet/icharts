@@ -21,8 +21,52 @@
  * values so the two paths stay interchangeable.
  */
 
-/** ECharts default for label-style text — see notes on consumer constants. */
-export const DEFAULT_LABEL_FONT = '12px sans-serif';
+/**
+ * Default font size (px) for canvas-rendered data labels and edge labels
+ * across every chart type. Defined here (and re-exported from
+ * `common.ts`) because {@link DEFAULT_LABEL_FONT} below derives from it
+ * at module init time — defining it in `common.ts` would force a
+ * `text-measure` ⇄ `common` circular import that breaks the TDZ check
+ * on this very `const`. See `common.ts` for the canonical adapter-facing
+ * entry (`DEFAULT_LABEL_FONT_SIZE` re-export + `getLabelFontSize` helper).
+ *
+ * Single source of truth — touched by:
+ *   - {@link DEFAULT_LABEL_FONT} (canvas measureText font string).
+ *   - `common.getLabelFontSize(options)` (adapter-side override).
+ *   - `src/themes/echarts-theme.ts` (theme-side fallback on each
+ *     `<seriesType>.label.fontSize`).
+ *
+ * AGENTS.md "Layout rule #6" documents the two-sided contract.
+ */
+export const DEFAULT_LABEL_FONT_SIZE = 12;
+
+/**
+ * ECharts default for label-style text. Derived from
+ * {@link DEFAULT_LABEL_FONT_SIZE} so a future tweak to the global label
+ * size flows through the canvas measureText path automatically — keeps
+ * the measure-vs-render contract (used by tree / network / race
+ * headroom) accurate without two places to change.
+ */
+export const DEFAULT_LABEL_FONT = `${DEFAULT_LABEL_FONT_SIZE}px sans-serif`;
+
+/**
+ * Build a CSS shorthand font string at an arbitrary size, matching the
+ * style {@link DEFAULT_LABEL_FONT} encodes. Used by adapters that allow
+ * the user to override the label fontSize (`options.labelFontSize`) and
+ * still need a matching font string for canvas `measureText` — e.g. the
+ * tree adapter measures its longest leaf name before mounting so the
+ * label can't overflow the body, and that measurement must use the same
+ * size ECharts will actually render.
+ *
+ * The font family stays bare `sans-serif` because (1) ECharts'
+ * built-in label style is the same, and (2) the underlying user-agent
+ * font fallback chain is what canvas `measureText` evaluates against
+ * the host browser anyway — adding the project's own font stack here
+ * would diverge from what ECharts actually paints.
+ */
+export function buildLabelFont(fontSize: number): string {
+  return `${fontSize}px sans-serif`;
+}
 
 /** Rough px-per-char fallback at 12px sans-serif (no canvas available). */
 const FALLBACK_CHAR_PX = 7;

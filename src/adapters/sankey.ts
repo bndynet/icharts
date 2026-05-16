@@ -5,6 +5,7 @@ import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
 import {
   buildTitle,
+  getLabelFontSize,
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
@@ -63,7 +64,7 @@ export function resolveSankeyOptions(
     right: p,
     label: {
       position: orient === 'vertical' ? 'inside' : 'right',
-      fontSize: 12,
+      fontSize: getLabelFontSize(options),
     },
     lineStyle: {
       color: 'gradient',

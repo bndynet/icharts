@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildEChartsTheme } from './echarts-theme.js';
 import type { ChartThemeColors } from './types.js';
+import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/text-measure.js';
 
 /**
  * Locks in the contract that adapters rely on: every chart family's
@@ -118,6 +119,82 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.radar.axisLine.lineStyle.color).toBe(COLORS.axisLine);
     expect(theme.radar.splitLine.lineStyle.color).toBe(COLORS.gridLine);
+  });
+
+  // ---------------------------------------------------------------------
+  // Label fontSize fallbacks
+  //
+  // Every `<seriesType>.label.fontSize` (and `<seriesType>.edgeLabel.fontSize`)
+  // ships the canonical `DEFAULT_LABEL_FONT_SIZE` so an adapter that
+  // forgets to emit `fontSize` still renders at the project-canonical
+  // 12 px rather than ECharts' built-in per-series-type default. This is
+  // the *fallback* layer of the two-sided contract — adapter overrides
+  // (driven by `ChartOptions.labelFontSize` via `getLabelFontSize(...)`)
+  // win at the series level. See `echarts-theme.ts` docblock + AGENTS.md
+  // "Layout rule #6".
+  // ---------------------------------------------------------------------
+
+  it('bar.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.bar.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('line.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.line.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('line.endLabel.fontSize falls back to DEFAULT_LABEL_FONT_SIZE (covers race tracking labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.line.endLabel.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('pie.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.pie.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('graph.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE (network node labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.graph.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('graph.edgeLabel.fontSize falls back to DEFAULT_LABEL_FONT_SIZE (network link labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.graph.edgeLabel.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('sankey.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.sankey.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('chord.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.chord.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('tree.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.tree.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('every themed label.fontSize entry agrees on DEFAULT_LABEL_FONT_SIZE (lockstep regression)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    const sizes = [
+      theme.bar.label.fontSize,
+      theme.line.label.fontSize,
+      theme.line.endLabel.fontSize,
+      theme.pie.label.fontSize,
+      theme.graph.label.fontSize,
+      theme.graph.edgeLabel.fontSize,
+      theme.sankey.label.fontSize,
+      theme.chord.label.fontSize,
+      theme.tree.label.fontSize,
+    ];
+    for (const size of sizes) {
+      expect(size).toBe(DEFAULT_LABEL_FONT_SIZE);
+    }
   });
 
   it('radar grid lines stay in lockstep with XY axis grid lines (shared tokens)', () => {

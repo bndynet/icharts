@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { NetworkData } from '../types.js';
 import { isNetworkData } from '../types.js';
 import { resolveNetworkOptions } from './network.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
 
 const sample: NetworkData = {
   nodes: [
@@ -937,6 +938,56 @@ describe('network adapter', () => {
       expect(isNetworkData(null as unknown as NetworkData)).toBe(false);
       expect(isNetworkData(undefined as unknown as NetworkData)).toBe(false);
       expect(isNetworkData('graph' as unknown as NetworkData)).toBe(false);
+    });
+  });
+
+  describe('labelFontSize propagation', () => {
+    // Network is the only built-in chart with BOTH `series.label` and
+    // `series.edgeLabel`. Both must follow the same global knob — the
+    // previous adapter emitted 12 / 11 (a 1 px hint) but a global
+    // override should land them on the same size by user request
+    // (see plan: "data-plus-edge, same value").
+
+    it('series.label.fontSize defaults to DEFAULT_LABEL_FONT_SIZE', () => {
+      const option = resolveNetworkOptions(sample, {});
+      const s = getSeries(option);
+      const label = s.label as Record<string, unknown>;
+      expect(label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+    });
+
+    it('series.label.fontSize honors ChartOptions.labelFontSize', () => {
+      const option = resolveNetworkOptions(sample, { labelFontSize: 18 });
+      const s = getSeries(option);
+      const label = s.label as Record<string, unknown>;
+      expect(label.fontSize).toBe(18);
+    });
+
+    it('series.edgeLabel.fontSize defaults to DEFAULT_LABEL_FONT_SIZE when showLinkLabel: true', () => {
+      const option = resolveNetworkOptions(sample, { showLinkLabel: true });
+      const s = getSeries(option);
+      const edgeLabel = s.edgeLabel as Record<string, unknown>;
+      expect(edgeLabel.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+    });
+
+    it('series.edgeLabel.fontSize honors ChartOptions.labelFontSize when showLinkLabel: true', () => {
+      const option = resolveNetworkOptions(sample, {
+        showLinkLabel: true,
+        labelFontSize: 18,
+      });
+      const s = getSeries(option);
+      const edgeLabel = s.edgeLabel as Record<string, unknown>;
+      expect(edgeLabel.fontSize).toBe(18);
+    });
+
+    it('node label and edgeLabel land on the same fontSize (no 1 px split anymore)', () => {
+      const option = resolveNetworkOptions(sample, {
+        showLinkLabel: true,
+        labelFontSize: 20,
+      });
+      const s = getSeries(option);
+      const label = s.label as Record<string, unknown>;
+      const edgeLabel = s.edgeLabel as Record<string, unknown>;
+      expect(label.fontSize).toBe(edgeLabel.fontSize);
     });
   });
 });

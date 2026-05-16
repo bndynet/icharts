@@ -43,6 +43,27 @@ export interface ChartOptions {
   colors?: string[];
   colorMap?: Record<string, string>;
 
+  /**
+   * Global font size (px) for data labels and edge labels across every
+   * chart type that renders them.
+   *
+   * **Applies to:**
+   * - line / bar / area `series.label` (when `showLabel: true`) and
+   *   line-race `endLabel`
+   * - pie slice labels
+   * - sankey / chord / tree node labels (parent + leaf for tree)
+   * - network node `series.label` and `series.edgeLabel`
+   *
+   * **Does NOT apply to:**
+   * - gauge `title` / `detail` inner text (container-auto-sized by the
+   *   gauge `percentage` variant)
+   * - radar `axisName` (indicator labels, not data labels)
+   * - `markPoint.label`
+   *
+   * Default: 12.
+   */
+  labelFontSize?: number;
+
   tooltip?: TooltipOptions;
 
   /** Raw ECharts options merged last — escape hatch for advanced users */

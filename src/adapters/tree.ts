@@ -10,11 +10,12 @@ import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
   buildTitle,
+  getLabelFontSize,
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
 } from './common.js';
-import { DEFAULT_LABEL_FONT, measureMaxTextWidth } from './text-measure.js';
+import { buildLabelFont, measureMaxTextWidth } from './text-measure.js';
 
 /**
  * Default node marker diameter (px). Matches the ECharts `tree-basic`
@@ -53,30 +54,19 @@ const TREE_LABEL_MAX_RESERVE_PX = 200;
 const TREE_LABEL_MIN_RESERVE_PX = 40;
 
 /**
- * Approximate line height (px) for the default 12 px sans-serif label
- * font. Used to derive the *perpendicular-axis* reserve in vertical
- * layouts (TB/BT): rotated -90° labels are a thin vertical strip whose
+ * Approximate line-height ratio for the default sans-serif label font.
+ * Used to derive the *perpendicular-axis* reserve in vertical layouts
+ * (TB/BT): rotated -90° labels are a thin vertical strip whose
  * horizontal extent equals one line-height, anchored on the node's
- * x-position — so half this value (+ gap) per side is plenty.
- */
-const TREE_LABEL_LINE_HEIGHT_PX = 18;
-
-/**
- * Pixel size emitted on every label this adapter writes (parent + leaf).
+ * x-position — so `fontSize * ratio / 2 + gap` per side is plenty.
  *
- * **Must stay in lockstep with the size baked into
- * {@link DEFAULT_LABEL_FONT} (`'12px sans-serif'`).** The text-measure
- * helpers use that font string to predict how wide each label will
- * render, and the reserve math (root/leaf slots, perp slot) feeds those
- * widths back into `series.top / bottom / left / right`. If the
- * rendered size drifts from the measured size, label clipping silently
- * comes back: measure says "this fits in 80 px" but ECharts renders at
- * 16 px and overflows. The library doesn't have a single global "label
- * font" knob today (each adapter ships its own constant — see network /
- * chord / sankey for the same `12`); centralising those across
- * adapters is a separate refactor.
+ * Multiplying by the effective `labelFontSize` (rather than baking in a
+ * fixed 18 px) keeps the perp slot proportional when the user overrides
+ * `ChartOptions.labelFontSize` — e.g. raising the global label size to
+ * 18 px would otherwise leave vertical-layout side reserves too tight,
+ * letting the leftmost / rightmost rotated labels kiss the canvas edge.
  */
-const TREE_LABEL_FONT_SIZE_PX = 12;
+const TREE_LABEL_LINE_HEIGHT_RATIO = 1.5;
 
 /**
  * Per-direction layout metadata. Two label-rendering regimes:
@@ -335,6 +325,15 @@ export function resolveTreeOptions(
 
   const showLabel = options.showNodeLabel ?? true;
 
+  // Effective label fontSize for this chart instance — drives both the
+  // canvas measureText calls below AND the `series.label.fontSize` /
+  // `series.leaves.label.fontSize` emitted further down. Keeping them
+  // in lockstep is the measure-vs-render contract: if `measure` uses
+  // 12 px but ECharts renders at 18 px, the reserved label slot under-
+  // estimates and the rightmost / leafmost names clip.
+  const labelFontSize = getLabelFontSize(options);
+  const labelFont = buildLabelFont(labelFontSize);
+
   // Per-axis edge reserves so labels at the root edge AND the leaf edge
   // both stay inside the canvas. Two failure modes the previous (leaf-only)
   // version hit:
@@ -351,10 +350,10 @@ export function resolveTreeOptions(
   // a tree often has very different name lengths between them.
   const { leafNames, parentNames } = splitNodeNames(data);
   const widestLeafPx = showLabel
-    ? measureMaxTextWidth(leafNames, DEFAULT_LABEL_FONT)
+    ? measureMaxTextWidth(leafNames, labelFont)
     : 0;
   const widestParentPx = showLabel
-    ? measureMaxTextWidth(parentNames, DEFAULT_LABEL_FONT)
+    ? measureMaxTextWidth(parentNames, labelFont)
     : 0;
 
   // Slot per edge, in the active layout's terms:
@@ -390,7 +389,8 @@ export function resolveTreeOptions(
     rootSlot = clampLabelReserve(widestParentPx);
     leafSlot = clampLabelReserve(widestLeafPx);
     perpSlot = showLabel
-      ? Math.ceil(TREE_LABEL_LINE_HEIGHT_PX / 2) + TREE_LABEL_GAP_PX
+      ? Math.ceil((labelFontSize * TREE_LABEL_LINE_HEIGHT_RATIO) / 2) +
+        TREE_LABEL_GAP_PX
       : 0;
   }
 
@@ -431,11 +431,13 @@ export function resolveTreeOptions(
       // for LR/RL (horizontal text). Mirrors ECharts' own tree-vertical
       // / tree-orient-bottom-top reference examples.
       rotate: layout.labelRotate,
-      // Single source of truth for the rendered font size — keeps the
-      // measure-vs-render contract intact (see `TREE_LABEL_FONT_SIZE_PX`
-      // docblock above). Same value gets stamped onto `leaves.label`
-      // below so parent and leaf labels always agree.
-      fontSize: TREE_LABEL_FONT_SIZE_PX,
+      // Single source of truth for the rendered font size — resolved
+      // once at the top of this function via `getLabelFontSize(options)`
+      // and threaded through both the canvas measureText calls (which
+      // size the per-edge label reserves) AND `leaves.label.fontSize`
+      // below. Diverging the two would silently re-introduce the
+      // original label-clipping bug.
+      fontSize: labelFontSize,
       // No `color` here on purpose — theme owns canvas text color.
       // See AGENTS.md "Layout rule #6" + `tree.label.color` entry in
       // `src/themes/echarts-theme.ts`.
@@ -446,12 +448,10 @@ export function resolveTreeOptions(
         align: layout.leafAlign,
         verticalAlign: 'middle',
         rotate: layout.labelRotate,
-        // Mirror parent label fontSize so the per-leaf measurement
-        // (`measureMaxTextWidth(leafNames, DEFAULT_LABEL_FONT)`) and
-        // the rendered width stay in lockstep — otherwise ECharts'
-        // built-in default could drift away from the measured size and
-        // re-introduce the original label-clipping bug.
-        fontSize: TREE_LABEL_FONT_SIZE_PX,
+        // Mirror parent label fontSize — both the parent and leaf
+        // measurements above used `labelFont` (the same `buildLabelFont
+        // (labelFontSize)` string), so the rendered size MUST match.
+        fontSize: labelFontSize,
       },
     },
     emphasis: { focus: 'descendant' },

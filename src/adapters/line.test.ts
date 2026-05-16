@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { XYData } from '../types.js';
 import { resolveLineOptions } from './line.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
 
 const racers = ['China', 'India', 'USA', 'Nigeria', 'Pakistan'];
 
@@ -376,5 +377,48 @@ describe('AxisOptions min/max propagation', () => {
     const yAxis = option.yAxis as Record<string, unknown>[];
     expect(yAxis[0].min).toBe('dataMin');
     expect(yAxis[0].max).toBe('dataMax');
+  });
+});
+
+describe('line adapter — labelFontSize propagation', () => {
+  // Two label surfaces here: non-race `showLabel: true` and the
+  // line-race `endLabel` tracking label. Both must follow the global
+  // knob — drift between them would surface as inconsistent sizes
+  // when a user enables race mode after styling labels on a static chart.
+
+  it('non-race series.label.fontSize defaults to DEFAULT_LABEL_FONT_SIZE when showLabel: true', () => {
+    const { option } = resolveLineOptions(defaultFrame, {
+      series: { '*': { showLabel: true } },
+    });
+    const series = (option.series as Record<string, unknown>[])[0];
+    const label = series.label as Record<string, unknown>;
+    expect(label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('non-race series.label.fontSize honors ChartOptions.labelFontSize', () => {
+    const { option } = resolveLineOptions(defaultFrame, {
+      labelFontSize: 18,
+      series: { '*': { showLabel: true } },
+    });
+    const series = (option.series as Record<string, unknown>[])[0];
+    const label = series.label as Record<string, unknown>;
+    expect(label.fontSize).toBe(18);
+  });
+
+  it('race endLabel.fontSize defaults to DEFAULT_LABEL_FONT_SIZE', () => {
+    const { option } = resolveLineOptions(smallFrame, { variant: 'race' });
+    const series = (option.series as Record<string, unknown>[])[0];
+    const endLabel = series.endLabel as Record<string, unknown>;
+    expect(endLabel.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('race endLabel.fontSize honors ChartOptions.labelFontSize', () => {
+    const { option } = resolveLineOptions(smallFrame, {
+      variant: 'race',
+      labelFontSize: 20,
+    });
+    const series = (option.series as Record<string, unknown>[])[0];
+    const endLabel = series.endLabel as Record<string, unknown>;
+    expect(endLabel.fontSize).toBe(20);
   });
 });

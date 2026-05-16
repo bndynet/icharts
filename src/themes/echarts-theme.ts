@@ -1,4 +1,5 @@
 import type { ChartThemeColors } from './types.js';
+import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/text-measure.js';
 
 /**
  * Build a full ECharts theme object from `ChartThemeColors` and a series palette.
@@ -31,6 +32,21 @@ import type { ChartThemeColors } from './types.js';
  * `<seriesType>.<field>.color` entry here AND a regression test below in
  * `echarts-theme.test.ts` — leaving the theme side unwired silently breaks
  * dark-theme rendering for that chart.
+ *
+ * Note on label fontSize (different contract from color): every relevant
+ * `<seriesType>.label.fontSize` / `<seriesType>.edgeLabel.fontSize` below
+ * is wired to {@link DEFAULT_LABEL_FONT_SIZE} as a *fallback*. Unlike
+ * color (which is owned entirely by the theme), fontSize is also emitted
+ * by adapters via `getLabelFontSize(options)` so that
+ * `ChartOptions.labelFontSize` actually takes effect at the series level.
+ * ECharts series-level merge wins over series-type defaults, so:
+ *   - user sets `labelFontSize: 18` → adapter emits 18 → theme's 12 is
+ *     overridden, every chart renders at 18 px.
+ *   - user sets nothing → adapter emits the same `DEFAULT_LABEL_FONT_SIZE`
+ *     (12) → identical to the theme default; the theme entry is the
+ *     belt-and-suspenders guarantee that even an adapter which forgets
+ *     to emit `fontSize` still ends up at the canonical 12 px (rather
+ *     than ECharts' built-in default for the series type).
  */
 export function buildEChartsTheme(
   colors: ChartThemeColors,
@@ -76,9 +92,11 @@ export function buildEChartsTheme(
       // Data labels (`showLabel: true`) and race endLabels — both render
       // against the chart canvas, so they need the on-background text
       // color, not whatever ECharts' built-in default happens to be (which
-      // is unreadable on dark themes).
-      label:    { color: colors.textPrimary },
-      endLabel: { color: colors.textPrimary },
+      // is unreadable on dark themes). `fontSize` is the
+      // `DEFAULT_LABEL_FONT_SIZE` fallback; adapter overrides with
+      // `options.labelFontSize` via series-level merge.
+      label:    { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
+      endLabel: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
     },
 
     bar: {
@@ -86,11 +104,11 @@ export function buildEChartsTheme(
       // Data labels (`showLabel: true`) and race value labels
       // (`position: 'right'` + `valueAnimation`). Same rationale as line —
       // labels live on the canvas and must follow the theme.
-      label: { color: colors.textPrimary },
+      label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
     },
 
     pie: {
-      label:     { color: colors.textPrimary },
+      label:     { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
       itemStyle: { borderWidth: 1, borderColor: colors.surface },
     },
 
@@ -135,14 +153,14 @@ export function buildEChartsTheme(
     // shade) would be unreadable on dark themes. Mirror the pie/bar/line
     // contract: theme owns the text color, adapters stay theme-agnostic.
     graph: {
-      label:     { color: colors.textPrimary }, // network node labels
-      edgeLabel: { color: colors.textPrimary }, // network link labels (when showLinkLabel)
+      label:     { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // network node labels
+      edgeLabel: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // network link labels (when showLinkLabel)
     },
     sankey: {
-      label: { color: colors.textPrimary }, // sankey node labels
+      label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // sankey node labels
     },
     chord: {
-      label: { color: colors.textPrimary }, // chord node labels (outside the ring)
+      label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // chord node labels (outside the ring)
     },
     tree: {
       // Tree node labels render on the canvas next to each node marker.
@@ -151,7 +169,7 @@ export function buildEChartsTheme(
       // `series.label` / `series.leaves.label` *without* a `color` key
       // so this theme entry can repaint every label in lockstep when
       // the user switches themes.
-      label: { color: colors.textPrimary },
+      label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
       // Connector lines (the curved branches between parent and child)
       // reuse the structural `axisLine` token so the tree's frame
       // agrees with axis spines on dark themes — without this they

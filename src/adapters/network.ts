@@ -12,6 +12,7 @@ import { deepMerge, resolveColors, resolveColorsForNodes } from '../utils.js';
 import {
   buildLegend,
   buildTitle,
+  getLabelFontSize,
   getLegendReserve,
   getTitleReserve,
   resolveAppendToBody,
@@ -476,6 +477,12 @@ export function resolveNetworkOptions(
   // kicks in. Only consulted by the force branch; circular ignores it.
   const autoEdgeLength = resolveAutoEdgeLength(data.nodes.length, bodyWidth, bodyHeight);
 
+  // Global label fontSize — node labels and edge labels share the same
+  // size (the previous 12/11 split was a token visual hint that didn't
+  // survive `ChartOptions.labelFontSize` overrides cleanly; keeping them
+  // identical makes user intent — "make all labels bigger" — predictable).
+  const labelFontSize = getLabelFontSize(options);
+
   const series: Record<string, unknown> = {
     type: 'graph',
     ...buildLayoutBlock(variant, options, autoEdgeLength),
@@ -491,12 +498,12 @@ export function resolveNetworkOptions(
     label: {
       show: options.showNodeLabel ?? true,
       position: 'right',
-      fontSize: 12,
+      fontSize: labelFontSize,
     },
     edgeLabel: options.showLinkLabel
       ? {
           show: true,
-          fontSize: 11,
+          fontSize: labelFontSize,
           formatter: (p2: { value?: unknown }) =>
             p2.value === undefined ? '' : String(p2.value),
         }

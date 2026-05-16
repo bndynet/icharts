@@ -212,6 +212,14 @@ Both reserve helpers return the same `EdgeReserves` shape so adapters that need 
  - `chord.label.color` → `textPrimary` (chord node labels around the ring)
 
  ECharts deep-merges these series-type defaults into each series, so adapters can keep emitting `label: { show, position, valueAnimation, formatter }` (no `color` key) and a single `chart.setTheme(...)` call repaints every label across every chart type. If a future feature needs a different label color (e.g. a warning highlight), thread it through the theme — don't hardcode it in the adapter. See `src/themes/echarts-theme.test.ts` for the regression test that locks this contract, and the **3.6 Theme integration for canvas text** checklist below for what to add when shipping a new chart type.
+
+ **Label fontSize follows a DIFFERENT contract from color.** Color is theme-only (adapters MUST NOT emit it). FontSize is *both* theme-fallback AND adapter-emitted, with `ChartOptions.labelFontSize` as the user override. The theme registers `<seriesType>.label.fontSize: DEFAULT_LABEL_FONT_SIZE` (12) as a fallback so any adapter that forgets to emit a size still renders at the canonical 12 px. Adapters that emit a `series.label` / `series.edgeLabel` MUST also emit `fontSize: getLabelFontSize(options)` so the user's `labelFontSize` actually takes effect at the series level — without this, the theme default wins and the global knob is silently ignored.
+
+ - **Resolver layer** — `getLabelFontSize(options)` (exported from `src/adapters/common.ts`, re-exporting `DEFAULT_LABEL_FONT_SIZE` from `src/adapters/text-measure.ts` so the constant stays in one place). Returns `options.labelFontSize ?? DEFAULT_LABEL_FONT_SIZE` — the single entry point.
+ - **Adapter side**: every `series.label` / `series.edgeLabel` / `series.endLabel` / `series.leaves.label` MUST include `fontSize: getLabelFontSize(options)`. Tree additionally feeds the same value through `buildLabelFont(labelFontSize)` into `measureMaxTextWidth(...)` so its measure-vs-render contract (canvas measureText vs rendered glyph extent) stays accurate when the user scales labels.
+ - **Theme side**: every series type listed above whose label is affected by `labelFontSize` MUST also ship a `<seriesType>.label.fontSize: DEFAULT_LABEL_FONT_SIZE` entry in `src/themes/echarts-theme.ts`, with a regression test in `src/themes/echarts-theme.test.ts`.
+ - **Scope**: `labelFontSize` deliberately applies to data labels + network edge labels only. Gauge `title`/`detail` are container-auto-sized (the `percentage` variant derives them from `ref = min(containerWidth, containerHeight)`), `radar.axisName` is an indicator label (not a data label), and `markPoint.label` is not currently themed for fontSize — these three intentionally ignore the global knob.
+
 7. **Reserves are padding-free.** Neither helper adds chart `padding`; callers add it where their coordinate system needs it (the XY grid path adds `padding + reserve`; the percent-center path lets `padding` cancel symmetrically). See [docs/LAYOUT.md §4.3](docs/LAYOUT.md).
 
 ### Public surface for `registerAdapter()` users
@@ -224,6 +232,8 @@ import {
  buildLegend,
  getTitleReserve,
  getLegendReserve,
+ getLabelFontSize,
+ DEFAULT_LABEL_FONT_SIZE,
  LEGEND_RESERVE,
  computeStackedTextOffsets,
  type EdgeReserves,
@@ -294,7 +304,7 @@ Checklist:
 - [ ] Define `XxxChartOptions extends ChartOptions` (or `extends XYChartOptions` for XY-family). Put every chart-specific knob (including the narrowed `variant?: XxxVariant`) on the subtype.
 - [ ] Add the new `XxxChartOptions` to the `AnyChartOptions` union in `src/types/instance.ts` so callers can pass a chart-specific literal to `createChart` without an explicit cast.
 - [ ] Add the new file to `src/types/index.ts`'s re-export list.
-- [ ] Do **NOT** add chart-specific fields to base `ChartOptions`. Base `ChartOptions` is reserved for truly cross-cutting concerns: `theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`. Note: `grid` lives on `XYChartOptions` only, and `legend` lives on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions` — gauge/sankey/chord do not render either.
+- [ ] Do **NOT** add chart-specific fields to base `ChartOptions`. Base `ChartOptions` is reserved for truly cross-cutting concerns: `theme`, `title`, `padding`, `colors`, `colorMap`, `labelFontSize`, `tooltip`, `echarts`. Note: `grid` lives on `XYChartOptions` only, and `legend` lives on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions` — gauge/sankey/chord do not render either.
 
 ### 2. Adapter module (`src/adapters/<type>.ts`)
 
@@ -388,6 +398,11 @@ Any text your adapter renders on the chart canvas (data labels, node labels, axi
  - `colors.surface` / `colors.axisLine` / `colors.gridLine` — structural strokes/fills (borders, splitLines, axisLines).
 - [ ] In `src/themes/echarts-theme.test.ts`, add a regression test asserting your new surface follows the chosen token AND extend the existing "changing textPrimary changes every label color in lockstep" test to cover your new surface.
 - [ ] Update the enumeration in **Layout rule #6** above so the doc and the theme stay in sync.
+- [ ] **Label fontSize** (different contract — adapter-emitted, theme-fallback). If the field is a data label or edge label that should follow `ChartOptions.labelFontSize`:
+ - Emit `fontSize: getLabelFontSize(options)` on the adapter side (alongside `show` / `position` / etc.). Import from `./common.js`.
+ - Add `fontSize: DEFAULT_LABEL_FONT_SIZE` next to the `color` entry in `echarts-theme.ts` as the fallback.
+ - Add a regression test in `echarts-theme.test.ts` asserting the new surface falls back to `DEFAULT_LABEL_FONT_SIZE`, plus an adapter-test assertion that `resolveXxxOptions(data, { labelFontSize: 18 })` produces `series.label.fontSize === 18`.
+ - **Exemptions**: gauge inner text (container-auto-sized), `radar.axisName` (indicator name, not data), `markPoint.label`. If your new chart fits one of those categories, skip the fontSize bullets above.
 
 **Why this matters.** ECharts ships built-in defaults for every `<seriesType>.label` that ignore our `ChartThemeColors` tokens. Any series type without a theme override silently falls back to ECharts' default — typically a near-black color that becomes unreadable on dark themes. The contract is two-sided: adapter must NOT set `color` (so a theme switch can repaint), AND theme must populate the surface (so there's something to repaint to). Skipping either side breaks dark-theme rendering for that chart and won't fail any existing adapter test, because adapter snapshots only assert the structural fields the adapter emits — they don't notice that `color` is missing.
 
@@ -454,7 +469,7 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Re-introduce a central `applyChartColors` / `core.ts` color post-processing step — adapters now own color assembly end-to-end.
 - Redeclare `LEGEND_RESERVE` (or any layout magic number) inside an adapter, or hand-author `title: { ... }` / `legend: { ... }` literals. Import `LEGEND_RESERVE` / `getTitleReserve` / `getLegendReserve` / `buildTitle` / `buildLegend` from `src/adapters/common.ts` — see [docs/LAYOUT.md](docs/LAYOUT.md) and the **Layout pipeline** section above.
 - Reach for `getTitleHeight`. It is module-private inside `src/adapters/common.ts` and intentionally not exported. Use `getTitleReserve(options).top` for title geometry — that's the only canonical entry point and keeps title and legend reserves on the same `EdgeReserves` shape.
-- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
+- Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `labelFontSize`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
 - Wrap a chart's own general options inside a sub-object/named type when they could be flat. `BarChartOptions.barWidth` / `colorByCategory` / `PieChartOptions.sliceBorderRadius` live directly on the subtype — no `bar?: BarOptions` or `slice?: PieSliceOptions` wrappers. Reserve sub-objects (`race?: BarRaceOptions`, …) for **variant-bound or scoped sub-features** only.
 - Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { TreeData } from '../types.js';
 import { isTreeData } from '../types.js';
 import { resolveTreeOptions } from './tree.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
 
 const sample: TreeData = {
   name: 'root',
@@ -476,22 +477,36 @@ describe('tree adapter', () => {
       expect('color' in leafLabel).toBe(false);
     });
 
-    it('parent and leaf labels share the same fontSize as DEFAULT_LABEL_FONT (measure-vs-render contract)', () => {
-      // If parent and leaf fontSizes drift from the size baked into
-      // `DEFAULT_LABEL_FONT` ('12px sans-serif'), the canvas
-      // measurement that drives the root/leaf reserve becomes a
-      // prediction of a different label than the one ECharts renders —
-      // which re-introduces the original "labels go outside the canvas"
-      // bug. Lock both values to 12 so a future change has to update
-      // both the constant and this test in the same commit.
+    it('parent and leaf labels default to DEFAULT_LABEL_FONT_SIZE (measure-vs-render contract)', () => {
+      // If parent and leaf fontSizes drift from the size used to
+      // build the canvas measureText font string, the measured label
+      // width predicts a different glyph extent than ECharts actually
+      // renders — re-introducing the original "labels go outside the
+      // canvas" bug. Lock both values to the project-canonical default
+      // so a future change has to update the constant and this test
+      // in the same commit.
       const s = getSeries(resolveTreeOptions(sample, {}));
       const label = s.label as Record<string, unknown>;
       const leafLabel = (s.leaves as Record<string, unknown>).label as Record<
         string,
         unknown
       >;
-      expect(label.fontSize).toBe(12);
-      expect(leafLabel.fontSize).toBe(12);
+      expect(label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+      expect(leafLabel.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+    });
+
+    it('parent and leaf labels propagate ChartOptions.labelFontSize in lockstep', () => {
+      // The global knob must move BOTH the parent and leaf fontSize
+      // together — otherwise the measure-vs-render contract above
+      // silently breaks when a user sizes labels up.
+      const s = getSeries(resolveTreeOptions(sample, { labelFontSize: 18 }));
+      const label = s.label as Record<string, unknown>;
+      const leafLabel = (s.leaves as Record<string, unknown>).label as Record<
+        string,
+        unknown
+      >;
+      expect(label.fontSize).toBe(18);
+      expect(leafLabel.fontSize).toBe(18);
     });
   });
 

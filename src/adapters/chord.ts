@@ -3,7 +3,12 @@ import type { ChartSetupResult, RenderContext } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
-import { buildTitle, resolveAppendToBody, resolveTooltipPosition } from './common.js';
+import {
+  buildTitle,
+  getLabelFontSize,
+  resolveAppendToBody,
+  resolveTooltipPosition,
+} from './common.js';
 import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
 
 function chordTooltipSyncHtml(params: unknown, options: ChordChartOptions): string {
@@ -58,7 +63,7 @@ export function resolveChordOptions(
       show: true,
       position: 'outside',
       distance: 8,
-      fontSize: 12,
+      fontSize: getLabelFontSize(options),
     },
     emphasis: {
       focus: 'adjacency',

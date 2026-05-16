@@ -24,6 +24,8 @@ export {
   buildAxisTooltipContext,
   getTitleReserve,
   getLegendReserve,
+  getLabelFontSize,
+  DEFAULT_LABEL_FONT_SIZE,
   LEGEND_RESERVE,
   computeStackedTextOffsets,
   STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
