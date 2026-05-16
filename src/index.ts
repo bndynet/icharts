@@ -64,6 +64,9 @@ export {
   type NetworkData,
   type NetworkNode,
   type NetworkLink,
+  type TreeData,
+  type TreeNode,
+  type TreeDirection,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
   type XYChartOptions,
   type LineChartOptions,
@@ -75,6 +78,7 @@ export {
   type ChordChartOptions,
   type RadarChartOptions,
   type NetworkChartOptions,
+  type TreeChartOptions,
   // Shared option building blocks
   type SeriesOptions,
   type LegendOptions,
@@ -101,6 +105,7 @@ export {
   isChordData,
   isRadarData,
   isNetworkData,
+  isTreeData,
 } from './types.js';
 
 // Configuration

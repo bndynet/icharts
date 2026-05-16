@@ -91,6 +91,7 @@ chart.dispose();
 | Chord  | `chord`  | `default` |
 | Radar  | `radar`  | `default`, `circle` |
 | Network | `network` | `default`, `circular` |
+| Tree   | `tree`   | `default` (use `direction` for layout orientation) |
 
 ---
 
@@ -243,6 +244,52 @@ When `showAllLabels: false` (the default), the adapter combines two strategies:
 Setting `showAllLabels: true` bypasses **both** strategies in one shot — equivalent to "I want every label, accept the overlap and the noise".
 
 Independently, the `circular` variant reserves body-edge space for label overflow (akin to radar's `axisName` overflow). With `rotateLabel: true` ECharts renders each label tangent to the ring and the text extends *outward* radially past the ring radius — the worst-case overflow per edge equals the widest label's pixel width. The adapter measures the actual data via canvas `measureText` and reserves `max(node.name.length) + 8 px` on every side (capped at 200 px so a single freakishly long node name can't shrink the ring to a dot). This composes on top of the title + legend reserves, so circular labels never bleed into the title bar or legend slot regardless of which corner each node ends up at.
+
+### Tree — `TreeData`
+
+A single hierarchical root node — the simplest possible structure. Internal nodes carry `children`; leaves omit it. `value` is optional metadata surfaced in tooltips (the tree adapter does not size nodes by value).
+
+```ts
+{
+  name: 'flare',
+  children: [
+    {
+      name: 'analytics',
+      children: [
+        { name: 'cluster',  children: [{ name: 'AgglomerativeCluster' }] },
+        { name: 'graph',    children: [{ name: 'BetweennessCentrality' }] },
+      ],
+    },
+    {
+      name: 'data',
+      children: [{ name: 'DataField', value: 1759 }],
+    },
+  ],
+}
+```
+
+Each node accepts an optional `color` to pin it (and its marker) to a specific hue, and an optional `collapsed: true` to render that sub-tree closed (the user can click to expand). The `colorMap` option works by node name, exactly like every other chart type.
+
+**Direction.** The chart grows in one of four orientations, controlled by `options.direction`:
+
+| Direction       | ECharts `orient` | Root edge | Leaf edge |
+|----------------|------------------|-----------|-----------|
+| `'left-to-right'` (default) | `LR` | left   | right  |
+| `'right-to-left'`           | `RL` | right  | left   |
+| `'top-to-bottom'`           | `TB` | top    | bottom |
+| `'bottom-to-top'`           | `BT` | bottom | top    |
+
+The adapter automatically flips the node label `position` so labels always point *outward* (parents toward the root edge, leaves toward the opposite edge) and reserves a label-width strip on **both** the root and leaf edges of the active axis so neither end clips. For vertical layouts (`top-to-bottom`, `bottom-to-top`) labels are additionally rotated 90° so the reading direction tracks the tree's growth: `top-to-bottom` uses `rotate: -90` (text reads top-to-bottom alongside a downward-growing tree, matching ECharts' [`tree-vertical`](https://echarts.apache.org/examples/en/editor.html?c=tree-vertical) example); `bottom-to-top` uses `rotate: +90` (text reads bottom-to-top alongside an upward-growing tree). This keeps long node names from competing for horizontal space with their siblings while keeping every label legible in the direction of the tree. Override the rotation via `echarts: { series: [{ label: { rotate: 0 } }] }` if your dataset uses very short names.
+
+**Other knobs** (all optional): `nodeSize` (px, default 7), `roam` (mouse-wheel zoom + drag-to-pan, default `true`), `expandAndCollapse` (click an internal node to collapse / expand its subtree, default `true`), `initialTreeDepth` (start with this many levels visible, default `-1` = fully expanded — useful for large trees: pass `2` to render only the root + one level), `showNodeLabel` (default `true`).
+
+```ts
+createChart(el, 'tree', orgData, {
+  title: 'Org Chart',
+  direction: 'top-to-bottom',
+  initialTreeDepth: 2,
+});
+```
 
 ---
 

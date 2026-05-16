@@ -76,6 +76,16 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.chord.label.color).toBe(COLORS.textPrimary);
   });
 
+  it('tree.label.color follows textPrimary (tree node labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.tree.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('tree.lineStyle.color follows axisLine (connector branches stay visible on dark themes)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.tree.lineStyle.color).toBe(COLORS.axisLine);
+  });
+
   it('changing textPrimary changes every label color in lockstep', () => {
     const a = buildEChartsTheme({ ...COLORS, textPrimary: '#aaaaaa' }, PALETTE);
     const b = buildEChartsTheme({ ...COLORS, textPrimary: '#bbbbbb' }, PALETTE);
@@ -87,6 +97,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.graph.edgeLabel.color).toBe('#aaaaaa');
     expect(a.sankey.label.color).toBe('#aaaaaa');
     expect(a.chord.label.color).toBe('#aaaaaa');
+    expect(a.tree.label.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
     expect(b.line.endLabel.color).toBe('#bbbbbb');
@@ -95,6 +106,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(b.graph.edgeLabel.color).toBe('#bbbbbb');
     expect(b.sankey.label.color).toBe('#bbbbbb');
     expect(b.chord.label.color).toBe('#bbbbbb');
+    expect(b.tree.label.color).toBe('#bbbbbb');
   });
 
   it('radar.axisName.color follows textPrimary so indicator labels stay legible on dark themes', () => {

@@ -28,8 +28,16 @@
           </span>
         </div>
         <div class="dash-theme-block-row">
-          <span class="dash-theme-label">Dashboard theme</span>
-          <el-segmented v-model="activeTheme" :options="themeOptions" size="small" />
+          <span
+            class="dash-theme-label"
+            :class="{ 'is-highlighted': highlightThemePicker }"
+          >Dashboard theme</span>
+          <div
+            class="dash-theme-segmented"
+            :class="{ 'is-highlighted': highlightThemePicker }"
+          >
+            <el-segmented v-model="activeTheme" :options="themeOptions" size="small" />
+          </div>
         </div>
       </div>
     </header>
@@ -408,6 +416,13 @@ const themeOptions: DashThemeOption[] = [
 // dashboard palette once the user explicitly picks one.
 const activeTheme = ref<string>('');
 
+// Blink the "Dashboard theme" picker border on first paint so first-time
+// visitors notice the page-level palette switcher in the top-right. Flipped
+// on in `onMounted` and turned off as soon as the user picks a theme (via
+// the `watch(activeTheme)` handler below) — no timer, the hint stays until
+// it has done its job and then disappears the moment the user acts on it.
+const highlightThemePicker = ref(false);
+
 // Live snapshot of icharts' currently-active theme (name + palette), shown
 // above the segmented control. Refreshed manually after every event that can
 // change the global ColorHub state — local picks (`watch(activeTheme)`),
@@ -599,6 +614,8 @@ onMounted(() => {
     for (const c of charts) c.resize();
   };
   window.addEventListener('resize', resizeHandler);
+
+  highlightThemePicker.value = true;
 });
 
 // Re-apply the active dashboard theme whenever the user picks a different
@@ -623,6 +640,7 @@ onMounted(() => {
 // plus one rAF (for the browser to lay out the new CSS) before reading
 // `clientWidth`/`clientHeight`.
 watch(activeTheme, async (next) => {
+  highlightThemePicker.value = false;
   if (!next) return;
   const meta = themeOptions.find((o) => o.value === next);
   if (meta && siteTheme.value !== meta.colorMode) {
@@ -763,6 +781,59 @@ onUnmounted(() => {
   text-transform: uppercase;
   color: var(--el-text-color-secondary);
   font-weight: 600;
+  transition: color 0.35s ease;
+}
+/* Tight wrapper around `<el-segmented>` so the blink hint hugs the
+   actual button group (not the row) — `inline-flex` shrink-fits the
+   wrapper to the segmented's bounding box, and the matching
+   `border-radius` keeps the box-shadow ring visually flush with the
+   control's rounded corners. */
+.dash-theme-segmented {
+  display: inline-flex;
+  border-radius: 6px;
+}
+
+/* First-paint hint: blink a bright border around the theme segmented
+   control so users notice the page-level palette switcher. The blink
+   loops indefinitely (`infinite`) and is cancelled the moment the user
+   picks a theme — `watch(activeTheme)` flips `highlightThemePicker`
+   off, which removes the `.is-highlighted` class and stops the
+   animation. Implemented via `box-shadow` (with spread radius) rather
+   than `border` so it follows `border-radius` naturally and doesn't
+   shift surrounding layout. A second shadow layer adds a soft outer
+   glow so the blink stays visible on busy backgrounds (incl. the
+   sci-fi HUD). The accompanying label color also blinks in sync so
+   the "Dashboard theme" caption reinforces the call to action.
+   `--dash-hint-rgb` lets the scifi theme override the accent color
+   without duplicating the keyframes. */
+.dash-theme-segmented {
+  --dash-hint-rgb: 64, 158, 255;
+}
+.dash-theme-segmented.is-highlighted {
+  animation: dash-theme-border-blink 0.7s ease-in-out infinite;
+}
+.dash-theme-label.is-highlighted {
+  animation: dash-theme-label-blink 0.7s ease-in-out infinite;
+}
+@keyframes dash-theme-border-blink {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(var(--dash-hint-rgb), 0),
+      0 0 0 0 rgba(var(--dash-hint-rgb), 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgb(var(--dash-hint-rgb)),
+      0 0 18px 4px rgba(var(--dash-hint-rgb), 0.55);
+  }
+}
+@keyframes dash-theme-label-blink {
+  0%, 100% {
+    color: var(--el-text-color-secondary);
+  }
+  50% {
+    color: rgb(var(--dash-hint-rgb));
+  }
 }
 
 /* ── Alert with pinned-color callout ──────────────────────────────────── */
@@ -987,6 +1058,9 @@ onUnmounted(() => {
 .dashboard.is-scifi .dash-theme-swatches {
   background: rgba(5, 18, 36, 0.5);
   border-color: rgba(0, 245, 255, 0.3);
+}
+.dashboard.is-scifi .dash-theme-segmented {
+  --dash-hint-rgb: 0, 245, 255;
 }
 
 /* Alert: glass card with cyan accent. `:deep` is required because Element

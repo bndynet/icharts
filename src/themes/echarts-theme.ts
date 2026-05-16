@@ -11,7 +11,8 @@ import type { ChartThemeColors } from './types.js';
  *  textPrimary   → chart title, legend, pie labels, gauge detail (value),
  *                  radar indicator names (axisName), markPoint labels,
  *                  bar/line value labels (incl. race value labels and
- *                  line-race endLabels), graph/sankey/chord node + link labels
+ *                  line-race endLabels), graph/sankey/chord/tree node
+ *                  + link labels
  *  textSecondary → axis tick labels, gauge title (label text e.g. "CPU")
  *  gridLine      → splitLine (grid rules), radar splitLine + alternating
  *                  splitArea bands
@@ -21,7 +22,8 @@ import type { ChartThemeColors } from './types.js';
  * / `series.endLabel.color` / `series.edgeLabel.color`. ECharts deep-merges
  * the series-type defaults below (`bar.label`, `line.label`, `line.endLabel`,
  * `pie.label`, `radar.axisName`, `graph.label`, `graph.edgeLabel`,
- * `sankey.label`, `chord.label`, …) into each series so themes drive the look.
+ * `sankey.label`, `chord.label`, `tree.label`, …) into each series so themes
+ * drive the look.
  * This keeps adapters theme-agnostic (they never read the active palette
  * directly) and means a single theme switch repaints every data label on the
  * chart. AGENTS.md "Layout rule #6" documents this two-sided contract: any
@@ -141,6 +143,20 @@ export function buildEChartsTheme(
     },
     chord: {
       label: { color: colors.textPrimary }, // chord node labels (outside the ring)
+    },
+    tree: {
+      // Tree node labels render on the canvas next to each node marker.
+      // Same two-sided contract as the other graph-family entries above:
+      // the adapter (`src/adapters/tree.ts`) intentionally emits
+      // `series.label` / `series.leaves.label` *without* a `color` key
+      // so this theme entry can repaint every label in lockstep when
+      // the user switches themes.
+      label: { color: colors.textPrimary },
+      // Connector lines (the curved branches between parent and child)
+      // reuse the structural `axisLine` token so the tree's frame
+      // agrees with axis spines on dark themes — without this they
+      // fall back to a near-black ECharts default and disappear.
+      lineStyle: { color: colors.axisLine },
     },
   };
 }

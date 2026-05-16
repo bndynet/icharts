@@ -51,6 +51,11 @@ export default defineConfig({
           page: () => import('./views/charts/NetworkCharts.vue'),
         },
         {
+          label: 'Tree',
+          icon: 'list-tree',
+          page: () => import('./views/charts/TreeCharts.vue'),
+        },
+        {
           label: 'Advanced',
           icon: 'sparkles',
           page: () => import('./views/charts/AdvancedCharts.vue'),

@@ -10,6 +10,7 @@ import type { SankeyVariant, SankeyData, SankeyChartOptions } from './sankey.js'
 import type { ChordData, ChordChartOptions } from './chord.js';
 import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
 import type { NetworkVariant, NetworkData, NetworkChartOptions } from './network.js';
+import type { TreeData, TreeChartOptions } from './tree.js';
 
 // ---------------------------------------------------------------------------
 // Aggregate unions
@@ -35,7 +36,8 @@ export type ChartData =
   | SankeyData
   | ChordData
   | RadarData
-  | NetworkData;
+  | NetworkData
+  | TreeData;
 
 /**
  * Discriminated union of every built-in chart's options type.
@@ -57,7 +59,8 @@ export type AnyChartOptions =
   | SankeyChartOptions
   | ChordChartOptions
   | RadarChartOptions
-  | NetworkChartOptions;
+  | NetworkChartOptions
+  | TreeChartOptions;
 
 // ---------------------------------------------------------------------------
 // Chart instance interface (returned by createChart)
