@@ -15,6 +15,9 @@ export function buildXAxis(
     splitLine: { show: false },
     splitArea: { show: false },
   };
+  if (userAxis.show !== undefined) {
+    axis.show = userAxis.show;
+  }
 
   if (!isTimeAxis) {
     axis.data = data.categories;
@@ -68,6 +71,9 @@ export function buildYAxis(options: XYChartOptions, count = 1): Record<string, u
       nameLocation: 'center',
       nameGap: 60,
     };
+    if (i === 0 && userAxis.show !== undefined) {
+      axis.show = userAxis.show;
+    }
 
     if (i === 0 && isAxisBound(userAxis.min)) axis.min = userAxis.min;
     if (i === 0 && isAxisBound(userAxis.max)) axis.max = userAxis.max;

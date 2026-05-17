@@ -79,6 +79,24 @@ describe('pie adapter', () => {
       expect(seriesOf(result).roseType).toBe('radius');
     });
 
+    it('applies nightingale corner radii as inner=4, outer=option', () => {
+      const result = resolvePieOptions(sample, {
+        variant: 'nightingale',
+        sliceBorderRadius: 2,
+      });
+      const itemStyle = seriesOf(result).itemStyle as Record<string, unknown>;
+      expect(itemStyle.borderRadius).toEqual([4, 4, 2, 2]);
+    });
+
+    it('keeps scalar border radius for non-nightingale pie variants', () => {
+      const result = resolvePieOptions(sample, {
+        variant: 'doughnut',
+        sliceBorderRadius: 2,
+      });
+      const itemStyle = seriesOf(result).itemStyle as Record<string, unknown>;
+      expect(itemStyle.borderRadius).toBe(2);
+    });
+
     it('exposes an onInit hook for adaptive pixel layout', () => {
       // The hook is what makes layout adapt to real canvas dimensions —
       // without it the static option's centered fallback would be the

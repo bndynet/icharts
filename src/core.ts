@@ -1,4 +1,5 @@
 import * as echarts from 'echarts';
+import wordCloudInstaller from '@echarts-x/custom-word-cloud';
 import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
 import { ChartType } from './types/base.js';
 import { isGaugeData, mergeGaugeData } from './types/gauge.js';
@@ -6,6 +7,14 @@ import { resolveEChartsOption, type RenderContext } from './adapters/index.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
 import { chartRegistry } from './registry.js';
 import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
+
+let wordCloudRegistered = false;
+
+function ensureWordCloudRegistered(): void {
+  if (wordCloudRegistered) return;
+  echarts.use(wordCloudInstaller);
+  wordCloudRegistered = true;
+}
 
 /**
  * Core chart engine that manages an ECharts instance and provides the
@@ -116,6 +125,7 @@ export class IChart implements IChartInstance {
     data: ChartData,
     options: AnyChartOptions = {},
   ) {
+    ensureWordCloudRegistered();
     ensureThemesRegistered();
     this._type = type;
     this._data = data;
@@ -166,6 +176,13 @@ export class IChart implements IChartInstance {
     const name = resolveThemeName(theme);
     if (this._activeTheme !== name) {
       this._activeTheme = name;
+      // Wordcloud uses a custom-series renderer; on theme switches, some
+      // ECharts custom-series pipelines can leave stale display elements in
+      // place during diff/merge, which shows up as duplicated/overlapped
+      // words. Clearing before re-apply ensures a clean repaint.
+      if (this._type === ChartType.WordCloud) {
+        this.ecInstance.clear?.();
+      }
       this.ecInstance.setTheme(name);
     }
     // Theme switches don't represent a frame tick — don't poison the

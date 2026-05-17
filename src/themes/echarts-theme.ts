@@ -17,7 +17,8 @@ import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/common/text-measure.js';
  *                  radar indicator names (axisName), markPoint labels,
  *                  bar/line value labels (incl. race value labels and
  *                  line-race endLabels), graph/sankey/chord/tree node
- *                  + link labels
+ *                  + link labels, and custom-series labels (used by
+ *                  `wordcloud`'s custom renderer)
  *  textSecondary → axis tick labels, gauge title (label text e.g. "CPU")
  *  gridLine      → splitLine (grid rules), radar splitLine + alternating
  *                  splitArea bands
@@ -27,7 +28,7 @@ import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/common/text-measure.js';
  * / `series.endLabel.color` / `series.edgeLabel.color`. ECharts deep-merges
  * the series-type defaults below (`bar.label`, `line.label`, `line.endLabel`,
  * `pie.label`, `radar.axisName`, `graph.label`, `graph.edgeLabel`,
- * `sankey.label`, `chord.label`, `tree.label`, …) into each series so themes
+ * `sankey.label`, `chord.label`, `tree.label`, `custom.label`, …) into each series so themes
  * drive the look.
  * This keeps adapters theme-agnostic (they never read the active palette
  * directly) and means a single theme switch repaints every data label on the
@@ -186,6 +187,12 @@ export function buildEChartsTheme(
       // agrees with axis spines on dark themes — without this they
       // fall back to a near-black ECharts default and disappear.
       lineStyle: { color: colors.axisLine },
+    },
+    custom: {
+      // Wordcloud is implemented via ECharts custom series (`renderItem:
+      // 'wordCloud'`). Keep custom-series labels on the same theme token
+      // so any label-like text emitted by custom charts remains legible.
+      label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
     },
   };
 }

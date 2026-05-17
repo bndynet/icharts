@@ -129,6 +129,29 @@
       </el-card>
     </div>
 
+    <!-- ── Section: keyword emphasis · word cloud ─────────────────────── -->
+    <div class="dash-row dash-row-1-1">
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Acquisition keywords emphasis</span>
+            <el-tag type="info" size="small" effect="plain">wordcloud · diamond</el-tag>
+          </div>
+        </template>
+        <div ref="wordCloudEl" class="chart-box-lg"></div>
+      </el-card>
+
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Acquisition keywords emphasis</span>
+            <el-tag type="info" size="small" effect="plain">wordcloud · default</el-tag>
+          </div>
+        </template>
+        <div ref="wordCloudDefaultEl" class="chart-box-lg"></div>
+      </el-card>
+    </div>
+
     <!-- ── Section: acquisition funnel + ops health ───────────────────── -->
     <div class="dash-row dash-row-8-4">
       <el-card shadow="hover">
@@ -472,6 +495,8 @@ const radarEl            = ref<HTMLElement>();
 const mixedEl        = ref<HTMLElement>();
 const nightingaleEl  = ref<HTMLElement>();
 const halfDoughnutEl = ref<HTMLElement>();
+const wordCloudEl    = ref<HTMLElement>();
+const wordCloudDefaultEl = ref<HTMLElement>();
 
 // ── Chart lifecycle ────────────────────────────────────────────────────────
 const charts: IChartInstance[] = [];
@@ -610,15 +635,36 @@ onMounted(() => {
     colorMap: PIN_COLOR_MAP,
     variant: 'nightingale',
     legend: { show: true, position: 'bottom' },
+    sliceBorderRadius: 12,
+    sliceGap: 2,
   }));
 
   // ── Pie · half-doughnut variant — trial signup outcomes ───────────────
   // Mirrors the sankey's second stage so the story stays consistent.
+  const halfDoughnutTotal = trialOutcomes.reduce((sum, item) => sum + item.value, 0);
   track(createChart(halfDoughnutEl.value!, 'pie', [...trialOutcomes], {
     colorMap: PIN_COLOR_MAP,
     variant: 'half-doughnut',
     legend: { show: true, position: 'bottom' },
+    centerLabels: [`${halfDoughnutTotal.toLocaleString()}`],
+    centerLabelOffset: [0, -16],
   }));
+
+  // ── Word cloud: emphasis by cohort segment volume ─────────────────────
+  track(createChart(
+    wordCloudEl.value!,
+    'wordcloud',
+    tierMovementNetwork.nodes.map((n) => ({ name: n.name, value: n.value ?? 1 })),
+    {
+      variant: 'diamond',
+    },
+  ));
+  track(createChart(
+    wordCloudDefaultEl.value!,
+    'wordcloud',
+    tierMovementNetwork.nodes.map((n) => ({ name: n.name, value: n.value ?? 1 })),
+    {},
+  ));
 
   resizeHandler = () => {
     for (const c of charts) c.resize();

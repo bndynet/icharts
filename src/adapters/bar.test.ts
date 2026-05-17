@@ -19,6 +19,12 @@ const singleSeriesData: XYData = {
 
 describe('bar adapter', () => {
   describe('default variant', () => {
+    it('shows the grid by default', () => {
+      const { option } = resolveBarOptions(singleSeriesData, {});
+      const grid = option.grid as Record<string, unknown>;
+      expect(grid.show).toBe(true);
+    });
+
     it('reserves bottom grid space only when the legend is shown', () => {
       const hidden = resolveBarOptions(singleSeriesData, {
         legend: { show: false },
@@ -216,6 +222,23 @@ describe('bar adapter', () => {
   });
 
   describe('race variant', () => {
+    it('hides the grid by default', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+      });
+      const grid = option.grid as Record<string, unknown>;
+      expect(grid.show).toBe(false);
+    });
+
+    it('allows explicit options.grid.show override', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+        grid: { show: true },
+      });
+      const grid = option.grid as Record<string, unknown>;
+      expect(grid.show).toBe(true);
+    });
+
     it('returns notMerge: false so ECharts animates between frames', () => {
       const result = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
         variant: 'race',
@@ -231,6 +254,10 @@ describe('bar adapter', () => {
       expect(yAxis.type).toBe('category');
       expect(yAxis.inverse).toBe(true);
       expect(yAxis.data).toEqual(racers);
+      expect(yAxis.axisLine).toEqual({ show: false });
+      expect(yAxis.axisTick).toEqual({ show: false });
+      expect(yAxis.splitLine).toEqual({ show: false });
+      expect(yAxis.splitArea).toEqual({ show: false });
     });
 
     it('enables realtimeSort and value-animated labels on the series', () => {
@@ -259,6 +286,18 @@ describe('bar adapter', () => {
       });
       const xAxis = option.xAxis as Record<string, unknown>;
       expect(xAxis.max).toBe('dataMax');
+    });
+
+    it('honors xAxis.show and yAxis.show in race mode', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+        xAxis: { show: false },
+        yAxis: { show: false },
+      });
+      const xAxis = option.xAxis as Record<string, unknown>;
+      const yAxis = option.yAxis as Record<string, unknown>;
+      expect(xAxis.show).toBe(false);
+      expect(yAxis.show).toBe(false);
     });
 
     it('maps race.topN to yAxis.max = topN - 1', () => {

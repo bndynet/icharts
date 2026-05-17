@@ -117,6 +117,7 @@ const PIE_AUTO_RING_RATIO = 0.075;
 const PIE_AUTO_RING_MIN = 8;
 const PIE_AUTO_RING_MAX = 36;
 const PIE_AUTO_RING_FALLBACK = 20;
+const NIGHTINGALE_INNER_CORNER_RADIUS = 4;
 
 /**
  * Per-chart-instance marker for the ResizeObserver. Stored as a symbol on
@@ -566,7 +567,7 @@ function buildPieSeries(
     series.roseType = 'radius';
   }
 
-  applySliceStyle(series, options);
+  applySliceStyle(series, options, variant);
   return [series];
 }
 
@@ -593,13 +594,26 @@ function defaultStaticRadius(
   return [inner, outer];
 }
 
-function applySliceStyle(series: Record<string, unknown>, options: PieChartOptions): void {
+function applySliceStyle(
+  series: Record<string, unknown>,
+  options: PieChartOptions,
+  variant: PieVariant,
+): void {
   if (options.sliceGap !== undefined) {
     series.padAngle = options.sliceGap;
   }
 
   const itemStyle: Record<string, unknown> = {};
-  if (options.sliceBorderRadius !== undefined) itemStyle.borderRadius = options.sliceBorderRadius;
+  if (options.sliceBorderRadius !== undefined) {
+    itemStyle.borderRadius = variant === 'nightingale'
+      ? [
+          NIGHTINGALE_INNER_CORNER_RADIUS,
+          NIGHTINGALE_INNER_CORNER_RADIUS,
+          options.sliceBorderRadius,
+          options.sliceBorderRadius,
+        ]
+      : options.sliceBorderRadius;
+  }
   if (options.sliceBorderColor !== undefined) itemStyle.borderColor = options.sliceBorderColor;
   if (Object.keys(itemStyle).length > 0) {
     series.itemStyle = itemStyle;

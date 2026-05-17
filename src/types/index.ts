@@ -17,4 +17,5 @@ export * from './chord.js';
 export * from './radar.js';
 export * from './network.js';
 export * from './tree.js';
+export * from './word-cloud.js';
 export * from './instance.js';

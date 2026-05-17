@@ -128,6 +128,8 @@ function resolveBarRaceOptions(
   // cadence. Explicit `race.frameDuration` still wins.
   const frameDuration = resolveRaceFrameDuration(race.frameDuration, ctx);
   const showValueLabel = race.showValueLabel ?? true;
+  const xAxisShow = options.xAxis?.show;
+  const yAxisShow = options.yAxis?.show;
   const firstSeries = data.series[0] ?? { name: '', data: [] };
   const seriesName = firstSeries.name;
 
@@ -152,6 +154,9 @@ function resolveBarRaceOptions(
     legendShow: legendVisible,
     names: seriesName ? [seriesName] : undefined,
   });
+  if (options.grid?.show === undefined) {
+    grid.show = false;
+  }
   if (options.grid?.right === undefined && showValueLabel) {
     grid.right = resolveRaceLabelHeadroom(
       firstSeries.data.map(formatRaceBarLabel),
@@ -194,13 +199,20 @@ function resolveBarRaceOptions(
       max: 'dataMax',
       splitLine: { show: false },
       splitArea: { show: false },
+      ...(xAxisShow !== undefined ? { show: xAxisShow } : {}),
     },
     yAxis: {
       type: 'category',
       data: data.categories,
       inverse: true,
+      // Keep racer labels visible while removing the axis chrome.
+      axisLine: { show: false },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      splitArea: { show: false },
       animationDuration: 300,
       animationDurationUpdate: 300,
+      ...(yAxisShow !== undefined ? { show: yAxisShow } : {}),
       // `max` controls how many bars fit in the viewport. ECharts wants the
       // last *visible* index, so topN=10 → max=9. Omit when unset to show all.
       ...(race.topN !== undefined ? { max: race.topN - 1 } : {}),

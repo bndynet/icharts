@@ -40,6 +40,7 @@ export function buildGrid(
   const p = getChartPadding(options);
   return deepMerge(
     {
+      show: true,
       top: p,
       left: p,
       right: p,

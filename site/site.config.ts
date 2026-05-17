@@ -55,6 +55,11 @@ export default defineConfig({
           icon: 'list-tree',
           page: () => import('./views/charts/TreeCharts.vue'),
         },
+        {
+          label: 'Word Cloud',
+          icon: 'cloud',
+          page: () => import('./views/charts/WordCloudCharts.vue'),
+        },
       ],
     },
     {

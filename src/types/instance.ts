@@ -11,6 +11,11 @@ import type { ChordData, ChordChartOptions } from './chord.js';
 import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
 import type { NetworkVariant, NetworkData, NetworkChartOptions } from './network.js';
 import type { TreeData, TreeChartOptions } from './tree.js';
+import type {
+  WordCloudVariant,
+  WordCloudData,
+  WordCloudChartOptions,
+} from './word-cloud.js';
 
 // ---------------------------------------------------------------------------
 // Aggregate unions
@@ -27,7 +32,8 @@ export type ChartVariant =
   | GaugeVariant
   | SankeyVariant
   | RadarVariant
-  | NetworkVariant;
+  | NetworkVariant
+  | WordCloudVariant;
 
 export type ChartData =
   | XYData
@@ -37,7 +43,8 @@ export type ChartData =
   | ChordData
   | RadarData
   | NetworkData
-  | TreeData;
+  | TreeData
+  | WordCloudData;
 
 /**
  * Discriminated union of every built-in chart's options type.
@@ -60,7 +67,8 @@ export type AnyChartOptions =
   | ChordChartOptions
   | RadarChartOptions
   | NetworkChartOptions
-  | TreeChartOptions;
+  | TreeChartOptions
+  | WordCloudChartOptions;
 
 // ---------------------------------------------------------------------------
 // Chart instance interface (returned by createChart)

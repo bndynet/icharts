@@ -71,6 +71,8 @@ export {
   type TreeData,
   type TreeNode,
   type TreeDirection,
+  type WordCloudData,
+  type WordCloudDataItem,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
   type XYChartOptions,
   type LineChartOptions,
@@ -83,6 +85,7 @@ export {
   type RadarChartOptions,
   type NetworkChartOptions,
   type TreeChartOptions,
+  type WordCloudChartOptions,
   // Shared option building blocks
   type SeriesOptions,
   type LegendOptions,
@@ -109,11 +112,13 @@ export {
   type SankeyVariant,
   type RadarVariant,
   type NetworkVariant,
+  type WordCloudVariant,
   isSankeyData,
   isChordData,
   isRadarData,
   isNetworkData,
   isTreeData,
+  isWordCloudData,
 } from './types.js';
 
 // Configuration

@@ -92,6 +92,7 @@ chart.dispose();
 | Radar  | `radar`  | `default`, `circle` |
 | Network | `network` | `default`, `circular` |
 | Tree   | `tree`   | `default` (use `direction` for layout orientation) |
+| Word Cloud | `wordcloud` | `default`, `diamond`, `poster` |
 
 ---
 
@@ -120,6 +121,18 @@ Line, bar, and area share the same runtime shape. The library exports `LineData`
   { name: 'Safari',  value: 12 },
 ]
 ```
+
+### Word Cloud — `WordCloudData`
+
+```ts
+[
+  { name: 'TypeScript', value: 120 },
+  { name: 'ECharts', value: 100 },
+  { name: 'Lit', value: 80, color: '#00b4d8' }, // optional per-word color pin
+]
+```
+
+`WordCloudData` uses `{ name, value }[]` like pie, but render behavior is selected by `type: 'wordcloud'`. Words are sorted by value descending by default (`autoSort: true`) and placed via the ECharts custom word-cloud series.
 
 ### Gauge — `GaugeData`
 
@@ -601,6 +614,7 @@ Each chart type has its own options interface that extends the base `ChartOption
 | `sankey`   | `SankeyChartOptions` | `ChartOptions`   |
 | `chord`    | `ChordChartOptions`  | `ChartOptions`   |
 | `radar`    | `RadarChartOptions`  | `ChartOptions`   |
+| `wordcloud`| `WordCloudChartOptions` | `ChartOptions` |
 
 `createChart` accepts an `AnyChartOptions` union — a chart-specific literal like `{ innerRadius: '50%' }` type-checks as `PieChartOptions` without importing the subtype. For stricter validation, import the matching `XxxChartOptions` and annotate explicitly.
 
@@ -934,6 +948,38 @@ No chord-specific knobs today; reuses every field on the base `ChartOptions`.
   };
 }
 ```
+
+### `WordCloudChartOptions` (extends `ChartOptions`)
+
+```ts
+{
+  variant?: 'default' | 'diamond' | 'poster';
+
+  // Layout + typography
+  autoSort?: boolean;                // default: true (sort words by value desc)
+  sizeRange?: [number, number];      // px font-size mapping range, default: [12, 60]
+  shape?: 'circle' | 'cardioid' | 'diamond' | 'triangle-forward' | 'triangle' | 'pentagon' | 'star';
+  rotationRange?: [number, number];  // degrees, default: [-90, 90]
+  rotationStep?: number;             // degrees, default: 45
+  gridSize?: number;                 // px, default: 8
+
+  // Boundary behavior
+  keepAspect?: boolean;              // keep mask-image ratio, default: false
+  drawOutOfBound?: boolean;          // allow overflow draw, default: false
+  shrinkToFit?: boolean;             // shrink words to fit dense layouts, default: false
+  layoutAnimation?: boolean;         // default: true
+
+  // Optional custom shape mask
+  maskImage?: HTMLImageElement | HTMLCanvasElement;
+}
+```
+
+Built-in presets:
+
+- `diamond`: compact diamond composition (`shape: 'diamond'`, `rotationRange: [0, 0]`, `sizeRange: [14, 48]`, `gridSize: 10`)
+- `poster`: headline-heavy hero style (`shape: 'star'`, `rotationRange: [-45, 45]`, `sizeRange: [16, 72]`, `rotationStep: 15`, `gridSize: 12`)
+
+Any explicit field you pass still overrides the selected preset.
 
 ---
 

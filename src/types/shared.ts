@@ -152,6 +152,8 @@ export interface LegendOptions {
 }
 
 export interface GridOptions {
+  /** Whether to render the grid background/border. Default: true (race defaults to false). */
+  show?: boolean;
   top?: number;
   right?: number;
   bottom?: number;
@@ -159,6 +161,10 @@ export interface GridOptions {
 }
 
 export interface AxisOptions {
+  /**
+   * Whether to render this axis. Default: true.
+   */
+  show?: boolean;
   name?: string;
   formatLabel?: (value: string | number, index: number) => string;
   /**

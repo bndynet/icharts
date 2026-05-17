@@ -15,8 +15,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('echarts', () => ({
+  use: vi.fn(),
   init: vi.fn(() => ({
     setOption: vi.fn(),
+    clear: vi.fn(),
     dispose: vi.fn(),
     setTheme: vi.fn(),
     resize: vi.fn(),
@@ -24,6 +26,10 @@ vi.mock('echarts', () => ({
     off: vi.fn(),
   })),
   registerTheme: vi.fn(),
+}));
+
+vi.mock('@echarts-x/custom-word-cloud', () => ({
+  default: { install: vi.fn() },
 }));
 
 import { IChart } from './core.js';
@@ -111,6 +117,29 @@ describe('IChart engine — RenderContext threading', () => {
     chart.setTheme('default');
     expect(observations).toHaveLength(1);
     expect(observations[0]?.observedFrameMs).toBeUndefined();
+    chart.dispose();
+  });
+});
+
+describe('IChart engine — wordcloud theme switch repaint', () => {
+  it('clears the instance before applying a new theme for wordcloud charts', () => {
+    registerAdapter('wordcloud', {
+      validate: () => true,
+      resolve: () => ({
+        option: {
+          series: [{ type: 'custom', renderItem: 'wordCloud', coordinateSystem: 'none' }],
+        },
+      }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'wordcloud', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      clear: ReturnType<typeof vi.fn>;
+    };
+    expect(ec.clear).not.toHaveBeenCalled();
+
+    chart.setTheme('dark');
+    expect(ec.clear).toHaveBeenCalledTimes(1);
     chart.dispose();
   });
 });

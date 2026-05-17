@@ -58,6 +58,8 @@ const chart = createChart(el, 'bar', frameFor(1960), {
   variant: 'race',
   race: { topN: 10 },              // frameDuration auto-measured from setInterval
   colorByCategory: true,           // distinct color per racer (legend auto-hides)
+  xAxis: { show: false },          // hide bottom value axis
+  yAxis: { show: true },           // keep left racer labels visible
   title: 'Population by Country — 1960',
 });
 
@@ -480,6 +482,8 @@ onMounted(() => {
     variant: 'race',
     race: { topN },
     colorByCategory: true,
+    xAxis: { show: false },
+    yAxis: { show: true },
     title: titleFor(START_YEAR),
   });
 

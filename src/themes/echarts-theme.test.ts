@@ -82,6 +82,11 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.tree.label.color).toBe(COLORS.textPrimary);
   });
 
+  it('custom.label.color follows textPrimary (wordcloud custom-series labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.custom.label.color).toBe(COLORS.textPrimary);
+  });
+
   it('tree.lineStyle.color follows axisLine (connector branches stay visible on dark themes)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.tree.lineStyle.color).toBe(COLORS.axisLine);
@@ -99,6 +104,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.sankey.label.color).toBe('#aaaaaa');
     expect(a.chord.label.color).toBe('#aaaaaa');
     expect(a.tree.label.color).toBe('#aaaaaa');
+    expect(a.custom.label.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
     expect(b.line.endLabel.color).toBe('#bbbbbb');
@@ -108,6 +114,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(b.sankey.label.color).toBe('#bbbbbb');
     expect(b.chord.label.color).toBe('#bbbbbb');
     expect(b.tree.label.color).toBe('#bbbbbb');
+    expect(b.custom.label.color).toBe('#bbbbbb');
   });
 
   it('radar.axisName.color follows textPrimary so indicator labels stay legible on dark themes', () => {
@@ -179,6 +186,11 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.tree.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
   });
 
+  it('custom.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.custom.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
   it('every themed label.fontSize entry agrees on DEFAULT_LABEL_FONT_SIZE (lockstep regression)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     const sizes = [
@@ -191,6 +203,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
       theme.sankey.label.fontSize,
       theme.chord.label.fontSize,
       theme.tree.label.fontSize,
+      theme.custom.label.fontSize,
     ];
     for (const size of sizes) {
       expect(size).toBe(DEFAULT_LABEL_FONT_SIZE);
