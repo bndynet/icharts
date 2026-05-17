@@ -97,7 +97,7 @@ export function isTreeData(data: ChartData): data is TreeData {
  *
  * Per the AGENTS.md convention, every chart-specific knob lives flat on
  * the subtype — no wrapping sub-object. Only `direction` is unique to
- * tree; the other fields are mild ECharts pass-throughs (`roam`,
+ * tree; the other fields are mild ECharts pass-throughs (`enableZoom`,
  * `nodeSize`, …) named consistently with sibling adapters.
  */
 export interface TreeChartOptions extends ChartOptions {
@@ -113,10 +113,13 @@ export interface TreeChartOptions extends ChartOptions {
    */
   initialTreeDepth?: number;
   /**
-   * Roaming behavior for the tree body.
-   * Default: `'move'` (drag-to-pan only; mouse-wheel zoom is disabled).
+   * Enable wheel zoom. Default: `false`.
    */
-  roam?: boolean | 'move' | 'scale';
+  enableZoom?: boolean;
+  /**
+   * Enable drag-to-pan. Default: `true`.
+   */
+  enablePan?: boolean;
   /** Show node-name labels. Default: `true`. */
   showNodeLabel?: boolean;
   /**

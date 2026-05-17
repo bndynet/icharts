@@ -541,19 +541,30 @@ describe('network adapter', () => {
       expect(withTitle.top).toBeGreaterThan(noTitle.top as number);
     });
 
-    it('defaults roam to true and draggable to (variant === "default")', () => {
+    it('defaults to pan-only and lets enablePan/enableZoom compose roam', () => {
       const def = getSeries(resolveNetworkOptions(sample, {}));
-      expect(def.roam).toBe(true);
+      expect(def.roam).toBe('move');
       expect(def.draggable).toBe(true);
 
       const circular = getSeries(resolveNetworkOptions(sample, { variant: 'circular' }));
       expect(circular.draggable).toBe(false);
 
       const explicit = getSeries(
-        resolveNetworkOptions(sample, { variant: 'circular', draggable: true, roam: false }),
+        resolveNetworkOptions(sample, {
+          variant: 'circular',
+          draggable: true,
+          enablePan: false,
+          enableZoom: false,
+        }),
       );
       expect(explicit.draggable).toBe(true);
       expect(explicit.roam).toBe(false);
+
+      const zoomOnly = getSeries(resolveNetworkOptions(sample, { enablePan: false, enableZoom: true }));
+      expect(zoomOnly.roam).toBe('scale');
+
+      const panAndZoom = getSeries(resolveNetworkOptions(sample, { enablePan: true, enableZoom: true }));
+      expect(panAndZoom.roam).toBe(true);
     });
 
     it('sets edgeLabel.show based on showLinkLabel', () => {

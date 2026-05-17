@@ -429,14 +429,17 @@ describe('tree adapter', () => {
       ).toBe(14);
     });
 
-    it('roam defaults to move (pan only); can be overridden', () => {
+    it('defaults to pan-only and lets enablePan/enableZoom compose roam', () => {
       expect(getSeries(resolveTreeOptions(sample, {})).roam).toBe('move');
       expect(
-        getSeries(resolveTreeOptions(sample, { roam: false })).roam,
+        getSeries(resolveTreeOptions(sample, { enablePan: false, enableZoom: false })).roam,
       ).toBe(false);
       expect(
-        getSeries(resolveTreeOptions(sample, { roam: true })).roam,
+        getSeries(resolveTreeOptions(sample, { enablePan: true, enableZoom: true })).roam,
       ).toBe(true);
+      expect(
+        getSeries(resolveTreeOptions(sample, { enablePan: false, enableZoom: true })).roam,
+      ).toBe('scale');
     });
 
     it('expandAndCollapse defaults to true; can be turned off', () => {

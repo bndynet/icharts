@@ -134,6 +134,18 @@ function buildLayoutBlock(
   };
 }
 
+function resolveRoamMode(
+  enablePan: boolean | undefined,
+  enableZoom: boolean | undefined,
+): boolean | 'move' | 'scale' {
+  const pan = enablePan ?? true;
+  const zoom = enableZoom ?? false;
+  if (pan && zoom) return true;
+  if (pan) return 'move';
+  if (zoom) return 'scale';
+  return false;
+}
+
 /**
  * Linearly map `value` from [vmin, vmax] into [smin, smax]. When all values
  * are equal we return the midpoint of the symbol-size range so every node
@@ -428,7 +440,7 @@ export function resolveNetworkOptions(
   // circular layout is fixed by construction so dragging it is meaningless
   // by default. Users can still opt in via `options.draggable: true`.
   const draggable = options.draggable ?? variant === 'default';
-  const roam = options.roam ?? true;
+  const roam = resolveRoamMode(options.enablePan, options.enableZoom);
 
   // `circular` arranges every node around the same ring, so straight edges
   // would all converge through the center and pile up into an unreadable

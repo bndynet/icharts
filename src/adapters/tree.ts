@@ -287,6 +287,18 @@ function treeTooltipSyncHtml(
   return `${marker}${name}: ${display}`;
 }
 
+function resolveRoamMode(
+  enablePan: boolean | undefined,
+  enableZoom: boolean | undefined,
+): boolean | 'move' | 'scale' {
+  const pan = enablePan ?? true;
+  const zoom = enableZoom ?? false;
+  if (pan && zoom) return true;
+  if (pan) return 'move';
+  if (zoom) return 'scale';
+  return false;
+}
+
 /**
  * Resolve a `TreeData` + `TreeChartOptions` pair into an ECharts option
  * object. Single-series chart — emits one `{ type: 'tree' }` series.
@@ -419,7 +431,7 @@ export function resolveTreeOptions(
     left,
     right,
     symbolSize: options.nodeSize ?? DEFAULT_NODE_SIZE,
-    roam: options.roam ?? 'move',
+    roam: resolveRoamMode(options.enablePan, options.enableZoom),
     expandAndCollapse,
     edgeShape: options.lineStyle ?? 'polyline',
     initialTreeDepth: options.initialTreeDepth ?? -1, // -1 = fully expanded

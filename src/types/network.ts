@@ -110,8 +110,10 @@ export function isNetworkData(data: ChartData): data is NetworkData {
 
 export interface NetworkChartOptions extends ChartOptions {
   variant?: NetworkVariant;
-  /** Allow zoom/pan (mouse wheel + drag). Default: true. */
-  roam?: boolean;
+  /** Enable wheel zoom. Default: `false`. */
+  enableZoom?: boolean;
+  /** Enable drag-to-pan. Default: `true`. */
+  enablePan?: boolean;
   /** Allow dragging individual nodes. Default: true for `default` (force), false for `circular`. */
   draggable?: boolean;
   /** Show node name labels. Default: true. */
