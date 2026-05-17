@@ -517,10 +517,13 @@ onMounted(() => {
     legend: { position: 'bottom' },
   }));
 
-  track(createChart(shareEl.value!, 'pie', buildAnnualShare(), {
+  const shareElData = buildAnnualShare();
+  const shareElTotal = shareElData.reduce((sum, item) => sum + item.value, 0);
+  track(createChart(shareEl.value!, 'pie', shareElData, {
     colorMap: PIN_COLOR_MAP,
     variant: 'doughnut',
     legend: { show: true, position: 'right' },
+    centerLabels: [`${shareElTotal.toLocaleString()}`, 'Total'],
   }));
 
   track(createChart(cumulativeEl.value!, 'area', buildMonthlyTrend(), {

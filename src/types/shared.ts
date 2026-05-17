@@ -41,6 +41,8 @@ export interface RichTextStyle {
   align?: 'left' | 'center' | 'right';
   verticalAlign?: 'top' | 'middle' | 'bottom';
   padding?: number | number[];
+  /** Shorthand for ECharts rich-text background image (`backgroundColor: { image }`). */
+  backgroundImage?: string | Record<string, unknown>;
   backgroundColor?: string | Record<string, unknown>;
   borderColor?: string;
   borderWidth?: number;

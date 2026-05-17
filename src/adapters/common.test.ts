@@ -410,6 +410,24 @@ describe('compileRichText', () => {
     );
     expect(compiled.text).toContain('{__ich_no_truncate_0|SuperLongLegendLabel}');
   });
+
+  it('maps backgroundImage shorthand into backgroundColor.image', () => {
+    const compiled = compileRichText(
+      {
+        segments: [
+          {
+            text: 'With image background',
+            style: { backgroundImage: 'https://example.com/bg.png' },
+          },
+        ],
+      },
+      'bg_image',
+    );
+    expect(compiled.rich?.__ich_bg_image_0?.backgroundColor).toEqual({
+      image: 'https://example.com/bg.png',
+    });
+    expect(compiled.rich?.__ich_bg_image_0?.backgroundImage).toBeUndefined();
+  });
 });
 
 describe('buildLegend + buildGrid: title vs top-legend stacking', () => {

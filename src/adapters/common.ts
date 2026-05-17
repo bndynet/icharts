@@ -281,6 +281,12 @@ function normalizeSegmentStyle(
     ...(referenced ?? {}),
     ...(inline ?? {}),
   };
+  if (out.backgroundImage !== undefined) {
+    if (out.backgroundColor === undefined) {
+      out.backgroundColor = { image: out.backgroundImage } as Record<string, unknown>;
+    }
+    delete out.backgroundImage;
+  }
   if (segment.width !== undefined) out.width = segment.width;
   if (segment.align !== undefined) out.align = segment.align;
   if (segment.verticalAlign !== undefined) out.verticalAlign = segment.verticalAlign;
