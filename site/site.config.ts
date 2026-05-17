@@ -55,16 +55,6 @@ export default defineConfig({
           icon: 'list-tree',
           page: () => import('./views/charts/TreeCharts.vue'),
         },
-        {
-          label: 'Advanced',
-          icon: 'sparkles',
-          page: () => import('./views/charts/AdvancedCharts.vue'),
-        },
-        {
-          label: 'Web Component',
-          icon: 'component',
-          page: () => import('./views/charts/WebComponentCharts.vue'),
-        },
       ],
     },
     {
@@ -86,6 +76,16 @@ export default defineConfig({
       label: 'Custom Legend',
       icon: 'tag',
       page: () => import('./views/CustomLegendView.vue'),
+    },
+    {
+      label: 'Advanced',
+      icon: 'sparkles',
+      page: () => import('./views/AdvancedView.vue'),
+    },
+    {
+      label: 'Web Component',
+      icon: 'component',
+      page: () => import('./views/WebComponentView.vue'),
     },
   ],
   env: {

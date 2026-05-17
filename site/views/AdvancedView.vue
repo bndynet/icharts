@@ -33,10 +33,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { createChart } from '@bndynet/icharts';
-import SectionDivider from '../../components/SectionDivider.vue';
-import DemoGrid from '../../components/DemoGrid.vue';
-import DemoCard from '../../components/DemoCard.vue';
-import { pieData } from './sharedData';
+import SectionDivider from '../components/SectionDivider.vue';
+import DemoGrid from '../components/DemoGrid.vue';
+import DemoCard from '../components/DemoCard.vue';
+import { pieData } from './charts/sharedData';
 
 type CardRef = InstanceType<typeof DemoCard>;
 

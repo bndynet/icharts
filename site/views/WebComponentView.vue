@@ -96,10 +96,10 @@ chart.options = { title: 'Performance Score', variant: 'percentage' };
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import SectionDivider from '../../components/SectionDivider.vue';
-import DemoGrid from '../../components/DemoGrid.vue';
-import DemoCard from '../../components/DemoCard.vue';
-import { xyData, pieData } from './sharedData';
+import SectionDivider from '../components/SectionDivider.vue';
+import DemoGrid from '../components/DemoGrid.vue';
+import DemoCard from '../components/DemoCard.vue';
+import { xyData, pieData } from './charts/sharedData';
 
 // Web component refs (typed as any since i-chart is a custom element)
 const wcLineEl = ref();
