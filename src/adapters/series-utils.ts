@@ -29,10 +29,16 @@ export function getYAxisCount(data: XYData, options: XYChartOptions): number {
 export function applyMarkLines(series: Record<string, unknown>, so: SeriesOptions): void {
   if (!so.markLines || so.markLines.length === 0) return;
   series.markLine = {
+    symbol: ['none', 'none'],
     data: so.markLines.map((type) => ({
       type,
       name: type.charAt(0).toUpperCase() + type.slice(1),
-      label: { position: 'insideEndTop' },
+      label: {
+        position: 'start',
+        align: 'right',
+        verticalAlign: 'middle',
+        distance: 8,
+      },
     })),
   };
 }

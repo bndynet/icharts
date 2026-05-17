@@ -126,6 +126,11 @@ const PIE_AUTO_RING_FALLBACK = 20;
  */
 const PIE_LAYOUT_OBSERVER_KEY = '__bndyIchartsPieLayoutObserver';
 
+interface PieLayoutObserverState {
+  observer: ResizeObserver;
+  recompute: () => void;
+}
+
 export function resolvePieOptions(
   data: PieData,
   options: PieChartOptions,
@@ -498,20 +503,30 @@ function attachResizeObserver(
 ): void {
   if (typeof ResizeObserver === 'undefined') return; // SSR / older browsers
   const slot = chart as unknown as Record<string, unknown>;
-  if (slot[PIE_LAYOUT_OBSERVER_KEY]) return; // already attached on a prior _apply()
+  const existing = slot[PIE_LAYOUT_OBSERVER_KEY] as PieLayoutObserverState | undefined;
+  if (existing) {
+    // Keep a single observer per chart instance, but always refresh the
+    // callback so theme/layout updates don't replay stale closures.
+    existing.recompute = recompute;
+    return;
+  }
 
   const dom = chart.getDom() as HTMLElement | undefined;
   if (!dom) return;
 
+  const state = {} as PieLayoutObserverState;
+  state.recompute = recompute;
   const observer = new ResizeObserver(() => {
     if (chart.isDisposed()) {
       observer.disconnect();
+      delete slot[PIE_LAYOUT_OBSERVER_KEY];
       return;
     }
-    recompute();
+    state.recompute();
   });
   observer.observe(dom);
-  slot[PIE_LAYOUT_OBSERVER_KEY] = observer;
+  state.observer = observer;
+  slot[PIE_LAYOUT_OBSERVER_KEY] = state;
 }
 
 // ---------------------------------------------------------------------------

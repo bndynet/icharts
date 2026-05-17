@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { PieData, PieChartOptions, PieVariant } from '../types.js';
 import { isPieData } from '../types.js';
 import { resolvePieOptions, __test } from './pie.js';
@@ -605,6 +605,57 @@ describe('pie adapter', () => {
       const graphic = (optOf(result).graphic as Record<string, unknown>[])[0];
       expect(graphic.x).toBe(12);
       expect(graphic.y).toBe(-8);
+    });
+
+    it('refreshes ResizeObserver callback after theme changes (no stale center-label colors)', () => {
+      const resizeCallbacks: Array<() => void> = [];
+      const observe = vi.fn();
+      const disconnect = vi.fn();
+      class MockResizeObserver {
+        constructor(cb: () => void) {
+          resizeCallbacks.push(cb);
+        }
+        observe = observe;
+        disconnect = disconnect;
+      }
+
+      const originalResizeObserver = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+
+      try {
+        const setOptionCalls: Array<Record<string, unknown>> = [];
+        const chart = {
+          isDisposed: () => false,
+          getWidth: () => 360,
+          getHeight: () => 280,
+          getDom: () => ({}) as HTMLElement,
+          setOption: (payload: Record<string, unknown>) => {
+            setOptionCalls.push(payload);
+          },
+        } as unknown as import('echarts').ECharts;
+
+        resolvePieOptions(sample, {
+          theme: 'light',
+          variant: 'doughnut',
+          centerLabels: ['80%', 'CPU'],
+        }).onInit?.(chart);
+
+        resolvePieOptions(sample, {
+          theme: 'dark',
+          variant: 'doughnut',
+          centerLabels: ['80%', 'CPU'],
+        }).onInit?.(chart);
+
+        resizeCallbacks[0]?.();
+
+        const lastPayload = setOptionCalls[setOptionCalls.length - 1] as Record<string, unknown>;
+        const graphic = (lastPayload.graphic as Record<string, unknown>[])[0];
+        const style = graphic.style as Record<string, unknown>;
+        const rich = style.rich as Record<string, Record<string, unknown>>;
+        expect(rich.cl0.color).toBe('#f1f5f9');
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver;
+      }
     });
   });
 });
