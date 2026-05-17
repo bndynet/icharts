@@ -46,6 +46,8 @@ const FONT_FAMILY =
 // ---------------------------------------------------------------------------
 
 const CHART_DEFAULT_PADDING = 12;
+const LEGEND_ICON_WIDTH = 10;
+const LEGEND_ICON_HEIGHT = 10;
 
 /**
  * Re-exported from `text-measure.ts` (the deepest primitive — defining
@@ -210,6 +212,8 @@ export function buildLegend(
     type: legend.type ?? 'scroll',
     data: names,
     icon: 'roundRect',
+    itemWidth: LEGEND_ICON_WIDTH,
+    itemHeight: LEGEND_ICON_HEIGHT,
     itemGap: 10,
     pageButtonItemGap: 5,
     pageButtonGap: 10,
@@ -533,11 +537,11 @@ export const LEGEND_RESERVE = 36;
 
 /**
  * Width budget added on top of the widest measured legend label for side
- * legends: swatch (~14 px) + icon-to-text gap (~5 px) + chart-to-legend
+ * legends: swatch (~10 px) + icon-to-text gap (~5 px) + chart-to-legend
  * margin (~10 px). Approximates ECharts' default vertical legend padding
  * closely enough that the body never lands underneath the labels.
  */
-const SIDE_LEGEND_NON_TEXT_PX = 30;
+const SIDE_LEGEND_NON_TEXT_PX = 26;
 /** Extra breathing room (px) between side legends and chart body. */
 const SIDE_LEGEND_BODY_GAP = 8;
 

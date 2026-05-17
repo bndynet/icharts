@@ -222,6 +222,8 @@ describe('buildLegend', () => {
     const legend = buildLegend(['A', 'B'], {});
     expect(legend.show).toBe(true);
     expect(legend.data).toEqual(['A', 'B']);
+    expect(legend.itemWidth).toBe(10);
+    expect(legend.itemHeight).toBe(10);
     expect(legend.bottom).toBe(12); // CHART_DEFAULT_PADDING
     expect(legend.left).toBe('center');
     expect(legend.orient).toBe('horizontal');
