@@ -1,5 +1,5 @@
 import type { ChartThemeColors } from './types.js';
-import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/text-measure.js';
+import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/common/text-measure.js';
 
 /**
  * Build a full ECharts theme object from `ChartThemeColors` and a series palette.

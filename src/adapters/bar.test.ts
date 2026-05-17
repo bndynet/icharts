@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { XYData } from '../types.js';
 import { resolveBarOptions } from './bar.js';
-import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
 
 const racers = ['USA', 'China', 'India', 'Brazil', 'Japan'];
 

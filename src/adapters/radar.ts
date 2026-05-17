@@ -9,7 +9,7 @@ import {
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
+} from './common/index.js';
 
 // ---------------------------------------------------------------------------
 // Layout constants

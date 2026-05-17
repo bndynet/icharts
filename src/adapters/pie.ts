@@ -22,8 +22,8 @@ import {
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
-import { measureTextWidth } from './text-measure.js';
+} from './common/index.js';
+import { measureTextWidth } from './common/text-measure.js';
 import { getThemeColors, resolveThemeName, syncColorHubTheme } from '../themes/index.js';
 
 // ---------------------------------------------------------------------------

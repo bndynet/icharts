@@ -12,7 +12,7 @@ import {
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
+} from './common/index.js';
 import { resolveLineOptions, resolveAreaOptions } from './line.js';
 import { resolveBarOptions } from './bar.js';
 import { resolvePieOptions } from './pie.js';

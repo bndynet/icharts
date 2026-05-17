@@ -9,8 +9,8 @@ import {
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
-import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
+} from './common/index.js';
+import { mapGraphNodesForECharts, paintGraphNodes } from './common/graph-colors.js';
 
 function sankeyTooltipSyncHtml(params: unknown, options: SankeyChartOptions): string {
   const fmt = options.tooltip?.formatValue;

@@ -14,8 +14,8 @@ import {
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
-import { buildLabelFont, measureMaxTextWidth } from './text-measure.js';
+} from './common/index.js';
+import { buildLabelFont, measureMaxTextWidth } from './common/text-measure.js';
 
 /**
  * Default node marker diameter (px). Matches the ECharts `tree-basic`

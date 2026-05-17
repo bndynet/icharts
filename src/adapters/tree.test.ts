@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { TreeData } from '../types.js';
 import { isTreeData } from '../types.js';
 import { resolveTreeOptions } from './tree.js';
-import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
 
 const sample: TreeData = {
   name: 'root',

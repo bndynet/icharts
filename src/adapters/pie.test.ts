@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import type { PieData, PieChartOptions, PieVariant } from '../types.js';
 import { isPieData } from '../types.js';
 import { resolvePieOptions, __test } from './pie.js';
-import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
 import { getThemeColors } from '../themes/index.js';
 
 const { computeEdgeReserves, computePieLayout } = __test;

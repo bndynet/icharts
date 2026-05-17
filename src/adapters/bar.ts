@@ -1,7 +1,7 @@
 import type { BarData, BarChartOptions } from '../types.js';
 import type { ChartSetupResult, RenderContext } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
-import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './race-utils.js';
+import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './common/race-utils.js';
 import {
   buildTitle,
   buildLegend,
@@ -11,8 +11,8 @@ import {
   buildSparkTooltip,
   getLabelFontSize,
   isTimeCategories,
-} from './common.js';
-import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './series-utils.js';
+} from './common/index.js';
+import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './common/series-utils.js';
 
 export function resolveBarOptions(
   data: BarData,

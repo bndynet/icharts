@@ -35,7 +35,7 @@ export {
   type CompiledRichText,
   type StackedTextOffsetsOptions,
   type StackedTextOffsets,
-} from './adapters/common.js';
+} from './adapters/common/index.js';
 
 // Adapter registry (extensibility)
 export { registerAdapter, type ChartAdapter, type ChartSetupResult } from './adapters/index.js';

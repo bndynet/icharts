@@ -8,8 +8,8 @@ import {
   getLabelFontSize,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
-import { mapGraphNodesForECharts, paintGraphNodes } from './graph-colors.js';
+} from './common/index.js';
+import { mapGraphNodesForECharts, paintGraphNodes } from './common/graph-colors.js';
 
 function chordTooltipSyncHtml(params: unknown, options: ChordChartOptions): string {
   const fmt = options.tooltip?.formatValue;

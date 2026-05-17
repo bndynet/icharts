@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildEChartsTheme } from './echarts-theme.js';
 import type { ChartThemeColors } from './types.js';
-import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/text-measure.js';
+import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/common/text-measure.js';
 
 /**
  * Locks in the contract that adapters rely on: every chart family's

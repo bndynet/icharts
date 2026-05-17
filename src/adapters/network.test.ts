@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { NetworkData } from '../types.js';
 import { isNetworkData } from '../types.js';
 import { resolveNetworkOptions } from './network.js';
-import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
+import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
 
 const sample: NetworkData = {
   nodes: [

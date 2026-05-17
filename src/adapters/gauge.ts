@@ -4,7 +4,7 @@ import {
   buildTitle,
   computeStackedTextOffsets,
   getTitleReserve,
-} from './common.js';
+} from './common/index.js';
 import type { RenderContext } from './index.js';
 
 /**

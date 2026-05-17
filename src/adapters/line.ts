@@ -11,9 +11,9 @@ import {
   buildSparkTooltip,
   getLabelFontSize,
   isTimeCategories,
-} from './common.js';
-import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './race-utils.js';
-import { getSeriesOpts, getYAxisCount, applyMarkLines, applyMarkPoints } from './series-utils.js';
+} from './common/index.js';
+import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './common/race-utils.js';
+import { getSeriesOpts, getYAxisCount, applyMarkLines, applyMarkPoints } from './common/series-utils.js';
 
 export function resolveLineOptions(
   data: LineData,

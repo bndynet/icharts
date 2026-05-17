@@ -17,9 +17,9 @@ import {
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
-} from './common.js';
-import { paintGraphNodes } from './graph-colors.js';
-import { DEFAULT_LABEL_FONT, measureMaxTextWidth } from './text-measure.js';
+} from './common/index.js';
+import { paintGraphNodes } from './common/graph-colors.js';
+import { DEFAULT_LABEL_FONT, measureMaxTextWidth } from './common/text-measure.js';
 
 const DEFAULT_NODE_SIZE = 10;
 const DEFAULT_NODE_SIZE_RANGE: readonly [number, number] = [10, 30];
