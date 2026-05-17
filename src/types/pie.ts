@@ -1,5 +1,5 @@
 import type { ChartOptions } from './base.js';
-import type { LegendOptions } from './shared.js';
+import type { LegendOptions, RichTextSpec } from './shared.js';
 import type { ChartData } from './instance.js';
 
 export type PieVariant = 'default' | 'doughnut' | 'half-doughnut' | 'nightingale';
@@ -10,6 +10,8 @@ export interface PieDataItem {
 }
 
 export type PieData = PieDataItem[];
+
+export type PieCenterLabel = string | RichTextSpec;
 
 export function isPieData(data: ChartData): data is PieData {
   return (
@@ -56,4 +58,12 @@ export interface PieChartOptions extends ChartOptions {
    * deliberately do not expose `legend`.
    */
   legend?: LegendOptions;
+
+  /** Center labels for doughnut / pie variants (multi-line). */
+  centerLabels?: PieCenterLabel[];
+  /**
+   * Pixel offset applied to center labels after layout: [x, y].
+   * Useful for fine-grained visual calibration.
+   */
+  centerLabelOffset?: [number, number];
 }

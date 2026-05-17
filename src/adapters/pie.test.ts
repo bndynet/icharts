@@ -3,6 +3,7 @@ import type { PieData, PieChartOptions, PieVariant } from '../types.js';
 import { isPieData } from '../types.js';
 import { resolvePieOptions, __test } from './pie.js';
 import { DEFAULT_LABEL_FONT_SIZE } from './common.js';
+import { getThemeColors } from '../themes/index.js';
 
 const { computeEdgeReserves, computePieLayout } = __test;
 
@@ -324,6 +325,38 @@ describe('pie adapter', () => {
       expect(half.radius[0]).toBe(50);
     });
 
+    it('auto-sizes doughnut ring width from container size when innerRadius is omitted', () => {
+      const small = layout(
+        240,
+        240,
+        'doughnut',
+        { showSliceLabel: false },
+        false,
+        false,
+        [],
+      );
+      const large = layout(
+        520,
+        520,
+        'doughnut',
+        { showSliceLabel: false },
+        false,
+        false,
+        [],
+      );
+      const smallOuter = small.radius[1] as number;
+      const smallInner = small.radius[0] as number;
+      const largeOuter = large.radius[1] as number;
+      const largeInner = large.radius[0] as number;
+      const smallRing = smallOuter - smallInner;
+      const largeRing = largeOuter - largeInner;
+
+      // Mirrors gauge-like clamp policy: 240 -> 18 px, 520 -> clamp at 36 px.
+      expect(smallRing).toBe(18);
+      expect(largeRing).toBe(36);
+      expect(largeRing).toBeGreaterThan(smallRing);
+    });
+
     it('half-doughnut centers the arc bounding rect vertically in the available area', () => {
       // Previously the half-doughnut was glued to the canvas bottom, which
       // looked fine in compact cards but left huge top-whitespace in tall
@@ -484,6 +517,94 @@ describe('pie adapter', () => {
     it('series.label.fontSize honors ChartOptions.labelFontSize', () => {
       const result = resolvePieOptions(sample, { labelFontSize: 18 });
       expect(labelOf(result).fontSize).toBe(18);
+    });
+  });
+
+  describe('centerLabels', () => {
+    it('adds a center graphic text layer for multi-line labels', () => {
+      const result = resolvePieOptions(sample, {
+        variant: 'doughnut',
+        centerLabels: ['80%', 'CPU'],
+      });
+      const series = optOf(result).series as Record<string, unknown>[];
+      expect(series).toHaveLength(1);
+      const graphic = (optOf(result).graphic as Record<string, unknown>[])[0];
+      expect(graphic.type).toBe('text');
+      expect(graphic.id).toBe('__ich_pie_center_labels');
+      const style = graphic.style as Record<string, unknown>;
+      expect(style.text).toBe('{cl0|80%}\n{cl1|CPU}');
+      const rich = style.rich as Record<string, Record<string, unknown>>;
+      expect(rich.cl0.fontWeight).toBe(700);
+      expect(rich.cl0.fontSize).toBeGreaterThan(rich.cl1.fontSize as number);
+      const colors = getThemeColors();
+      expect(rich.cl0.color).toBe(colors?.textPrimary);
+      expect(rich.cl1.color).toBe(colors?.textSecondary);
+      expect(rich.cl1.fill).toBe(colors?.textSecondary);
+    });
+
+    it('auto-sizes center label fonts from container size', () => {
+      const small = resolvePieOptions(
+        sample,
+        {
+          variant: 'doughnut',
+          centerLabels: ['80%', 'CPU'],
+        },
+        { containerWidth: 240, containerHeight: 240 },
+      );
+      const large = resolvePieOptions(
+        sample,
+        {
+          variant: 'doughnut',
+          centerLabels: ['80%', 'CPU'],
+        },
+        { containerWidth: 520, containerHeight: 520 },
+      );
+
+      const smallLabel =
+        (((optOf(small).graphic as Record<string, unknown>[])[0].style as Record<
+          string,
+          unknown
+        >).rich as Record<string, Record<string, unknown>>);
+      const largeLabel =
+        (((optOf(large).graphic as Record<string, unknown>[])[0].style as Record<
+          string,
+          unknown
+        >).rich as Record<string, Record<string, unknown>>);
+
+      expect(largeLabel.cl0.fontSize).toBeGreaterThan(smallLabel.cl0.fontSize as number);
+      expect(largeLabel.cl1.fontSize).toBeGreaterThan(smallLabel.cl1.fontSize as number);
+    });
+
+    it('accepts RichTextSpec lines and keeps auto-size fallback on missing fontSize', () => {
+      const result = resolvePieOptions(sample, {
+        variant: 'doughnut',
+        centerLabels: [
+          { segments: [{ text: '80%', style: { fontWeight: 700 } }] },
+          {
+            segments: [
+              { text: 'C', style: { color: '#a3b3cc' } },
+              { text: 'PU', style: { color: '#a3b3cc' } },
+            ],
+          },
+        ],
+      });
+      const graphic = (optOf(result).graphic as Record<string, unknown>[])[0];
+      const style = graphic.style as Record<string, unknown>;
+      const rich = style.rich as Record<string, Record<string, unknown>>;
+      expect((style.text as string).includes('__ich_pie_center_')).toBe(true);
+      expect(rich.__ich_pie_center_0_0.fontSize).toBeTypeOf('number');
+      expect(rich.__ich_pie_center_1_0.color).toBe('#a3b3cc');
+    });
+
+    it('supports centerLabelOffset for fine-grained calibration', () => {
+      const result = resolvePieOptions(sample, {
+        variant: 'doughnut',
+        centerLabels: ['80%', 'CPU'],
+        centerLabelOffset: [12, -8],
+      });
+      const graphic = (optOf(result).graphic as Record<string, unknown>[])[0];
+      expect(graphic.x).toBe(12);
+      expect(graphic.y).toBe(-8);
     });
   });
 });

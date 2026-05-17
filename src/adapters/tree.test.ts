@@ -429,11 +429,14 @@ describe('tree adapter', () => {
       ).toBe(14);
     });
 
-    it('roam defaults to true; can be turned off', () => {
-      expect(getSeries(resolveTreeOptions(sample, {})).roam).toBe(true);
+    it('roam defaults to move (pan only); can be overridden', () => {
+      expect(getSeries(resolveTreeOptions(sample, {})).roam).toBe('move');
       expect(
         getSeries(resolveTreeOptions(sample, { roam: false })).roam,
       ).toBe(false);
+      expect(
+        getSeries(resolveTreeOptions(sample, { roam: true })).roam,
+      ).toBe(true);
     });
 
     it('expandAndCollapse defaults to true; can be turned off', () => {
@@ -455,6 +458,16 @@ describe('tree adapter', () => {
         getSeries(resolveTreeOptions(sample, { initialTreeDepth: 2 }))
           .initialTreeDepth,
       ).toBe(2);
+    });
+
+    it('maps options.lineStyle to series.edgeShape', () => {
+      expect(getSeries(resolveTreeOptions(sample, {})).edgeShape).toBe('polyline');
+      expect(
+        getSeries(resolveTreeOptions(sample, { lineStyle: 'curve' })).edgeShape,
+      ).toBe('curve');
+      expect(
+        getSeries(resolveTreeOptions(sample, { lineStyle: 'polyline' })).edgeShape,
+      ).toBe('polyline');
     });
 
     it('showNodeLabel toggles the series-level label.show flag', () => {

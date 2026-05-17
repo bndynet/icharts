@@ -419,8 +419,9 @@ export function resolveTreeOptions(
     left,
     right,
     symbolSize: options.nodeSize ?? DEFAULT_NODE_SIZE,
-    roam: options.roam ?? true,
+    roam: options.roam ?? 'move',
     expandAndCollapse,
+    edgeShape: options.lineStyle ?? 'polyline',
     initialTreeDepth: options.initialTreeDepth ?? -1, // -1 = fully expanded
     label: {
       show: showLabel,

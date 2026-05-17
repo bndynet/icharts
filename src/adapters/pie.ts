@@ -1,4 +1,9 @@
-import type { PieData, PieChartOptions, PieVariant } from '../types.js';
+import type {
+  PieData,
+  PieChartOptions,
+  PieVariant,
+  PieCenterLabel,
+} from '../types.js';
 import type * as echarts from 'echarts';
 import type { ChartSetupResult, RenderContext } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
@@ -11,6 +16,7 @@ import {
   type EdgeReserves,
   buildTitle,
   buildLegend,
+  compileRichText,
   getLabelFontSize,
   getLegendReserve,
   getTitleReserve,
@@ -18,6 +24,7 @@ import {
   resolveTooltipPosition,
 } from './common.js';
 import { measureTextWidth } from './text-measure.js';
+import { getThemeColors, resolveThemeName, syncColorHubTheme } from '../themes/index.js';
 
 // ---------------------------------------------------------------------------
 // Layout architecture
@@ -96,6 +103,21 @@ const LEGEND_ROW_GAP_PX = 10;
  */
 const LEGEND_ITEM_NON_TEXT_PX = 25 /* itemWidth */ + 5 /* icon-text gap */ + 10 /* item-to-item gap */;
 
+const CENTER_LABEL_DEFAULT_GAP_PX = 4;
+const CENTER_LABEL_PRIMARY_RATIO = 0.135;
+const CENTER_LABEL_PRIMARY_MIN = 18;
+const CENTER_LABEL_PRIMARY_MAX = 72;
+const CENTER_LABEL_LINE_MIN = 10;
+const CENTER_LABEL_LINE_MAX = 96;
+const CENTER_LABEL_SECONDARY_SCALE = 0.4;
+const CENTER_LABEL_FALLBACK_REF = 320;
+const CENTER_LABEL_GRAPHIC_ID = '__ich_pie_center_labels';
+// Keep doughnut ring auto-sizing aligned with gauge `percentage`.
+const PIE_AUTO_RING_RATIO = 0.075;
+const PIE_AUTO_RING_MIN = 8;
+const PIE_AUTO_RING_MAX = 36;
+const PIE_AUTO_RING_FALLBACK = 20;
+
 /**
  * Per-chart-instance marker for the ResizeObserver. Stored as a symbol on
  * the chart so re-runs of `onInit` (each `_apply()` re-fires it) reuse the
@@ -109,6 +131,11 @@ export function resolvePieOptions(
   options: PieChartOptions,
   ctx?: RenderContext,
 ): ChartSetupResult {
+  const themeName = resolveThemeName(options.theme);
+  syncColorHubTheme(themeName);
+  const defaultCenterLabelPrimaryColor = getThemeColors()?.textPrimary;
+  const defaultCenterLabelSecondaryColor = getThemeColors()?.textSecondary;
+
   const variant = (options.variant ?? 'default') as PieVariant;
   const names = data.map((d) => d.name);
   const showLegend = options.legend?.show ?? false;
@@ -143,6 +170,12 @@ export function resolvePieOptions(
     });
   }
 
+  const centerLabels = normalizeCenterLabels(
+    options.centerLabels,
+    defaultCenterLabelPrimaryColor,
+    defaultCenterLabelSecondaryColor,
+  );
+  const centerLabelOffset = options.centerLabelOffset ?? [0, 0];
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
     legend: buildLegend(names, {
@@ -151,6 +184,23 @@ export function resolvePieOptions(
     }),
     tooltip,
     series: buildPieSeries(sorted, options, variant, showSliceLabel),
+    ...(centerLabels
+      ? {
+          graphic: [
+            buildCenterLabelGraphic(
+              centerLabels,
+              variant,
+              0,
+              0,
+              centerLabelOffset[0],
+              centerLabelOffset[1],
+              false,
+              ctx?.containerWidth,
+              ctx?.containerHeight,
+            ),
+          ],
+        }
+      : {}),
   };
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
@@ -159,7 +209,16 @@ export function resolvePieOptions(
   return {
     option: merged,
     onInit: (chart) =>
-      applyAdaptiveLayout(chart, options, variant, showLegend, showSliceLabel, names),
+      applyAdaptiveLayout(
+        chart,
+        options,
+        variant,
+        showLegend,
+        showSliceLabel,
+        names,
+        centerLabels,
+        centerLabelOffset,
+      ),
   };
 }
 
@@ -201,7 +260,7 @@ function computePieLayout(
       ? options.outerRadius
       : Math.max(PIE_MIN_RADIUS_PX, (Math.min(availW, availH) / 2) * PIE_FILL_FACTOR);
 
-  const innerRadius = resolveInnerRadius(variant, options, outerRadius);
+  const innerRadius = resolveInnerRadius(variant, options, outerRadius, availW, availH);
 
   return {
     center: [Math.round(cx), Math.round(cy)],
@@ -246,7 +305,7 @@ function computeHalfDoughnutLayout(
   // collapse to a hairline ring and a giant chart doesn't get an oversize
   // gap. Capped at 60 px so the ring stays visually thin on large cards.
   const ring =
-    typeof outerRadius === 'number' ? Math.min(outerRadius * 0.4, 60) : 30;
+    resolveAutoRingWidth(availW, availH);
   const innerRadius =
     options.innerRadius !== undefined
       ? options.innerRadius
@@ -264,13 +323,29 @@ function resolveInnerRadius(
   variant: PieVariant,
   options: PieChartOptions,
   outerRadius: number | string,
+  availW?: number,
+  availH?: number,
 ): number | string {
   if (options.innerRadius !== undefined) return options.innerRadius;
   if (variant === 'doughnut') {
-    return typeof outerRadius === 'number' ? outerRadius * 0.5 : '50%';
+    if (typeof outerRadius === 'number') {
+      const ring = resolveAutoRingWidth(availW, availH);
+      return Math.max(0, outerRadius - ring);
+    }
+    return '50%';
   }
   if (variant === 'nightingale') return typeof outerRadius === 'number' ? 16 : 20;
   return 0;
+}
+
+function resolveAutoRingWidth(w?: number, h?: number): number {
+  if (!w || !h) return PIE_AUTO_RING_FALLBACK;
+  const ref = Math.min(w, h);
+  return clampRound(
+    ref * PIE_AUTO_RING_RATIO,
+    PIE_AUTO_RING_MIN,
+    PIE_AUTO_RING_MAX,
+  );
 }
 
 /**
@@ -364,6 +439,8 @@ function applyAdaptiveLayout(
   showLegend: boolean,
   showSliceLabel: boolean,
   names: ReadonlyArray<string>,
+  centerLabels?: NormalizedCenterLabels,
+  centerLabelOffset: [number, number] = [0, 0],
 ): void {
   const recompute = (): void => {
     if (chart.isDisposed()) return;
@@ -377,8 +454,26 @@ function applyAdaptiveLayout(
     }
     const reserves = computeEdgeReserves(options, showLegend, showSliceLabel, names, W);
     const layout = computePieLayout(W, H, reserves, variant, options);
+    const payload: Record<string, unknown> = {
+      series: [{ center: layout.center, radius: layout.radius }],
+    };
+    if (centerLabels) {
+      payload.graphic = [
+        buildCenterLabelGraphic(
+          centerLabels,
+          variant,
+          layout.center[0],
+          layout.center[1],
+          centerLabelOffset[0],
+          centerLabelOffset[1],
+          true,
+          W,
+          H,
+        ),
+      ];
+    }
     chart.setOption(
-      { series: [{ center: layout.center, radius: layout.radius }] },
+      payload,
       // Merge, not replace — we only want to overwrite center/radius and
       // leave the data / colors / labels / etc. that the static option
       // already set up.
@@ -494,6 +589,176 @@ function applySliceStyle(series: Record<string, unknown>, options: PieChartOptio
   if (Object.keys(itemStyle).length > 0) {
     series.itemStyle = itemStyle;
   }
+}
+
+interface NormalizedCenterLabelLine {
+  plainText: string;
+  richText?: string;
+  rich?: Record<string, Record<string, unknown>>;
+  isRich: boolean;
+}
+
+interface NormalizedCenterLabels {
+  lines: NormalizedCenterLabelLine[];
+  gap: number;
+  defaultPrimaryColor?: string;
+  defaultSecondaryColor?: string;
+}
+
+function normalizeCenterLabelLine(line: PieCenterLabel, index: number): NormalizedCenterLabelLine {
+  if (typeof line === 'string') {
+    return {
+      plainText: line,
+      isRich: false,
+    };
+  }
+  const compiled = compileRichText(line, `pie_center_${index}`);
+  return {
+    plainText: compiled.plainText,
+    richText: compiled.text,
+    rich: compiled.rich as Record<string, Record<string, unknown>> | undefined,
+    isRich: true,
+  };
+}
+
+function normalizeCenterLabels(
+  centerLabels: PieCenterLabel[] | undefined,
+  defaultPrimaryColor?: string,
+  defaultSecondaryColor?: string,
+): NormalizedCenterLabels | undefined {
+  if (!centerLabels) return undefined;
+  const lines = centerLabels
+    .map((line, index) => normalizeCenterLabelLine(line, index))
+    .filter((line) => line.plainText.trim().length > 0);
+  if (lines.length === 0) return undefined;
+  return {
+    lines,
+    gap: CENTER_LABEL_DEFAULT_GAP_PX,
+    defaultPrimaryColor,
+    defaultSecondaryColor,
+  };
+}
+
+function clampRound(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function resolveCenterLabelBaseFont(w?: number, h?: number): number {
+  const ref = w && h ? Math.min(w, h) : CENTER_LABEL_FALLBACK_REF;
+  return clampRound(
+    ref * CENTER_LABEL_PRIMARY_RATIO,
+    CENTER_LABEL_PRIMARY_MIN,
+    CENTER_LABEL_PRIMARY_MAX,
+  );
+}
+
+function centerLabelToken(index: number): string {
+  return `cl${index}`;
+}
+
+function extractRichTokenKeys(text: string): string[] {
+  const keys: string[] = [];
+  const re = /\{([^|{}]+)\|/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    keys.push(match[1]);
+  }
+  return keys;
+}
+
+function buildCenterLabelRich(
+  centerLabels: NormalizedCenterLabels,
+  variant: PieVariant,
+  w?: number,
+  h?: number,
+): { formatter: string; rich: Record<string, Record<string, unknown>> } {
+  // Half-doughnut dedicates less vertical room to the inner label block, so
+  // nudge base size down slightly to keep two+ lines readable without overlap.
+  const variantScale = variant === 'half-doughnut' ? 0.9 : 1;
+  const base = resolveCenterLabelBaseFont(w, h) * variantScale;
+  const rich: Record<string, Record<string, unknown>> = {};
+  const formatterLines: string[] = [];
+  centerLabels.lines.forEach((line, index) => {
+    const isPrimary = index === 0;
+    const token = centerLabelToken(index);
+    const scale = isPrimary ? 1 : CENTER_LABEL_SECONDARY_SCALE;
+    const fontSize = clampRound(
+      base * scale,
+      CENTER_LABEL_LINE_MIN,
+      CENTER_LABEL_LINE_MAX,
+    );
+    const fontWeight = isPrimary ? 700 : 400;
+    const lineDefaultColor = isPrimary
+      ? centerLabels.defaultPrimaryColor
+      : centerLabels.defaultSecondaryColor ?? centerLabels.defaultPrimaryColor;
+
+    if (!line.isRich || !line.richText || !line.rich) {
+      rich[token] = {
+        fontSize,
+        fontWeight,
+        color: lineDefaultColor,
+        fill: lineDefaultColor,
+        lineHeight: fontSize + centerLabels.gap,
+        align: 'center',
+        verticalAlign: 'middle',
+      };
+      formatterLines.push(`{${token}|${line.plainText}}`);
+      return;
+    }
+    const tokenKeys = extractRichTokenKeys(line.richText);
+    for (const [styleKey, styleValue] of Object.entries(line.rich)) {
+      const shouldApplyLineDefaults = tokenKeys.includes(styleKey);
+      rich[styleKey] = {
+        ...styleValue,
+        fontSize:
+          styleValue.fontSize ?? (shouldApplyLineDefaults ? fontSize : undefined),
+        fontWeight:
+          styleValue.fontWeight ?? (shouldApplyLineDefaults ? fontWeight : undefined),
+        color: styleValue.color ?? lineDefaultColor,
+        fill: (styleValue as Record<string, unknown>).fill ?? styleValue.color ?? lineDefaultColor,
+        lineHeight:
+          styleValue.lineHeight ??
+          (shouldApplyLineDefaults ? fontSize + centerLabels.gap : undefined),
+      };
+    }
+    formatterLines.push(line.richText);
+  });
+  return {
+    formatter: formatterLines.join('\n'),
+    rich,
+  };
+}
+
+function buildCenterLabelGraphic(
+  centerLabels: NormalizedCenterLabels,
+  variant: PieVariant,
+  centerX: number,
+  centerY: number,
+  offsetX: number,
+  offsetY: number,
+  visible: boolean,
+  w?: number,
+  h?: number,
+): Record<string, unknown> {
+  const label = buildCenterLabelRich(centerLabels, variant, w, h);
+  return {
+    id: CENTER_LABEL_GRAPHIC_ID,
+    type: 'text',
+    x: centerX + offsetX,
+    y: centerY + offsetY,
+    invisible: !visible,
+    silent: true,
+    z: 20,
+    style: {
+      x: 0,
+      y: 0,
+      text: label.formatter,
+      rich: label.rich,
+      fill: centerLabels.defaultPrimaryColor,
+      textAlign: 'center',
+      textVerticalAlign: 'middle',
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------

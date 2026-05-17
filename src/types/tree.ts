@@ -112,10 +112,19 @@ export interface TreeChartOptions extends ChartOptions {
    * starting state on large trees.
    */
   initialTreeDepth?: number;
-  /** Allow mouse-wheel zoom and drag-to-pan on the chart. Default: `true`. */
-  roam?: boolean;
+  /**
+   * Roaming behavior for the tree body.
+   * Default: `'move'` (drag-to-pan only; mouse-wheel zoom is disabled).
+   */
+  roam?: boolean | 'move' | 'scale';
   /** Show node-name labels. Default: `true`. */
   showNodeLabel?: boolean;
+  /**
+   * Tree edge rendering style. Maps to ECharts `series.edgeShape`.
+   * Default: `'polyline'`. Use `'polyline'` for orthogonal elbow connectors,
+   * `'curve'` for smooth links.
+   */
+  lineStyle?: 'curve' | 'polyline';
   /**
    * Diameter (px) of every node marker. Default: `7` — matches the
    * ECharts `tree-basic` example, which is calibrated so labels and

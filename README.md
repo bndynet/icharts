@@ -281,7 +281,7 @@ Each node accepts an optional `color` to pin it (and its marker) to a specific h
 
 The adapter automatically flips the node label `position` so labels always point *outward* (parents toward the root edge, leaves toward the opposite edge) and reserves a label-width strip on **both** the root and leaf edges of the active axis so neither end clips. For vertical layouts (`top-to-bottom`, `bottom-to-top`) labels are additionally rotated 90° so the reading direction tracks the tree's growth: `top-to-bottom` uses `rotate: -90` (text reads top-to-bottom alongside a downward-growing tree, matching ECharts' [`tree-vertical`](https://echarts.apache.org/examples/en/editor.html?c=tree-vertical) example); `bottom-to-top` uses `rotate: +90` (text reads bottom-to-top alongside an upward-growing tree). This keeps long node names from competing for horizontal space with their siblings while keeping every label legible in the direction of the tree. Override the rotation via `echarts: { series: [{ label: { rotate: 0 } }] }` if your dataset uses very short names.
 
-**Other knobs** (all optional): `nodeSize` (px, default 7), `roam` (mouse-wheel zoom + drag-to-pan, default `true`), `expandAndCollapse` (click an internal node to collapse / expand its subtree, default `true`), `initialTreeDepth` (start with this many levels visible, default `-1` = fully expanded — useful for large trees: pass `2` to render only the root + one level), `showNodeLabel` (default `true`).
+**Other knobs** (all optional): `nodeSize` (px, default 7), `roam` (pan/zoom behavior; default `'move'` = drag-to-pan only, mouse-wheel zoom disabled), `expandAndCollapse` (click an internal node to collapse / expand its subtree, default `true`), `initialTreeDepth` (start with this many levels visible, default `-1` = fully expanded — useful for large trees: pass `2` to render only the root + one level), `showNodeLabel` (default `true`), `lineStyle` (`'curve' | 'polyline'`, default `'polyline'`, maps to ECharts `series.edgeShape` for smooth vs elbow connectors).
 
 ```ts
 createChart(el, 'tree', orgData, {
@@ -332,7 +332,13 @@ createChart(el, 'bar', {
 ### Doughnut Chart
 
 ```ts
-createChart(el, 'pie', pieData, { variant: 'doughnut' });
+const total = pieData.reduce((sum, item) => sum + item.value, 0);
+
+createChart(el, 'pie', pieData, {
+  variant: 'doughnut',
+  centerLabels: [`${total}%`, 'CPU'],
+  centerLabelOffset: [0, 0], // optional fine-tune in px: [x, y]
+});
 ```
 
 ### Gauge (Percentage)
@@ -813,7 +819,7 @@ Each chart type has its own options interface that extends the base `ChartOption
 ```ts
 {
   variant?: 'default' | 'doughnut' | 'half-doughnut' | 'nightingale';
-  innerRadius?: string | number;
+  innerRadius?: string | number;            // when omitted on doughnut/half-doughnut, ring width auto-sizes by container
   outerRadius?: string | number;
   autoSort?: boolean;                 // default: true (sort slices by value desc)
 
@@ -822,6 +828,9 @@ Each chart type has its own options interface that extends the base `ChartOption
   sliceBorderRadius?: number;
   sliceBorderColor?: string;
   sliceGap?: number;                  // gap between slices, in degrees
+
+  centerLabels?: Array<string | RichTextSpec>; // multi-line center labels, auto-sized, themed text color
+  centerLabelOffset?: [number, number];        // optional px offset for centerLabels: [x, y]
 
   // Pie is the only non-XY chart that renders a legend.
   legend?: {
