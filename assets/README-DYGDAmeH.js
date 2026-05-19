@@ -1,4 +1,4 @@
-const n=`# @bndynet/icharts
+const e=`# @bndynet/icharts
 
 A lightweight charting library with a Web Component (\`<i-chart>\`) and a simple \`createChart()\` API.
 
@@ -78,7 +78,7 @@ chart.dispose();
 | Type   | \`type\` value | Variants |
 |--------|-------------|----------|
 | Line   | \`line\`   | \`default\`, \`spark\` |
-| Bar    | \`bar\`    | \`default\`, \`horizontal\`, \`spark\` |
+| Bar    | \`bar\`    | \`default\`, \`horizontal\`, \`spark\`, \`race\` |
 | Area   | \`area\`   | \`default\`, \`spark\` |
 | Pie    | \`pie\`    | \`default\`, \`doughnut\`, \`half-doughnut\`, \`nightingale\` |
 | Gauge  | \`gauge\`  | \`default\`, \`percentage\` |
@@ -89,7 +89,7 @@ chart.dispose();
 
 ## Data Formats
 
-### Line / Bar / Area — \`XYData\`
+### Line / Bar / Area — \`XYData\` (aliased as \`LineData\` / \`BarData\` / \`AreaData\`)
 
 \`\`\`ts
 {
@@ -100,6 +100,8 @@ chart.dispose();
   ],
 }
 \`\`\`
+
+Line, bar, and area share the same runtime shape. The library exports \`LineData\`, \`BarData\`, and \`AreaData\` aliases for \`XYData\` so call sites and adapters can declare intent explicitly.
 
 ### Pie — \`PieData\`
 
@@ -159,6 +161,27 @@ Each node accepts optional \`color\` and \`value\` fields. When \`value\` is omi
 ---
 
 ## Common Examples
+
+### Bar with Distinct Colors per Category
+
+Single-series bar chart where each bar gets its own palette color (resolved from the category name via \`colorMap\` → theme palette → \`consistentColors\`, exactly like every other "name → color" lookup in the library). The legend is auto-hidden because the series marker would conflict with the per-bar colors drawn on the plot.
+
+\`\`\`ts
+createChart(el, 'bar', {
+  categories: ['Chrome', 'Firefox', 'Safari', 'Edge'],
+  series: [{ name: 'Share', data: [65, 15, 12, 8] }],
+}, {
+  colorByCategory: true,
+  colorMap: {
+    Chrome:  '#4285F4',
+    Firefox: '#FF7139',
+    Safari:  '#1B88CA',
+    Edge:    '#0078D7',
+  },
+});
+\`\`\`
+
+Silently falls back to a single series color when \`stacked: true\` or when the chart has more than one series — per-category colors only make visual sense for single-series bars.
 
 ### Stacked Bar
 
@@ -227,6 +250,60 @@ createChart(el, 'line', {
 
 Supported time formats: \`YYYY-MM-DD\`, \`YYYY/MM/DD\`, \`YYYY-MM-DD HH:mm\`, ISO 8601, Unix timestamps (ms or s).
 
+### Bar Race (Dynamic Sorting Bar Chart)
+
+\`variant: 'race'\` renders one ranked snapshot per call. You drive the animation by calling \`chart.update(nextFrame)\` on your own interval — the library handles the smooth value/position transitions in between.
+
+\`\`\`ts
+const racers = ['USA', 'China', 'India', 'Brazil', 'Japan'];
+
+function frameFor(year: number) {
+  return {
+    categories: racers,                       // stable across frames — defines bar identity
+    series: [{
+      name: 'Population (M)',
+      data: populationLookup[year],           // current values, unsorted
+    }],
+  };
+}
+
+const chart = createChart(el, 'bar', frameFor(1950), {
+  variant: 'race',
+  race: { topN: 10, frameDuration: 1000 },
+  title: 'Population — 1950',
+});
+
+let year = 1950;
+const timer = setInterval(() => {
+  year++;
+  if (year > 2023) { clearInterval(timer); return; }
+  chart.update(frameFor(year), { title: \`Population — \${year}\` });
+}, 1000);
+\`\`\`
+
+Rules for the data you feed each frame:
+
+- \`categories\` defines the racer set — keep its **order and contents stable** across frames. ECharts uses the index to match bars between frames, so any reorder will scramble the animation.
+- Do **not** pre-sort. \`realtimeSort: true\` is on by default; just supply raw values for each racer in their registered order.
+- For racers that are absent in a given frame, use \`0\` (or \`null\`) rather than removing them from \`categories\`.
+- Use only \`series[0]\` — bar race shows a single ranked metric. Additional series are ignored.
+- Match your \`setInterval\` cadence to \`race.frameDuration\` (default 3000 ms) so the previous frame's animation finishes before the next one starts.
+
+Race-specific options live under \`race\`:
+
+\`\`\`ts
+{
+  variant: 'race',
+  race: {
+    topN?: number;            // visible bars (omit to show all); maps to yAxis.max = topN - 1
+    frameDuration?: number;   // ms between frames (default: 3000)
+    showValueLabel?: boolean; // animated value label at bar end (default: true)
+  },
+}
+\`\`\`
+
+Add \`colorByCategory: true\` to give every racer its own color (matches the look of the official ECharts country-race demo). The library auto-hides the legend in that mode.
+
 ### Sankey Chart
 
 \`\`\`ts
@@ -274,7 +351,21 @@ createChart(el, 'chord', {
 
 ## Options Reference
 
-All options are optional.
+Each chart type has its own options interface that extends the base \`ChartOptions\`. All fields are optional.
+
+| Chart type | Options interface | Extends |
+|------------|-------------------|---------|
+| \`line\`     | \`LineChartOptions\`   | \`XYChartOptions\` |
+| \`bar\`      | \`BarChartOptions\`    | \`XYChartOptions\` |
+| \`area\`     | \`AreaChartOptions\`   | \`XYChartOptions\` |
+| \`pie\`      | \`PieChartOptions\`    | \`ChartOptions\`   |
+| \`gauge\`    | \`GaugeChartOptions\`  | \`ChartOptions\`   |
+| \`sankey\`   | \`SankeyChartOptions\` | \`ChartOptions\`   |
+| \`chord\`    | \`ChordChartOptions\`  | \`ChartOptions\`   |
+
+\`createChart\` accepts an \`AnyChartOptions\` union — a chart-specific literal like \`{ innerRadius: '50%' }\` type-checks as \`PieChartOptions\` without importing the subtype. For stricter validation, import the matching \`XxxChartOptions\` and annotate explicitly.
+
+### \`ChartOptions\` (cross-cutting, base for every chart)
 
 \`\`\`ts
 {
@@ -298,13 +389,42 @@ All options are optional.
   colors?: string[];                 // override color palette
   colorMap?: Record<string, string>; // pin series/node names to specific colors
 
-  // Layout
-  variant?: string;                  // chart-type variant (see table above)
-  stacked?: boolean;                 // stack series (line / bar / area)
-  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
-  grid?: { top?: number; right?: number; bottom?: number; left?: number };
+  // Tooltip
+  tooltip?: {
+    enabled?: boolean;
+    /** Format the tooltip header when using a time x-axis (line/bar/area). */
+    dateFormat?: string;
+    /** Format each rendered value (axis-mode, pie slice, sankey/chord node/edge). */
+    formatValue?: (value: number | string, name: string) => string;
+    /**
+     * Append asynchronously loaded HTML below the chart's default tooltip body.
+     * Receives a normalized TooltipContext — narrow with \`ctx.kind\`:
+     *   - 'axis' for line / bar / area
+     *   - 'item' for pie slice, sankey/chord node
+     *   - 'edge' for sankey/chord link
+     * Not applied to spark variants or when \`tooltip.enabled === false\`.
+     */
+    customHtml?: (ctx: TooltipContext) => Promise<string>;
+    /** Shown while \`customHtml\` is pending. Default: 'Loading…' */
+    placeholder?: string;
+  };
 
-  // Axis (line / bar / area)
+  // Advanced passthrough — for anything not covered above
+  echarts?: Record<string, unknown>;
+}
+\`\`\`
+
+> \`legend\` and \`grid\` are intentionally **not** on the base — only chart types
+> that actually render them expose the field. \`legend\` lives on \`XYChartOptions\`
+> and \`PieChartOptions\`; \`grid\` lives on \`XYChartOptions\`. Gauge, sankey, and
+> chord render neither.
+
+### \`XYChartOptions\` (shared by line / bar / area, extends \`ChartOptions\`)
+
+\`\`\`ts
+{
+  stacked?: boolean;                 // stack series (line / bar / area)
+
   xAxis?: {
     name?: string;
     dateFormat?: string;              // e.g. 'MM/DD', 'YYYY-MM-DD'
@@ -316,27 +436,7 @@ All options are optional.
     formatLabel?: (value: string | number, index: number) => string;
   };
 
-  // Pie
-  innerRadius?: string | number;
-  outerRadius?: string | number;
-  autoSort?: boolean;
-  slice?: {
-    borderRadius?: number;
-    borderColor?: string;
-    gap?: number;                     // gap between slices in px
-  };
-
-  // Gauge
-  gaugeWidth?: number;
-
-  // Tooltip
-  tooltip?: {
-    enabled?: boolean;
-    dateFormat?: string;
-    formatValue?: (value: number | string, name: string) => string;
-  };
-
-  // Per-series overrides (keyed by series/node name, '*' applies to all)
+  // Per-series overrides (keyed by series name, '*' applies to all)
   series?: Record<string, {
     type?: 'line' | 'bar';
     smooth?: boolean | number;        // true, false, or 0–1 curveness
@@ -349,11 +449,88 @@ All options are optional.
     markLines?: ('average' | 'max' | 'min')[];
     markPoints?: ('max' | 'min')[];
   }>;
-
-  // Advanced passthrough — for anything not covered above
-  echarts?: Record<string, unknown>;
 }
 \`\`\`
+
+### \`LineChartOptions\` (extends \`XYChartOptions\`)
+
+\`\`\`ts
+{
+  variant?: 'default' | 'spark';
+}
+\`\`\`
+
+### \`BarChartOptions\` (extends \`XYChartOptions\`)
+
+\`\`\`ts
+{
+  variant?: 'default' | 'horizontal' | 'spark' | 'race';
+
+  // Bar sizing + per-bar coloring — apply to every variant, flat on the subtype.
+  barWidth?: number | string;       // bar thickness, e.g. 24 or '60%'
+  barMaxWidth?: number | string;    // cap on bar thickness
+  barMinWidth?: number | string;    // floor on bar thickness
+  barGap?: number | string;         // gap between bars of different series, default: '30%'
+  barCategoryGap?: number | string; // gap between bar groups, default: '20%'
+  colorByCategory?: boolean;        // color each bar by category name (auto-hides legend)
+
+  // Variant-specific sub-namespace — only consulted when \`variant === 'race'\`.
+  race?: {
+    topN?: number;            // visible bars; maps to yAxis.max = topN - 1
+    frameDuration?: number;   // ms between frames, default: 3000
+    showValueLabel?: boolean; // animated value label at bar end, default: true
+  };
+}
+\`\`\`
+
+### \`AreaChartOptions\` (extends \`XYChartOptions\`)
+
+\`\`\`ts
+{
+  variant?: 'default' | 'spark';
+}
+\`\`\`
+
+### \`PieChartOptions\` (extends \`ChartOptions\`)
+
+\`\`\`ts
+{
+  variant?: 'default' | 'doughnut' | 'half-doughnut' | 'nightingale';
+  innerRadius?: string | number;
+  outerRadius?: string | number;
+  autoSort?: boolean;                 // default: true (sort slices by value desc)
+
+  // Slice styling — flat on the subtype, \`slice\` prefix disambiguates the
+  // otherwise-generic field names at the top level.
+  sliceBorderRadius?: number;
+  sliceBorderColor?: string;
+  sliceGap?: number;                  // gap between slices, in degrees
+
+  // Pie is the only non-XY chart that renders a legend.
+  legend?: { show?: boolean; position?: 'top' | 'bottom' | 'left' | 'right' };
+}
+\`\`\`
+
+### \`GaugeChartOptions\` (extends \`ChartOptions\`)
+
+\`\`\`ts
+{
+  variant?: 'default' | 'percentage';
+  gaugeWidth?: number;                // arc thickness in px
+}
+\`\`\`
+
+### \`SankeyChartOptions\` (extends \`ChartOptions\`)
+
+\`\`\`ts
+{
+  variant?: 'default' | 'vertical';
+}
+\`\`\`
+
+### \`ChordChartOptions\` (extends \`ChartOptions\`)
+
+No chord-specific knobs today; reuses every field on the base \`ChartOptions\`.
 
 ---
 
@@ -499,4 +676,4 @@ npm run typecheck  # Type check
 ## License
 
 MIT
-`;export{n as default};
+`;export{e as default};
