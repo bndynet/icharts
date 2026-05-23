@@ -48,9 +48,42 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
 // Number / string helpers
 // ---------------------------------------------------------------------------
 
-export function formatNumber(value?: number | string): string {
+export function formatNumber(
+  value?: number | string,
+  options?: FormatNumberOptions,
+): string {
+  return formatNumberWithOptions(value, options);
+}
+
+export interface FormatNumberOptions extends Intl.NumberFormatOptions {
+  compact?: boolean;
+  locale?: string;
+}
+
+function formatNumberWithOptions(
+  value?: number | string,
+  options?: FormatNumberOptions,
+): string {
   if (value === undefined || value === null) return '';
-  return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  if (!options) {
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  const {
+    compact = false,
+    locale,
+    ...numberFormatOptions
+  } = options;
+
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return '';
+
+  const formatter = new Intl.NumberFormat(locale, {
+    ...(compact ? { notation: 'compact', compactDisplay: 'short' as const } : {}),
+    useGrouping: true,
+    ...numberFormatOptions,
+  });
+  return formatter.format(numericValue);
 }
 
 export function isTimestamp(value: unknown): boolean {

@@ -12,6 +12,7 @@ import {
   pieParamsToTooltipContext,
 } from '../tooltip-context.js';
 import { deepMerge, resolveColors } from '../utils.js';
+import { getConfig } from '../config.js';
 import {
   type EdgeReserves,
   buildTitle,
@@ -770,6 +771,11 @@ function buildCenterLabelGraphic(
   h?: number,
 ): Record<string, unknown> {
   const label = buildCenterLabelRich(centerLabels, variant, w, h);
+  const configuredFontFamily = getConfig().fontFamily?.trim();
+  const rich =
+    configuredFontFamily
+      ? applyFontFamilyToRichStyles(label.rich, configuredFontFamily)
+      : label.rich;
   return {
     id: CENTER_LABEL_GRAPHIC_ID,
     type: 'text',
@@ -782,12 +788,35 @@ function buildCenterLabelGraphic(
       x: 0,
       y: 0,
       text: label.formatter,
-      rich: label.rich,
+      rich,
       fill: centerLabels.defaultPrimaryColor,
+      ...(configuredFontFamily ? { fontFamily: configuredFontFamily } : {}),
       textAlign: 'center',
       textVerticalAlign: 'middle',
     },
   };
+}
+
+function applyFontFamilyToRichStyles(
+  rich: Record<string, unknown>,
+  fontFamily: string,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, style] of Object.entries(rich)) {
+    if (!style || typeof style !== 'object') {
+      out[key] = style;
+      continue;
+    }
+    const styleRecord = style as Record<string, unknown>;
+    const existing = styleRecord.fontFamily;
+    out[key] = {
+      ...styleRecord,
+      ...(typeof existing === 'string' && existing.trim().length > 0
+        ? {}
+        : { fontFamily }),
+    };
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

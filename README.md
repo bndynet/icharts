@@ -87,6 +87,7 @@ chart.dispose();
 | Area   | `area`   | `default`, `spark` |
 | Pie    | `pie`    | `default`, `doughnut`, `half-doughnut`, `nightingale` |
 | Gauge  | `gauge`  | `default`, `percentage` |
+| Liquid Progress | `liquidprogress` | `default` |
 | Sankey | `sankey` | `default`, `vertical` |
 | Chord  | `chord`  | `default` |
 | Radar  | `radar`  | `default`, `circle` |
@@ -144,6 +145,16 @@ Line, bar, and area share the same runtime shape. The library exports `LineData`
 `max` / `label` to keep them, include the key to override (`label: ''`
 clears the caption; `max: undefined` drops a custom max so the default
 `100` applies).
+
+### Liquid Progress — `LiquidProgressData`
+
+```ts
+{ value: 72, max: 100, label: 'Storage' }
+```
+
+`LiquidProgressData` matches gauge's single-metric shape and supports the same
+partial update merge behavior: `chart.update({ value })` keeps `max`/`label`
+from the previous frame unless explicitly provided.
 
 ### Sankey — `SankeyData`
 
@@ -358,6 +369,17 @@ createChart(el, 'pie', pieData, {
 
 ```ts
 createChart(el, 'gauge', { value: 85, label: 'CPU' }, { variant: 'percentage' });
+```
+
+### Liquid Progress
+
+```ts
+createChart(el, 'liquidprogress', {
+  value: 72, max: 100, label: 'Storage',
+}, {
+  title: 'Storage Usage',
+  waveCount: 3,
+});
 ```
 
 ### Spark Line (mini, no axes)
@@ -611,6 +633,7 @@ Each chart type has its own options interface that extends the base `ChartOption
 | `area`     | `AreaChartOptions`   | `XYChartOptions` |
 | `pie`      | `PieChartOptions`    | `ChartOptions`   |
 | `gauge`    | `GaugeChartOptions`  | `ChartOptions`   |
+| `liquidprogress` | `LiquidProgressChartOptions` | `ChartOptions` |
 | `sankey`   | `SankeyChartOptions` | `ChartOptions`   |
 | `chord`    | `ChordChartOptions`  | `ChartOptions`   |
 | `radar`    | `RadarChartOptions`  | `ChartOptions`   |
@@ -871,6 +894,17 @@ from the rendered container — `min(width, height)` — so the gauge keeps
 balanced proportions across small KPI tiles and large hero cards, and
 re-flows when the chart resizes. An explicit `gaugeWidth` always wins.
 The `default` variant keeps fixed defaults regardless of container size.
+
+### `LiquidProgressChartOptions` (extends `ChartOptions`)
+
+```ts
+{
+  variant?: 'default';
+  radius?: string | number;           // default: '70%'
+  waveCount?: number;                 // default: 3
+  borderWidth?: number;               // default: 2
+}
+```
 
 ### `SankeyChartOptions` (extends `ChartOptions`)
 

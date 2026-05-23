@@ -10,6 +10,7 @@ export enum ChartType {
   Area = 'area',
   Pie = 'pie',
   Gauge = 'gauge',
+  LiquidProgress = 'liquidprogress',
   Sankey = 'sankey',
   Chord = 'chord',
   Radar = 'radar',

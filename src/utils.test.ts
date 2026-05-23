@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { ChordData, SankeyData, PieData, XYData } from './types.js';
-import { resolveColors, resolveColorsForNodes } from './utils.js';
+import { formatNumber, resolveColors, resolveColorsForNodes } from './utils.js';
 import { resolveChordOptions } from './adapters/chord.js';
 import { resolveSankeyOptions } from './adapters/sankey.js';
 import { resolvePieOptions } from './adapters/pie.js';
@@ -31,6 +31,40 @@ describe('resolveColors', () => {
 
   it('returns an empty array for empty input', () => {
     expect(resolveColors([], {})).toEqual([]);
+  });
+});
+
+describe('formatNumber', () => {
+  it('keeps existing thousands-separator behavior by default', () => {
+    expect(formatNumber(1234567)).toBe('1,234,567');
+    expect(formatNumber(-1234567)).toBe('-1,234,567');
+  });
+
+  it('formats compact numbers in en-US', () => {
+    expect(formatNumber(1200, { compact: true, locale: 'en-US' })).toMatch(/^1(\.2)?K$/);
+    expect(formatNumber(-1500000, { compact: true, locale: 'en-US' })).toMatch(/^-1(\.5)?M$/);
+  });
+
+  it('uses runtime default locale when locale is omitted', () => {
+    const expected = new Intl.NumberFormat(undefined, {
+      notation: 'compact',
+      compactDisplay: 'short',
+      useGrouping: true,
+    }).format(1200);
+    expect(formatNumber(1200, { compact: true })).toBe(expected);
+  });
+
+  it('formats compact numbers in zh-CN', () => {
+    expect(formatNumber(1230000, { compact: true, locale: 'zh-CN' })).toContain('万');
+    const formattedNegative = formatNumber(-123000000, { compact: true, locale: 'zh-CN' });
+    expect(formattedNegative.startsWith('-')).toBe(true);
+    expect(formattedNegative).toMatch(/(万|亿)/);
+  });
+
+  it('returns empty string for non-finite inputs when intl formatting is requested', () => {
+    expect(formatNumber('abc', { compact: true })).toBe('');
+    expect(formatNumber(Number.NaN, { compact: true })).toBe('');
+    expect(formatNumber(Number.POSITIVE_INFINITY, { compact: true })).toBe('');
   });
 });
 

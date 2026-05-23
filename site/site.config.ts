@@ -36,6 +36,11 @@ export default defineConfig({
           page: () => import('./views/charts/GaugeCharts.vue'),
         },
         {
+          label: 'Liquid Progress',
+          icon: 'droplets',
+          page: () => import('./views/charts/LiquidProgressCharts.vue'),
+        },
+        {
           label: 'Chord',
           icon: 'orbit',
           page: () => import('./views/charts/ChordCharts.vue'),

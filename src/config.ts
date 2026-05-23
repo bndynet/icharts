@@ -3,17 +3,25 @@ import { resetColorMap } from './themes/index.js';
 
 export interface IChartsConfig {
   consistentColors: boolean;
+  fontFamily?: string;
 }
 
-let currentConfig: IChartsConfig = {
+const DEFAULT_CONFIG: Readonly<IChartsConfig> = {
   consistentColors: false,
+  fontFamily: undefined,
 };
+
+let currentConfig: IChartsConfig = { ...DEFAULT_CONFIG };
 
 export function configure(opts: Partial<IChartsConfig>): void {
   const prev = { ...currentConfig };
   currentConfig = { ...currentConfig, ...opts };
 
-  if (prev.consistentColors !== currentConfig.consistentColors) {
+  const shouldRerender =
+    prev.consistentColors !== currentConfig.consistentColors ||
+    prev.fontFamily !== currentConfig.fontFamily;
+
+  if (shouldRerender) {
     if (currentConfig.consistentColors) {
       resetColorMap();
     }
@@ -26,6 +34,11 @@ export function configure(opts: Partial<IChartsConfig>): void {
       chart.update();
     }
   }
+}
+
+/** Reset configure() state back to library defaults. */
+export function resetConfiguration(): void {
+  configure({ ...DEFAULT_CONFIG });
 }
 
 export function getConfig(): Readonly<IChartsConfig> {

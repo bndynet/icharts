@@ -56,6 +56,7 @@ export {
   type PieData,
   type PieDataItem,
   type GaugeData,
+  type LiquidProgressData,
   type SankeyData,
   type SankeyNode,
   type SankeyLink,
@@ -80,6 +81,7 @@ export {
   type AreaChartOptions,
   type PieChartOptions,
   type GaugeChartOptions,
+  type LiquidProgressChartOptions,
   type SankeyChartOptions,
   type ChordChartOptions,
   type RadarChartOptions,
@@ -109,6 +111,7 @@ export {
   type AreaVariant,
   type PieVariant,
   type GaugeVariant,
+  type LiquidProgressVariant,
   type SankeyVariant,
   type RadarVariant,
   type NetworkVariant,
@@ -119,15 +122,22 @@ export {
   isNetworkData,
   isTreeData,
   isWordCloudData,
+  isLiquidProgressData,
+  mergeLiquidProgressData,
 } from './types.js';
 
 // Configuration
-export { configure, type IChartsConfig } from './config.js';
+export { configure, resetConfiguration, type IChartsConfig } from './config.js';
 
-// Color resolver — single entry point for "name → color".
+// Number + color helpers.
 // Adapters call these directly to obtain colors; the result is then attached
 // to whichever ECharts option field makes sense for the chart type.
-export { resolveColors, resolveColorsForNodes } from './utils.js';
+export {
+  formatNumber,
+  type FormatNumberOptions,
+  resolveColors,
+  resolveColorsForNodes,
+} from './utils.js';
 
 // Theme utilities
 export {

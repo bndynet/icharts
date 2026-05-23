@@ -136,6 +136,7 @@ import {
   isXYData,
   isPieData,
   isGaugeData,
+  isLiquidProgressData,
   isSankeyData,
   isChordData,
   isRadarData,
@@ -149,6 +150,7 @@ import type {
   AreaData,
   PieData,
   GaugeData,
+  LiquidProgressData,
   SankeyData,
   ChordData,
   RadarData,
@@ -160,6 +162,7 @@ import type {
   AreaChartOptions,
   PieChartOptions,
   GaugeChartOptions,
+  LiquidProgressChartOptions,
   SankeyChartOptions,
   ChordChartOptions,
   RadarChartOptions,
@@ -171,6 +174,7 @@ import { resolveLineOptions, resolveAreaOptions } from './line.js';
 import { resolveBarOptions } from './bar.js';
 import { resolvePieOptions } from './pie.js';
 import { resolveGaugeOptions } from './gauge.js';
+import { resolveLiquidProgressOptions } from './liquid-progress.js';
 import { resolveSankeyOptions } from './sankey.js';
 import { resolveChordOptions } from './chord.js';
 import { resolveRadarOptions } from './radar.js';
@@ -214,6 +218,18 @@ registerAdapter(ChartType.Gauge, {
     // Merge successive frames so ECharts can animate pointer / progress /
     // detail.valueAnimation when consumers drive live metrics via
     // `chart.update({ value })` on an interval.
+    notMerge: false,
+  }),
+});
+
+registerAdapter(ChartType.LiquidProgress, {
+  validate: isLiquidProgressData,
+  resolve: (data, options, ctx) => ({
+    option: resolveLiquidProgressOptions(
+      data as LiquidProgressData,
+      options as LiquidProgressChartOptions,
+      ctx,
+    ),
     notMerge: false,
   }),
 });

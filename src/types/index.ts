@@ -12,6 +12,7 @@ export * from './bar.js';
 export * from './area.js';
 export * from './pie.js';
 export * from './gauge.js';
+export * from './liquid-progress.js';
 export * from './sankey.js';
 export * from './chord.js';
 export * from './radar.js';

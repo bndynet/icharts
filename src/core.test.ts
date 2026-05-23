@@ -34,6 +34,7 @@ vi.mock('@echarts-x/custom-word-cloud', () => ({
 
 import { IChart } from './core.js';
 import { registerAdapter, type RenderContext } from './adapters/index.js';
+import { configure, resetConfiguration } from './config.js';
 import type { ChartData } from './types.js';
 
 const observations: Array<RenderContext | undefined> = [];
@@ -54,6 +55,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  resetConfiguration();
 });
 
 /** Cast to satisfy the `HTMLElement` arg without a real DOM. */
@@ -413,6 +415,91 @@ describe('IChart engine — async tooltip dismiss wiring', () => {
     // No new `on` call — the new option has no dismiss to wire.
     expect(ec.on).toHaveBeenCalledTimes(1);
 
+    chart.dispose();
+  });
+});
+
+describe('IChart engine — configured fontFamily propagation', () => {
+  it('applies configure({ fontFamily }) to root, series labels, and graphic text', () => {
+    registerAdapter('font-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: {
+          title: { text: 'Revenue', textStyle: { color: '#111827' } },
+          legend: { show: true, textStyle: { color: '#111827' } },
+          series: [
+            {
+              type: 'pie',
+              data: [{ name: 'A', value: 1 }],
+              label: { show: true },
+              emphasis: { label: { show: true } },
+            },
+          ],
+          graphic: [
+            {
+              type: 'text',
+              style: {
+                text: '{a|Total}',
+                rich: { a: { fontSize: 18 } },
+              },
+            },
+          ],
+        },
+      }),
+    });
+
+    configure({ fontFamily: 'Inter, sans-serif' });
+    const chart = new IChart(fakeContainer(), 'font-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      setOption: ReturnType<typeof vi.fn>;
+    };
+    const option = ec.setOption.mock.calls[0][0] as {
+      textStyle?: { fontFamily?: string };
+      title?: { textStyle?: { fontFamily?: string } };
+      legend?: { textStyle?: { fontFamily?: string } };
+      series?: Array<{ label?: { fontFamily?: string }; emphasis?: { label?: { fontFamily?: string } } }>;
+      graphic?: Array<{ style?: { fontFamily?: string; rich?: Record<string, { fontFamily?: string }> } }>;
+    };
+
+    expect(option.textStyle?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.title?.textStyle?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.legend?.textStyle?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.series?.[0]?.label?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.series?.[0]?.emphasis?.label?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.graphic?.[0]?.style?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.graphic?.[0]?.style?.rich?.a?.fontFamily).toBe('Inter, sans-serif');
+
+    chart.dispose();
+  });
+
+  it('fills empty or undefined fontFamily fields instead of falling back to ECharts defaults', () => {
+    registerAdapter('font-empty-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: {
+          series: [
+            {
+              type: 'line',
+              data: [1, 2, 3],
+              label: { show: true, fontFamily: undefined as unknown as string },
+              emphasis: { label: { show: true, fontFamily: '' } },
+            },
+          ],
+        },
+      }),
+    });
+
+    configure({ fontFamily: 'Inter, sans-serif' });
+    const chart = new IChart(fakeContainer(), 'font-empty-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      setOption: ReturnType<typeof vi.fn>;
+    };
+    const option = ec.setOption.mock.calls[0][0] as {
+      series?: Array<{ label?: { fontFamily?: string }; emphasis?: { label?: { fontFamily?: string } } }>;
+    };
+
+    expect(option.series?.[0]?.label?.fontFamily).toBe('Inter, sans-serif');
+    expect(option.series?.[0]?.emphasis?.label?.fontFamily).toBe('Inter, sans-serif');
     chart.dispose();
   });
 });

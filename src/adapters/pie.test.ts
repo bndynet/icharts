@@ -1,9 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { PieData, PieChartOptions, PieVariant } from '../types.js';
 import { isPieData } from '../types.js';
 import { resolvePieOptions, __test } from './pie.js';
 import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
 import { getThemeColors } from '../themes/index.js';
+import { configure, resetConfiguration } from '../config.js';
 
 const { computeEdgeReserves, computePieLayout } = __test;
 
@@ -28,6 +29,10 @@ const labelOf = (r: ReturnType<typeof resolvePieOptions>): Record<string, unknow
   seriesOf(r).label as Record<string, unknown>;
 
 describe('pie adapter', () => {
+  afterEach(() => {
+    resetConfiguration();
+  });
+
   describe('resolvePieOptions — static option', () => {
     it('builds a single pie series with slices sorted by value desc', () => {
       const result = resolvePieOptions(sample, {});
@@ -185,6 +190,21 @@ describe('pie adapter', () => {
       expect(typeof formatter).toBe('function');
       expect(formatter('Pro')).toBe('Pro (880)');
       expect(formatter('Premium')).toBe('Premium (420)');
+    });
+
+    it('applies configure({ fontFamily }) to center-label graphic text', () => {
+      configure({ fontFamily: 'Inter, sans-serif' });
+      const result = resolvePieOptions(sample, {
+        variant: 'doughnut',
+        centerLabels: ['3715', 'Total'],
+      });
+      const graphic = optOf(result).graphic as Array<Record<string, unknown>>;
+      const style = (graphic[0]?.style ?? {}) as Record<string, unknown>;
+      expect(style.fontFamily).toBe('Inter, sans-serif');
+      const rich = (style.rich ?? {}) as Record<string, Record<string, unknown>>;
+      for (const richStyle of Object.values(rich)) {
+        expect(richStyle.fontFamily).toBe('Inter, sans-serif');
+      }
     });
   });
 

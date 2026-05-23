@@ -189,9 +189,10 @@ export function buildEChartsTheme(
       lineStyle: { color: colors.axisLine },
     },
     custom: {
-      // Wordcloud is implemented via ECharts custom series (`renderItem:
-      // 'wordCloud'`). Keep custom-series labels on the same theme token
-      // so any label-like text emitted by custom charts remains legible.
+      // Wordcloud and liquidprogress are implemented via ECharts custom
+      // series (`renderItem: 'wordCloud'` / `'liquidFill'`). Keep
+      // custom-series labels on the same theme token so any label-like
+      // text emitted by custom charts remains legible.
       label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE },
     },
   };

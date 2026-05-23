@@ -6,6 +6,11 @@ import type { BarVariant, BarChartOptions } from './bar.js';
 import type { AreaVariant, AreaChartOptions } from './area.js';
 import type { PieVariant, PieData, PieChartOptions } from './pie.js';
 import type { GaugeVariant, GaugeData, GaugeChartOptions } from './gauge.js';
+import type {
+  LiquidProgressVariant,
+  LiquidProgressData,
+  LiquidProgressChartOptions,
+} from './liquid-progress.js';
 import type { SankeyVariant, SankeyData, SankeyChartOptions } from './sankey.js';
 import type { ChordData, ChordChartOptions } from './chord.js';
 import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
@@ -30,6 +35,7 @@ export type ChartVariant =
   | AreaVariant
   | PieVariant
   | GaugeVariant
+  | LiquidProgressVariant
   | SankeyVariant
   | RadarVariant
   | NetworkVariant
@@ -39,6 +45,7 @@ export type ChartData =
   | XYData
   | PieData
   | GaugeData
+  | LiquidProgressData
   | SankeyData
   | ChordData
   | RadarData
@@ -63,6 +70,7 @@ export type AnyChartOptions =
   | AreaChartOptions
   | PieChartOptions
   | GaugeChartOptions
+  | LiquidProgressChartOptions
   | SankeyChartOptions
   | ChordChartOptions
   | RadarChartOptions

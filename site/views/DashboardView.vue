@@ -278,6 +278,8 @@ import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
   createChart,
   configure,
+  resetConfiguration,
+  formatNumber,
   switchTheme,
   registerTheme,
   getCurrentTheme,
@@ -474,6 +476,21 @@ function kpiDeltaClass(k: DashboardKpi): 'up' | 'down' {
   return goingUp === k.deltaPositiveIsGood ? 'up' : 'down';
 }
 
+function resolveDashboardFontFamily(): string {
+  const cssVar = getComputedStyle(document.documentElement)
+    .getPropertyValue('--el-font-family')
+    .trim();
+  if (cssVar) return cssVar;
+  return getComputedStyle(document.body).fontFamily.trim();
+}
+
+const SCI_FI_FONT_FAMILY = "ui-monospace, 'SF Mono', Menlo, Consolas, monospace";
+function resolveDashboardChartFontFamily(themeName?: string): string {
+  return themeName === 'dash-scifi'
+    ? SCI_FI_FONT_FAMILY
+    : resolveDashboardFontFamily();
+}
+
 // ── Refs ──────────────────────────────────────────────────────────────────
 const kpiSparkEls = ref<HTMLElement[]>([]);
 function bindKpiSpark(el: unknown, i: number): void {
@@ -509,7 +526,10 @@ let resizeHandler: (() => void) | null = null;
 
 onMounted(() => {
   registerDashboardThemes();
-  configure({ consistentColors: true });
+  configure({
+    consistentColors: true,
+    fontFamily: resolveDashboardChartFontFamily(activeTheme.value || undefined),
+  });
   // Don't force a dashboard theme on first paint — let the site's current
   // light/dark theme drive the palette until the user picks one from the
   // segmented control above.
@@ -548,7 +568,7 @@ onMounted(() => {
     colorMap: PIN_COLOR_MAP,
     variant: 'doughnut',
     legend: { show: true, position: 'right' },
-    centerLabels: [`${shareElTotal.toLocaleString()}`, 'Total'],
+    centerLabels: [formatNumber(shareElTotal, { compact: true }), 'Total'],
   }));
 
   track(createChart(cumulativeEl.value!, 'area', buildMonthlyTrend(), {
@@ -697,6 +717,9 @@ onMounted(() => {
 // `clientWidth`/`clientHeight`.
 watch(activeTheme, async (next) => {
   highlightThemePicker.value = false;
+  configure({
+    fontFamily: resolveDashboardChartFontFamily(next || undefined),
+  });
   if (!next) return;
   const meta = themeOptions.find((o) => o.value === next);
   if (meta && siteTheme.value !== meta.colorMode) {
@@ -728,7 +751,7 @@ onUnmounted(() => {
 
   // Restore the global icharts state so charts on other pages don't inherit
   // the dashboard's consistentColors flag or active theme.
-  configure({ consistentColors: false });
+  resetConfiguration();
   switchTheme(siteTheme.value);
 });
 </script>

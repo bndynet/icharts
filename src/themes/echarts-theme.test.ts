@@ -82,7 +82,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.tree.label.color).toBe(COLORS.textPrimary);
   });
 
-  it('custom.label.color follows textPrimary (wordcloud custom-series labels)', () => {
+  it('custom.label.color follows textPrimary (wordcloud + liquidprogress labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.custom.label.color).toBe(COLORS.textPrimary);
   });
