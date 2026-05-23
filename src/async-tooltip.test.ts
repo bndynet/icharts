@@ -21,6 +21,19 @@ describe('escapeTooltipHtml', () => {
 });
 
 describe('createAsyncTooltipFormatter', () => {
+  it('renders customHtml alone when formatSync is empty (no separator row)', async () => {
+    const formatter = createAsyncTooltipFormatter({
+      formatSync: () => '',
+      customHtml: async () => '<b>ONLY</b>',
+    });
+    const callback = vi.fn();
+    formatter({ name: 'A' }, 't0', callback);
+    await flushAsync();
+    const html = callback.mock.calls[0][1] as string;
+    expect(html).toContain('<b>ONLY</b>');
+    expect(html).not.toContain('icharts-tooltip-extra');
+  });
+
   it('returns the synchronous body immediately and resolves async HTML via the callback', async () => {
     const customHtml = vi.fn(async () => 'EXTRA');
     const formatter = createAsyncTooltipFormatter({

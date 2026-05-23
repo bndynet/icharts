@@ -3,19 +3,25 @@ import type {
   TreeNode,
   TreeChartOptions,
   TreeDirection,
+  TreeNodeIconSpec,
 } from '../types.js';
-import type { RenderContext } from './index.js';
+import type { ChartSetupResult, RenderContext } from './index.js';
 import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
+import { getConfig } from '../config.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
+  applyConfiguredFontFamilyToOption,
   buildTitle,
+  compileRichText,
   getLabelFontSize,
   getTitleReserve,
+  measureCompiledLabelWidth,
+  mergeCompiledRichStyles,
+  renderIconDataUrl,
   resolveAppendToBody,
   resolveTooltipPosition,
 } from './common/index.js';
-import { buildLabelFont, measureMaxTextWidth } from './common/text-measure.js';
 
 /**
  * Default node marker diameter (px). Matches the ECharts `tree-basic`
@@ -206,23 +212,172 @@ function collectNodeNames(root: TreeNode): string[] {
  * separately for the body-reserve math.
  */
 interface SplitNodeNames {
-  leafNames: string[];
-  parentNames: string[];
+  leafLabels: Array<{ name: string; compiled: ReturnType<typeof compileRichText> }>;
+  parentLabels: Array<{ name: string; compiled: ReturnType<typeof compileRichText> }>;
 }
 
-function splitNodeNames(root: TreeNode): SplitNodeNames {
-  const leafNames: string[] = [];
-  const parentNames: string[] = [];
-  const visit = (node: TreeNode): void => {
+const TREE_LABEL_TOKEN_KEY = '__ichLabelText';
+const TREE_ICON_META_KEY = '__ichIconMeta';
+
+/**
+ * Fallback border / fill color when the resolver doesn't surface a
+ * palette color for a node (e.g. the node's name isn't in the resolved
+ * `names` array, which shouldn't happen for tree adapters but is
+ * defensive). Slate-400-equivalent — visible against both light and
+ * dark themes without screaming for attention. Adapters elsewhere use
+ * the same neutral as a last-resort defensive color.
+ */
+const TREE_ICON_FALLBACK_COLOR = '#94a3b8';
+
+/**
+ * Icon→label gap calibration for nodes that carry a custom icon
+ * (`formatNodeIcon` returned an `image` / `circle` spec). ECharts'
+ * default `label.distance` is 5 px — fine for a 7 px dot, but reads
+ * as cramped as soon as the symbol carries any real visual mass
+ * (avatars, logos, app icons). We scale the gap proportionally to the
+ * icon's larger dimension and clamp at a comfortable floor:
+ *
+ *   distance = max(round(maxIconDim * RATIO), FLOOR)
+ *
+ * Calibration:
+ *   - 36 px avatar → 12 px gap (comfortable list-item spacing)
+ *   - 24 px icon  → 8 px (clamped to floor; tight icons don't need
+ *                          loose labels)
+ *   - 12 px badge → 8 px (floor)
+ *
+ * Why 1/3 + an 8 px floor (vs. a fixed bump or a single magic number)?
+ *   - The 1/3 ratio echoes typographic spacing rules of thumb (caption
+ *     gap ≈ 1/3 of the visual element it labels) so it scales with
+ *     custom sizes without surprising users.
+ *   - The 8 px floor matches the smallest gap that consistently reads
+ *     as "intentional space" rather than "rendering glitch" at typical
+ *     label font sizes (12–14 px) — anything smaller and the label
+ *     looks glued to the icon.
+ *
+ * Only applied when the node carries a custom icon. Default 7 px dot
+ * nodes keep ECharts' built-in 5 px gap so existing layouts that
+ * don't opt into `formatNodeIcon` see no reflow.
+ */
+const TREE_ICON_LABEL_DISTANCE_RATIO = 1 / 3;
+const TREE_ICON_LABEL_DISTANCE_FLOOR_PX = 8;
+
+/**
+ * Metadata stashed on each node whose icon needs the canvas baking
+ * pipeline. Two flavors of node end up with this:
+ *
+ *   - `shape: 'circle'` — *always* needs the canvas (for the circular
+ *     clip + contain-fit), regardless of border. Sync placeholder is
+ *     a `circle` ECharts symbol with palette fill (and palette ring
+ *     when `borderWidth > 0`).
+ *   - `shape: 'rect'`  — only when `borderWidth > 0`. Without a
+ *     border, square icons skip canvas baking entirely and use a
+ *     plain `image://<URL>` symbol that ECharts loads natively. With
+ *     a border, the only way to draw a frame around an image symbol
+ *     is to bake it into the bitmap (ECharts ignores
+ *     `itemStyle.border*` on image symbols), so the rect goes through
+ *     the same async-swap pipeline as circles. Sync placeholder is
+ *     a `rect` ECharts symbol (which DOES respect `itemStyle.border*`
+ *     because it's a shape symbol, not an image symbol).
+ *
+ * The metadata lives in a private symbol-keyed property so
+ * {@link createTreeIconOnInit} can walk the tree post-render and
+ * asynchronously swap each placeholder for a pre-composited
+ * `image://<dataUrl>` symbol — see {@link renderIconDataUrl} for the
+ * bitmap pipeline.
+ */
+interface IconMeta {
+  shape: 'circle' | 'rect';
+  src: string;
+  width: number;
+  height: number;
+  borderColor: string;
+  /** `0` means no border (canvas helper skips the stroke). */
+  borderWidth: number;
+}
+
+function isRichTextSpecLike(
+  value: unknown,
+): value is Extract<Parameters<typeof compileRichText>[0], object> {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('segments' in value)) return false;
+  return Array.isArray((value as { segments?: unknown }).segments);
+}
+
+function splitNodeNames(root: TreeNode, options: TreeChartOptions): SplitNodeNames {
+  const leafLabels: Array<{ name: string; compiled: ReturnType<typeof compileRichText> }> = [];
+  const parentLabels: Array<{ name: string; compiled: ReturnType<typeof compileRichText> }> =
+    [];
+  let labelIndex = 0;
+  const visit = (node: TreeNode, depth: number): void => {
     if (node.children && node.children.length > 0) {
-      parentNames.push(node.name);
-      for (const child of node.children) visit(child);
+      parentLabels.push({
+        name: node.name,
+        compiled: compileNodeLabel(
+          node,
+          depth,
+          false,
+          options,
+          `treeLabel_${labelIndex++}`,
+        ),
+      });
+      for (const child of node.children) visit(child, depth + 1);
     } else {
-      leafNames.push(node.name);
+      leafLabels.push({
+        name: node.name,
+        compiled: compileNodeLabel(node, depth, true, options, `treeLabel_${labelIndex++}`),
+      });
     }
   };
-  visit(root);
-  return { leafNames, parentNames };
+  visit(root, 0);
+  return { leafLabels, parentLabels };
+}
+
+function compileNodeLabel(
+  node: TreeNode,
+  depth: number,
+  isLeaf: boolean,
+  options: TreeChartOptions,
+  keyPrefix: string,
+): ReturnType<typeof compileRichText> {
+  const ctx = { node, name: node.name, depth, isLeaf };
+  const formatter = options.formatNodeLabel;
+  let base = compileRichText(node.name, keyPrefix);
+  try {
+    if (formatter) {
+      const out = formatter(ctx);
+      if (typeof out === 'string' || isRichTextSpecLike(out)) {
+        base = compileRichText(out, keyPrefix);
+      }
+    }
+  } catch {
+    // Fallback to raw node name when formatter fails.
+  }
+  return base;
+}
+
+function resolveTreeIconSpec(
+  formatter: NonNullable<TreeChartOptions['formatNodeIcon']>,
+  ctx: { node: TreeNode; name: string; depth: number; isLeaf: boolean },
+): TreeNodeIconSpec | undefined {
+  try {
+    const out = formatter(ctx);
+    if (!out) return undefined;
+    if (typeof out === 'string') return { image: out };
+    if (typeof out === 'object' && typeof out.image === 'string') return out;
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function measureWidestCompiledLabel(
+  labels: ReadonlyArray<{ name: string; compiled: ReturnType<typeof compileRichText> }>,
+): number {
+  let widest = 0;
+  for (const label of labels) {
+    widest = Math.max(widest, measureCompiledLabelWidth(label.compiled));
+  }
+  return widest;
 }
 
 /** Clamp a label-driven reserve into `[MIN, MAX]`, then add the gap. */
@@ -251,21 +406,337 @@ function clampLabelReserve(widestPx: number): number {
 function annotateTree(
   root: TreeNode,
   nameToColor: ReadonlyMap<string, string>,
+  options: TreeChartOptions,
 ): Record<string, unknown> {
-  const visit = (node: TreeNode): Record<string, unknown> => {
+  let labelIndex = 0;
+  const hasCustomLabel = typeof options.formatNodeLabel === 'function';
+  const formatIcon = options.formatNodeIcon;
+  const visit = (node: TreeNode, depth: number): Record<string, unknown> => {
     const out: Record<string, unknown> = { name: node.name };
     if (node.value !== undefined) out.value = node.value;
     if (node.collapsed) out.collapsed = true;
+    const isLeaf = !node.children || node.children.length === 0;
+    if (hasCustomLabel) {
+      const compiled = compileNodeLabel(
+        node,
+        depth,
+        isLeaf,
+        options,
+        `treeLabel_${labelIndex++}`,
+      );
+      out[TREE_LABEL_TOKEN_KEY] = compiled.text;
+    }
+    const paletteColor = node.color ?? nameToColor.get(node.name);
+    // Tracks whether the icon branch already emitted a custom `itemStyle`
+    // (placeholder fill / border for nodes routed through the canvas
+    // pipeline OR plain image-symbol nodes — note that image-symbol
+    // nodes never set `itemStyle`, so this gate is really "did the icon
+    // branch claim ownership of the node's appearance"). When false, we
+    // fall through to the default `itemStyle: { color: paletteColor }`
+    // assignment below; when true, we leave the icon's setup intact.
+    let usesAsyncIcon = false;
+    if (formatIcon) {
+      const icon = resolveTreeIconSpec(formatIcon, {
+        node,
+        name: node.name,
+        depth,
+        isLeaf,
+      });
+      if (icon) {
+        const width = icon.width ?? 20;
+        const height = icon.height ?? width;
+        // Border is opt-in: a missing `borderWidth` means no border,
+        // even on circles. Users who want the old default 2 px palette
+        // ring must say so explicitly. Setting `borderWidth: 0` is
+        // equivalent to omitting it — both produce a no-border render.
+        const hasBorder =
+          icon.borderWidth !== undefined && icon.borderWidth > 0;
+        const placeholderFill =
+          paletteColor ?? TREE_ICON_FALLBACK_COLOR;
+        // `borderColor` falls back to the palette fill so a node with
+        // a per-node `color` (or palette token) still gets a tinted
+        // ring even if the user only specified `borderWidth`.
+        const borderColor = icon.borderColor ?? placeholderFill;
+        const borderWidth = hasBorder ? (icon.borderWidth as number) : 0;
+
+        if (icon.shape === 'circle') {
+          // Circles ALWAYS go through the canvas pipeline — that's the
+          // only way to get a circular clip + contain-fit on top of an
+          // arbitrary source image. The border is optional (canvas
+          // helper skips the stroke when `borderWidth === 0`).
+          //
+          // Synchronous placeholder: an ECharts `circle` shape symbol
+          // tinted with the node's palette color. NO pattern fill with
+          // `itemStyle.color: { image }` — that's the buggy path we
+          // replaced: ECharts pattern fill is positioned in world
+          // coords (not shape-local), so the avatar appears off-center
+          // and cropped under a circle shape; `itemStyle.borderRadius`
+          // has no effect on the built-in `circle` symbol either. The
+          // placeholder exists ONLY to render a visible marker until
+          // the async swap and stash metadata that the swap consumes.
+          out.symbol = 'circle';
+          usesAsyncIcon = true;
+          out[TREE_ICON_META_KEY] = {
+            shape: 'circle',
+            src: icon.image,
+            width,
+            height,
+            borderColor,
+            borderWidth,
+          } satisfies IconMeta;
+          out.itemStyle = hasBorder
+            ? { color: placeholderFill, borderColor, borderWidth }
+            : { color: placeholderFill };
+        } else {
+          // Square: only run the canvas pipeline when the user wants a
+          // border around the image. ECharts' image symbol cannot draw
+          // `itemStyle.border*` (the image is the symbol; no underlying
+          // shape geometry to stroke), so a bordered square avatar
+          // *requires* baking the frame into the PNG. Without a border
+          // we keep the simpler path — `image://<URL>` — which lets
+          // ECharts load the image natively (no CORS friction).
+          if (hasBorder) {
+            // Sync placeholder: ECharts `rect` shape symbol — unlike
+            // image symbols, shape symbols DO respect `itemStyle.border*`,
+            // so we get a clean colored frame around a palette-fill
+            // square until the baked PNG swaps in.
+            out.symbol = 'rect';
+            usesAsyncIcon = true;
+            out[TREE_ICON_META_KEY] = {
+              shape: 'rect',
+              src: icon.image,
+              width,
+              height,
+              borderColor,
+              borderWidth,
+            } satisfies IconMeta;
+            out.itemStyle = {
+              color: placeholderFill,
+              borderColor,
+              borderWidth,
+            };
+          } else {
+            // No border requested → no canvas needed → ECharts loads
+            // the image natively.
+            const image = icon.image;
+            out.symbol = image.startsWith('image://') ? image : `image://${image}`;
+            out.symbolKeepAspect = true;
+          }
+        }
+        out.symbolSize = width === height ? width : [width, height];
+        // Per-node `label.distance` override — see
+        // `TREE_ICON_LABEL_DISTANCE_*` for calibration. Deep-merges into
+        // `series.label` / `series.leaves.label` so it applies whether
+        // the node is a parent or leaf and survives any other label
+        // overrides. Only set on icon-bearing nodes; default-dot nodes
+        // keep ECharts' built-in 5 px gap.
+        const maxIconDim = Math.max(width, height);
+        const labelDistance = Math.max(
+          Math.round(maxIconDim * TREE_ICON_LABEL_DISTANCE_RATIO),
+          TREE_ICON_LABEL_DISTANCE_FLOOR_PX,
+        );
+        out.label = { distance: labelDistance };
+      }
+    }
     // Per-node `color` wins over the palette lookup so per-row overrides
     // can pin a single node without affecting the rest of the tree.
-    const color = node.color ?? nameToColor.get(node.name);
-    if (color) out.itemStyle = { color };
+    if (paletteColor && !usesAsyncIcon) out.itemStyle = { color: paletteColor };
     if (node.children && node.children.length > 0) {
-      out.children = node.children.map(visit);
+      out.children = node.children.map((child) => visit(child, depth + 1));
     }
     return out;
   };
-  return visit(root);
+  return visit(root, 0);
+}
+
+function collectNodesWithIconMeta(
+  root: Record<string, unknown>,
+): Array<{ node: Record<string, unknown>; meta: IconMeta }> {
+  const out: Array<{ node: Record<string, unknown>; meta: IconMeta }> = [];
+  const stack: Record<string, unknown>[] = [root];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    const rawMeta = node[TREE_ICON_META_KEY];
+    if (typeof rawMeta === 'object' && rawMeta !== null) {
+      const meta = rawMeta as IconMeta;
+      if (
+        (meta.shape === 'circle' || meta.shape === 'rect') &&
+        typeof meta.src === 'string' &&
+        typeof meta.width === 'number' &&
+        typeof meta.height === 'number' &&
+        typeof meta.borderColor === 'string' &&
+        typeof meta.borderWidth === 'number'
+      ) {
+        out.push({ node, meta });
+      }
+    }
+    const kids = node.children;
+    if (Array.isArray(kids)) {
+      for (const child of kids) {
+        if (typeof child === 'object' && child !== null) {
+          stack.push(child as Record<string, unknown>);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * After the synchronous placeholder is rendered, asynchronously
+ * upgrade each canvas-pipeline avatar (circles always, rects only
+ * when the user requested a border) to a real image symbol. Two
+ * upgrade paths, picked per-node based on what the browser allows:
+ *
+ *   1. **Canvas path (preferred)** — {@link renderIconDataUrl}
+ *      pre-composites the image into a PNG with a baked-in shape clip
+ *      (circle or rect), contain-fit, and optional border stroke,
+ *      then we set `symbol: 'image://<dataUrl>'` and drop the
+ *      placeholder `itemStyle`. Only works when the image host ships
+ *      `Access-Control-Allow-Origin` — otherwise the canvas is
+ *      CORS-tainted and `toDataURL` throws `SecurityError`.
+ *
+ *   2. **Native image fallback** — when the canvas path returns
+ *      `undefined` (CORS-blocked or load failed), use ECharts'
+ *      built-in `image://<original-url>` symbol instead. ECharts
+ *      loads the image as a regular `<img>` (no CORS needed for
+ *      display, only for pixel extraction), so the avatar shows up
+ *      as a *square* image. When the user asked for a border, we
+ *      paint a rectangular frame around the image via
+ *      `itemStyle.borderColor` / `borderWidth`. Circles lose the
+ *      circular clip in this fallback (the avatar reads as square)
+ *      but stay visible — strictly better than the colored-shape
+ *      placeholder users see when both paths fail.
+ *
+ *   3. **Placeholder retained** — when both async paths fail (image
+ *      404, network error, etc.), the synchronous colored-shape
+ *      placeholder stays as the last-resort visible marker.
+ *
+ * The two-tier strategy means *most* avatar hosts work out of the
+ * box. Hosts like DiceBear, Gravatar, S3-with-CORS get the full
+ * baked-in treatment; hosts like pravatar.cc (no CORS) gracefully
+ * degrade to a square framed avatar; total failures stay readable.
+ *
+ * Why a flat image symbol (not a canvas pattern fill on a shape)?
+ *   ECharts pattern fill is positioned in world coordinates, not
+ *   shape-local, so the avatar would appear mis-aligned under a
+ *   centered shape and gets clipped to whatever slice of the canvas
+ *   overlaps the shape. The image-symbol path treats the
+ *   pre-composited PNG as a flat sprite — exactly what we want.
+ *
+ * Returns `undefined` when no node has a canvas-pipeline icon (no
+ * circles, no bordered rects), so the adapter can skip wiring an
+ * `onInit` callback entirely (saves a `Promise.all` + `setOption`
+ * round-trip on every render of every tree without avatars). The
+ * async work is wrapped in an IIFE-style void promise so the
+ * engine's `onInit?.(this.ecInstance)` call returns immediately; the
+ * swap happens on the next frame after the canvas paints (or images
+ * load).
+ */
+function createTreeIconOnInit(
+  root: Record<string, unknown>,
+): ((instance: { setOption: (option: Record<string, unknown>, notMerge?: boolean) => void }) => void) | undefined {
+  const targets = collectNodesWithIconMeta(root);
+  if (targets.length === 0) return undefined;
+
+  return (instance) => {
+    void (async () => {
+      let changed = false;
+      await Promise.all(
+        targets.map(async ({ node, meta }) => {
+          const dataUrl = await renderIconDataUrl({
+            shape: meta.shape,
+            src: meta.src,
+            width: meta.width,
+            height: meta.height,
+            borderColor: meta.borderColor,
+            borderWidth: meta.borderWidth,
+          });
+          if (dataUrl) {
+            // Canvas path — full avatar with shape clip + contain-fit
+            // (+ optional border) baked into the PNG. Drop the
+            // placeholder `itemStyle` so ECharts doesn't double-paint
+            // the colored fill / border underneath or on top of the
+            // image symbol. `symbolKeepAspect` is defensive — the
+            // canvas is square when `width === height`, but the flag
+            // prevents subtle distortion when they diverge.
+            node.symbol = `image://${dataUrl}`;
+            node.symbolKeepAspect = true;
+            delete (node as Record<string, unknown>).itemStyle;
+            changed = true;
+            return;
+          }
+          // Native image fallback — host doesn't ship CORS headers (or
+          // image load failed but we'll let ECharts retry the load with
+          // its own loader). ECharts draws the image as a rectangular
+          // image symbol — for circles this means losing the circular
+          // clip (a known degradation; users see a square avatar
+          // instead of a colored dot, which is strictly better).
+          //
+          // When the user asked for a border (`borderWidth > 0`) we
+          // paint a rectangular frame around the symbol via
+          // `itemStyle`. ECharts honors `border*` on image symbols
+          // here as a stroke around the bounding box. `color:
+          // 'transparent'` ensures the placeholder fill doesn't tint
+          // the loaded image. When no border was requested, we omit
+          // the `itemStyle` entirely so ECharts renders just the raw
+          // image — matching the "no border" intent end-to-end.
+          node.symbol = meta.src.startsWith('image://')
+            ? meta.src
+            : `image://${meta.src}`;
+          node.symbolKeepAspect = true;
+          if (meta.borderWidth > 0) {
+            node.itemStyle = {
+              color: 'transparent',
+              borderColor: meta.borderColor,
+              borderWidth: meta.borderWidth,
+            };
+          } else {
+            delete (node as Record<string, unknown>).itemStyle;
+          }
+          changed = true;
+        }),
+      );
+      if (!changed) return;
+      // Runtime payload — must go through `applyConfiguredFontFamilyToOption`
+      // per AGENTS.md architecture rule #9 even though we touch no text
+      // fields here. Future contributors swapping in label tweaks via
+      // this same payload pipeline get the font-family guard for free.
+      const payload: Record<string, unknown> = {
+        series: [{ data: [root] }],
+      };
+      applyConfiguredFontFamilyToOption(payload, getConfig().fontFamily);
+      try {
+        instance.setOption(payload, false);
+      } catch {
+        // Chart may already be disposed (e.g. component unmounted
+        // mid-fetch). Swallow rather than rethrow — there's no way
+        // for the swap to retroactively succeed.
+      }
+    })();
+  };
+}
+
+function createTreeLabelFormatter(
+  fallbackByName: ReadonlyMap<string, string>,
+): (params: unknown) => string {
+  return (params: unknown): string => formatTreeLabel(params, fallbackByName);
+}
+
+function formatTreeLabel(
+  params: unknown,
+  fallbackByName: ReadonlyMap<string, string>,
+): string {
+  const pr = params as Record<string, unknown>;
+  const data =
+    (pr.data as Record<string, unknown> | undefined) ??
+    (pr.value as Record<string, unknown> | undefined);
+  const custom = data?.[TREE_LABEL_TOKEN_KEY];
+  if (typeof custom === 'string') return custom;
+  if (typeof pr.name === 'string') {
+    return fallbackByName.get(pr.name) ?? pr.name;
+  }
+  return '';
 }
 
 /**
@@ -326,6 +797,7 @@ export function resolveTreeOptions(
 ): Record<string, unknown> {
   const direction: TreeDirection = options.direction ?? 'left-to-right';
   const layout = DIRECTION_LAYOUT[direction];
+  const labelRotate = options.disableLabelRotate ? 0 : layout.labelRotate;
 
   const names = collectNodeNames(data);
   const colors = resolveColors(names, options);
@@ -336,6 +808,9 @@ export function resolveTreeOptions(
   const titleR = getTitleReserve(options).top;
 
   const showLabel = options.showNodeLabel ?? true;
+  const hasCustomLabel = typeof options.formatNodeLabel === 'function';
+  const parentAlign = hasCustomLabel ? 'center' : layout.parentAlign;
+  const leafAlign = hasCustomLabel ? 'center' : layout.leafAlign;
 
   // Effective label fontSize for this chart instance — drives both the
   // canvas measureText calls below AND the `series.label.fontSize` /
@@ -344,8 +819,6 @@ export function resolveTreeOptions(
   // 12 px but ECharts renders at 18 px, the reserved label slot under-
   // estimates and the rightmost / leafmost names clip.
   const labelFontSize = getLabelFontSize(options);
-  const labelFont = buildLabelFont(labelFontSize);
-
   // Per-axis edge reserves so labels at the root edge AND the leaf edge
   // both stay inside the canvas. Two failure modes the previous (leaf-only)
   // version hit:
@@ -360,12 +833,12 @@ export function resolveTreeOptions(
   // Measure both groups separately because they receive different label
   // positions (parents on the root side, leaves on the opposite side) and
   // a tree often has very different name lengths between them.
-  const { leafNames, parentNames } = splitNodeNames(data);
+  const { leafLabels, parentLabels } = splitNodeNames(data, options);
   const widestLeafPx = showLabel
-    ? measureMaxTextWidth(leafNames, labelFont)
+    ? measureWidestCompiledLabel(leafLabels)
     : 0;
   const widestParentPx = showLabel
-    ? measureMaxTextWidth(parentNames, labelFont)
+    ? measureWidestCompiledLabel(parentLabels)
     : 0;
 
   // Slot per edge, in the active layout's terms:
@@ -420,11 +893,21 @@ export function resolveTreeOptions(
   const right = p + reserveFor('right');
 
   const expandAndCollapse = options.expandAndCollapse ?? true;
+  const mergedRich = mergeCompiledRichStyles([
+    ...parentLabels.map((entry) => entry.compiled),
+    ...leafLabels.map((entry) => entry.compiled),
+  ]);
+  const rich =
+    hasCustomLabel && Object.keys(mergedRich).length > 0 ? mergedRich : undefined;
+  const parentLabelTextByName = new Map(parentLabels.map((entry) => [entry.name, entry.compiled.text]));
+  const leafLabelTextByName = new Map(leafLabels.map((entry) => [entry.name, entry.compiled.text]));
+  const parentFormatter = createTreeLabelFormatter(parentLabelTextByName);
+  const leafFormatter = createTreeLabelFormatter(leafLabelTextByName);
 
   const series: Record<string, unknown> = {
     type: 'tree',
     // ECharts expects an array of root nodes; we only ever ship one.
-    data: [annotateTree(data, nameToColor)],
+    data: [annotateTree(data, nameToColor, options)],
     orient: layout.orient,
     top,
     bottom,
@@ -438,33 +921,33 @@ export function resolveTreeOptions(
     label: {
       show: showLabel,
       position: layout.parentPosition,
-      align: layout.parentAlign,
+      align: parentAlign,
       verticalAlign: 'middle',
       // `rotate` is `-90` for TB/BT (labels read top-to-bottom) and `0`
       // for LR/RL (horizontal text). Mirrors ECharts' own tree-vertical
       // / tree-orient-bottom-top reference examples.
-      rotate: layout.labelRotate,
-      // Single source of truth for the rendered font size — resolved
-      // once at the top of this function via `getLabelFontSize(options)`
-      // and threaded through both the canvas measureText calls (which
-      // size the per-edge label reserves) AND `leaves.label.fontSize`
-      // below. Diverging the two would silently re-introduce the
-      // original label-clipping bug.
+      rotate: labelRotate,
+      // Single source of truth for the rendered font size — resolved once
+      // via `getLabelFontSize(options)`, then used for both parent/leaf
+      // label styles while reserve math is driven by compiled label widths.
+      // Diverging these values would re-introduce label clipping.
       fontSize: labelFontSize,
       // No `color` here on purpose — theme owns canvas text color.
       // See AGENTS.md "Layout rule #6" + `tree.label.color` entry in
       // `src/themes/echarts-theme.ts`.
+      ...(hasCustomLabel ? { formatter: parentFormatter } : {}),
+      ...(rich ? { rich } : {}),
     },
     leaves: {
       label: {
         position: layout.leafPosition,
-        align: layout.leafAlign,
+        align: leafAlign,
         verticalAlign: 'middle',
-        rotate: layout.labelRotate,
-        // Mirror parent label fontSize — both the parent and leaf
-        // measurements above used `labelFont` (the same `buildLabelFont
-        // (labelFontSize)` string), so the rendered size MUST match.
+        rotate: labelRotate,
+        // Mirror parent label fontSize to keep label metrics consistent.
         fontSize: labelFontSize,
+        ...(hasCustomLabel ? { formatter: leafFormatter } : {}),
+        ...(rich ? { rich } : {}),
       },
     },
     emphasis: { focus: 'descendant' },
@@ -486,7 +969,10 @@ export function resolveTreeOptions(
   if (options.tooltip?.customHtml) {
     const customHtml = options.tooltip.customHtml;
     tooltip.formatter = createAsyncTooltipFormatter({
-      formatSync: (params) => treeTooltipSyncHtml(params, options),
+      // Tree `customHtml` owns the full tooltip body (name, avatar, …).
+      // Other chart types append below their default sync row; tree nodes
+      // are usually fully custom when this hook is used.
+      formatSync: () => '',
       customHtml: (params) =>
         Promise.resolve(customHtml(sankeyChordParamsToTooltipContext(params))),
       placeholder: options.tooltip.placeholder,
@@ -512,4 +998,18 @@ export function resolveTreeOptions(
   merged.color = colors;
 
   return merged;
+}
+
+export function resolveTreeSetup(
+  data: TreeData,
+  options: TreeChartOptions,
+  ctx?: RenderContext,
+): ChartSetupResult {
+  const option = resolveTreeOptions(data, options, ctx);
+  const root = ((option.series as Record<string, unknown>[] | undefined)?.[0]?.data as
+    | Record<string, unknown>[]
+    | undefined)?.[0];
+  if (!root || typeof root !== 'object') return { option };
+  const onInit = createTreeIconOnInit(root);
+  return { option, onInit };
 }

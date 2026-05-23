@@ -179,7 +179,7 @@ import { resolveSankeyOptions } from './sankey.js';
 import { resolveChordOptions } from './chord.js';
 import { resolveRadarOptions } from './radar.js';
 import { resolveNetworkOptions } from './network.js';
-import { resolveTreeOptions } from './tree.js';
+import { resolveTreeSetup } from './tree.js';
 import { resolveWordCloudOptions } from './word-cloud.js';
 
 // Each built-in adapter narrows the generic `ChartData` / `ChartOptions` it
@@ -263,9 +263,8 @@ registerAdapter(ChartType.Network, {
 
 registerAdapter(ChartType.Tree, {
   validate: isTreeData,
-  resolve: (data, options, ctx) => ({
-    option: resolveTreeOptions(data as TreeData, options as TreeChartOptions, ctx),
-  }),
+  resolve: (data, options, ctx) =>
+    resolveTreeSetup(data as TreeData, options as TreeChartOptions, ctx),
 });
 
 registerAdapter(ChartType.WordCloud, {

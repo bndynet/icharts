@@ -1,5 +1,6 @@
 import type { ChartOptions } from './base.js';
 import type { ChartData } from './instance.js';
+import type { RichTextInput } from './shared.js';
 
 /**
  * Growth direction of the tree.
@@ -64,6 +65,65 @@ export interface TreeNode {
  * ```
  */
 export type TreeData = TreeNode;
+
+/**
+ * Context passed to {@link TreeChartOptions.formatNodeLabel}.
+ */
+export interface TreeLabelFormatterContext {
+  /** Raw node object from the user-supplied tree data. */
+  node: TreeNode;
+  /** Convenience alias for `node.name`. */
+  name: string;
+  /** Depth from the root (`0` for root). */
+  depth: number;
+  /** `true` when the node has no children. */
+  isLeaf: boolean;
+}
+
+/**
+ * Icon payload for {@link TreeChartOptions.formatNodeIcon}.
+ */
+export interface TreeNodeIconSpec {
+  /** Avatar / icon image URL (without `image://` prefix). */
+  image: string;
+  /** Node symbol width in px. */
+  width?: number;
+  /** Node symbol height in px. Defaults to `width`. */
+  height?: number;
+  /** Node symbol shape. Default: `'square'`. */
+  shape?: 'square' | 'circle';
+  /**
+   * Border thickness in px. **Opt-in** — when omitted (or set to `0`),
+   * the icon renders without any border on either shape. Set to a
+   * positive number to:
+   *
+   *   - **`shape: 'circle'`** → stroke a ring along the inside edge
+   *     of the circular clip in the avatar PNG.
+   *   - **`shape: 'square'`** → stroke a rectangular frame inside the
+   *     image's bounding box. Square + border switches the underlying
+   *     ECharts symbol from `image://...` (which can't render
+   *     `itemStyle.border*` natively) to a canvas-baked PNG so the
+   *     frame is part of the bitmap.
+   *
+   * Trade-off note: the canvas pipeline reserves `borderWidth * 2` px
+   * for the stroke before contain-fitting the avatar, so bumping this
+   * past `~width / 7` (e.g. 3 px on a 20 px icon, 5 px on a 36 px
+   * icon) starts visibly shrinking the image inside the frame.
+   * Adjust `width` proportionally if you want a thicker border.
+   */
+  borderWidth?: number;
+  /**
+   * Border color. Honored only when `borderWidth` is set to a
+   * positive value (color without width is silently ignored — there's
+   * no border to paint). Defaults to the node's resolved palette
+   * color (or the per-node `node.color` override when present), so a
+   * single `borderWidth: 2` opt-in produces the classic
+   * "framed-in-node-color" look without forcing the user to duplicate
+   * the palette. Specify a CSS color string (e.g. `'#10b981'`) to pin
+   * every node's frame to a brand accent.
+   */
+  borderColor?: string;
+}
 
 /**
  * Structural type guard for tree data.
@@ -140,4 +200,37 @@ export interface TreeChartOptions extends ChartOptions {
    * snapshot exports).
    */
   expandAndCollapse?: boolean;
+  /**
+   * Disable automatic label rotation for vertical directions (`top-to-bottom`
+   * / `bottom-to-top`).
+   *
+   * - `false` (default): uses direction-aware rotation (`-90` for TB,
+   *   `+90` for BT).
+   * - `true`: forces both parent and leaf label `rotate` to `0`.
+   */
+  disableLabelRotate?: boolean;
+  /**
+   * Customize node labels.
+   *
+   * Receives the current node context and returns plain text or
+   * `RichTextSpec`. Rich text is compiled to ECharts formatter tokens and
+   * injected into both `series.label.rich` and `series.leaves.label.rich`.
+   * If this callback throws or returns an invalid value, the adapter falls
+   * back to the raw `node.name`.
+   */
+  formatNodeLabel?: (ctx: TreeLabelFormatterContext) => RichTextInput;
+  /**
+   * Customize the icon shown before each node label.
+   *
+   * Return:
+   * - `string` → treated as `image` URL.
+   * - `TreeNodeIconSpec` → full icon style control.
+   * - `null` / `undefined` → no icon for this node.
+   *
+   * When enabled, the adapter replaces that node's marker symbol with an
+   * image symbol (`symbol: 'image://...'`, `symbolSize` from `width/height`).
+   */
+  formatNodeIcon?: (
+    ctx: TreeLabelFormatterContext,
+  ) => string | TreeNodeIconSpec | null | undefined;
 }

@@ -72,6 +72,8 @@ export {
   type TreeData,
   type TreeNode,
   type TreeDirection,
+  type TreeLabelFormatterContext,
+  type TreeNodeIconSpec,
   type WordCloudData,
   type WordCloudDataItem,
   // Per-chart options (each extends ChartOptions / XYChartOptions)

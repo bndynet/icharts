@@ -149,10 +149,16 @@ export function createAsyncTooltipFormatter(
   let generation = 0;
 
   const wrap = (syncHtml: string, extra: string): string => {
-    const fragment = extra.trim()
-      ? `<div class="icharts-tooltip-extra" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,.35);font-size:12px">${extra}</div>`
-      : '';
-    return `<div style="line-height:1.55">${syncHtml}${fragment}</div>`;
+    const extraTrim = extra.trim();
+    const syncTrim = syncHtml.trim();
+    if (!extraTrim) {
+      return syncTrim ? `<div style="line-height:1.55">${syncTrim}</div>` : '';
+    }
+    if (!syncTrim) {
+      return `<div style="line-height:1.55">${extraTrim}</div>`;
+    }
+    const fragment = `<div class="icharts-tooltip-extra" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(128,128,128,.35);font-size:12px">${extraTrim}</div>`;
+    return `<div style="line-height:1.55">${syncTrim}${fragment}</div>`;
   };
 
   const wrapError = (syncHtml: string, e: unknown): string => {

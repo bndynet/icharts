@@ -113,19 +113,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Override DemoGrid minmax(480px) so all four cards stay on one row. */
 .liquid-grid :deep(.demo-grid) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-@media (max-width: 1600px) {
-  .liquid-grid :deep(.demo-grid) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .liquid-grid :deep(.demo-grid) {
-    grid-template-columns: repeat(1, minmax(0, 1fr));
-  }
 }
 </style>

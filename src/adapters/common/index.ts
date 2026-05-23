@@ -8,3 +8,4 @@ export * from './tooltip.js';
 export * from './rich-text.js';
 export * from './shared.js';
 export * from './font-family.js';
+export * from './icon-symbol.js';
