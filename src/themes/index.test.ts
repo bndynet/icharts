@@ -40,8 +40,10 @@ import {
   resolveSeriesColors,
   resolveColorsByPosition,
 } from './index.js';
+import { configure, resetConfiguration } from '../config.js';
 
 beforeEach(() => {
+  resetConfiguration();
   // Start each test from a known-clean auto-assignment state. Pins from
   // prior tests survive (by design) but each test uses unique names so
   // they don't clash. Anchor on 'light' so resolveSeriesColors reads the
@@ -113,6 +115,19 @@ describe('switchTheme — auto-reset of target theme', () => {
     // the durable layer, see below.)
     const fresh = resolveSeriesColors(['cycle-new']);
     expect(fresh).toEqual(['#3b82f6']);
+  });
+});
+
+describe('configure({ theme }) integration', () => {
+  it('sets the configured theme as fallback for subsequent color resolution', () => {
+    configure({
+      theme: {
+        name: 'configured-theme-fallback',
+        palette: ['#101010', '#202020'],
+      },
+    });
+
+    expect(resolveSeriesColors(['configured-fallback-a'])).toEqual(['#101010']);
   });
 });
 

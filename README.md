@@ -1041,6 +1041,28 @@ createChart(el, 'bar', data, { theme: 'ocean' });
 
 Call `registerTheme` once at application start, before any charts are created.
 
+### Global Default Theme via `configure`
+
+You can also set a library-level default theme through `configure`. When a chart does not specify `options.theme`, this configured theme will be used.
+
+```ts
+import { configure } from '@bndynet/icharts';
+
+configure({
+  theme: {
+    name: 'ocean',
+    colorMode: 'dark',
+    colors: {
+      background: '#0c1a2e',
+      textPrimary: '#ccd6f6',
+    },
+    palette: ['#64ffda', '#00b4d8', '#48cae4'],
+  },
+});
+```
+
+`options.theme` still takes precedence over the global config for that specific chart.
+
 ### Consistent Colors Across Charts
 
 When building dashboards with multiple charts, enable `consistentColors` so that the same name always gets the same color — regardless of which chart it appears in or how many series that chart has.
@@ -1099,7 +1121,7 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 
 | Function | Description |
 |----------|-------------|
-| `configure(opts)` | Set global options (e.g. `{ consistentColors: true }`) |
+| `configure(opts)` | Set global options (e.g. `{ consistentColors: true }` or `{ theme: { name, colors, palette } }`) |
 | `switchTheme(name)` | Switch all charts to a registered theme |
 | `registerTheme(config)` | Register a custom theme |
 | `setColorMap(map, themeName?)` | Pre-register name → color mappings (all themes or one) |

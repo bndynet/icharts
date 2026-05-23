@@ -1,14 +1,21 @@
 import { chartRegistry, pruneDetachedCharts } from './registry.js';
-import { resetColorMap } from './themes/index.js';
+import {
+  resetColorMap,
+  registerTheme,
+  switchTheme,
+  type ChartThemeConfig,
+} from './themes/index.js';
 
 export interface IChartsConfig {
   consistentColors: boolean;
   fontFamily?: string;
+  theme?: ChartThemeConfig;
 }
 
 const DEFAULT_CONFIG: Readonly<IChartsConfig> = {
   consistentColors: false,
   fontFamily: undefined,
+  theme: undefined,
 };
 
 let currentConfig: IChartsConfig = { ...DEFAULT_CONFIG };
@@ -16,6 +23,19 @@ let currentConfig: IChartsConfig = { ...DEFAULT_CONFIG };
 export function configure(opts: Partial<IChartsConfig>): void {
   const prev = { ...currentConfig };
   currentConfig = { ...currentConfig, ...opts };
+
+  if (opts.theme) {
+    const shouldRegister =
+      !prev.theme ||
+      prev.theme.name !== opts.theme.name ||
+      prev.theme.colorMode !== opts.theme.colorMode ||
+      prev.theme.colors !== opts.theme.colors ||
+      prev.theme.palette !== opts.theme.palette;
+    if (shouldRegister) {
+      registerTheme(opts.theme);
+    }
+    switchTheme(opts.theme.name);
+  }
 
   const shouldRerender =
     prev.consistentColors !== currentConfig.consistentColors ||
@@ -38,6 +58,7 @@ export function configure(opts: Partial<IChartsConfig>): void {
 
 /** Reset configure() state back to library defaults. */
 export function resetConfiguration(): void {
+  switchTheme('light');
   configure({ ...DEFAULT_CONFIG });
 }
 

@@ -36,6 +36,7 @@ import { IChart } from './core.js';
 import { registerAdapter, type RenderContext } from './adapters/index.js';
 import { configure, resetConfiguration } from './config.js';
 import type { ChartData } from './types.js';
+import * as echarts from 'echarts';
 
 const observations: Array<RenderContext | undefined> = [];
 
@@ -500,6 +501,24 @@ describe('IChart engine — configured fontFamily propagation', () => {
 
     expect(option.series?.[0]?.label?.fontFamily).toBe('Inter, sans-serif');
     expect(option.series?.[0]?.emphasis?.label?.fontFamily).toBe('Inter, sans-serif');
+    chart.dispose();
+  });
+});
+
+describe('IChart engine — configured global theme fallback', () => {
+  it('initializes charts without options.theme using configure({ theme }).name', () => {
+    configure({
+      theme: {
+        name: 'core-config-theme',
+        palette: ['#22d3ee', '#818cf8'],
+      },
+    });
+
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    const initMock = vi.mocked(echarts.init);
+    const lastCall = initMock.mock.calls[initMock.mock.calls.length - 1] ?? [];
+    const [, themeName] = lastCall;
+    expect(themeName).toBe('core-config-theme');
     chart.dispose();
   });
 });
