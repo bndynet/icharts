@@ -54,12 +54,29 @@ function frameFor(year: number) {
   };
 }
 
+// Country-flag SVGs imported once at module top so Vite hashes them.
+import flagChina from '../assets/flags/china.svg';
+// ...one import per racer, collected in `flagByCountry` lookup.
+
 const chart = createChart(el, 'bar', frameFor(1960), {
   variant: 'race',
   race: { topN: 10 },              // frameDuration auto-measured from setInterval
   colorByCategory: true,           // distinct color per racer (legend auto-hides)
   xAxis: { show: false },          // hide bottom value axis
-  yAxis: { show: true },           // keep left racer labels visible
+  yAxis: {
+    show: true,                    // keep left racer labels visible
+    // RichTextSpec on a category axis pre-compiles into `axisLabel.rich`,
+    // so the SVG flag (via `backgroundImage`) renders right of each name.
+    formatLabel: (name) =&gt; ({
+      segments: [
+        { text: String(name), style: { padding: [0, 6, 0, 0] } },
+        { text: ' ', style: {
+            width: 18, height: 12, verticalAlign: 'middle',
+            backgroundImage: flagByCountry[String(name)],
+        } },
+      ],
+    }),
+  },
   title: 'Population by Country — 1960',
 });
 
@@ -214,6 +231,44 @@ import {
   type XYData,
 } from '@bndynet/icharts';
 import { useTheme } from '@bndynet/vue-site';
+
+// Country-flag SVGs for the bar-race y-axis (one import per racer in
+// `racerSpecs` below). Vite resolves these to hashed asset URLs at build
+// time, which we feed into `RichTextStyle.backgroundImage` so each row
+// shows the racer's flag right of the country name.
+import flagBangladesh from '../assets/flags/bangladesh.svg';
+import flagBrazil from '../assets/flags/brazil.svg';
+import flagChina from '../assets/flags/china.svg';
+import flagEgypt from '../assets/flags/egypt.svg';
+import flagEthiopia from '../assets/flags/ethiopia.svg';
+import flagGermany from '../assets/flags/germany.svg';
+import flagIndia from '../assets/flags/india.svg';
+import flagIndonesia from '../assets/flags/indonesia.svg';
+import flagJapan from '../assets/flags/japan.svg';
+import flagMexico from '../assets/flags/mexico.svg';
+import flagNigeria from '../assets/flags/nigeria.svg';
+import flagPakistan from '../assets/flags/pakistan.svg';
+import flagRussia from '../assets/flags/russia.svg';
+import flagUSA from '../assets/flags/usa.svg';
+import flagVietnam from '../assets/flags/vietnam.svg';
+
+const flagByCountry: Record<string, string> = {
+  Bangladesh: flagBangladesh,
+  Brazil: flagBrazil,
+  China: flagChina,
+  Egypt: flagEgypt,
+  Ethiopia: flagEthiopia,
+  Germany: flagGermany,
+  India: flagIndia,
+  Indonesia: flagIndonesia,
+  Japan: flagJapan,
+  Mexico: flagMexico,
+  Nigeria: flagNigeria,
+  Pakistan: flagPakistan,
+  Russia: flagRussia,
+  USA: flagUSA,
+  Vietnam: flagVietnam,
+};
 
 const { theme } = useTheme();
 
@@ -483,7 +538,29 @@ onMounted(() => {
     race: { topN },
     colorByCategory: true,
     xAxis: { show: false },
-    yAxis: { show: true },
+    // Rich-text axis label: country name + flag icon. The library pre-
+    // compiles each `data.categories` entry once, merges every segment's
+    // style into `axisLabel.rich`, and registers a value→index lookup so
+    // the runtime formatter is O(1) — the same contract `legend.formatLabel`
+    // uses. The flag SVG is wired through `backgroundImage`, which the
+    // adapter rewrites to ECharts' `backgroundColor: { image }` form.
+    yAxis: {
+      show: true,
+      formatLabel: (name) => ({
+        segments: [
+          { text: String(name), style: { padding: [0, 6, 0, 0] } },
+          {
+            text: ' ',
+            style: {
+              width: 18,
+              height: 12,
+              backgroundImage: flagByCountry[String(name)],
+              verticalAlign: 'middle',
+            },
+          },
+        ],
+      }),
+    },
     title: titleFor(START_YEAR),
   });
 

@@ -1,0 +1,7 @@
+<svg width="60" height="40" viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flag of Ethiopia">
+  <rect width="60" height="13.33" y="0" fill="#078930"/>
+  <rect width="60" height="13.33" y="13.33" fill="#FCDD09"/>
+  <rect width="60" height="13.34" y="26.66" fill="#DA121A"/>
+  <circle cx="30" cy="20" r="6" fill="#0F47AF"/>
+  <polygon points="30,15.5 30.94,18.14 33.71,18.16 31.49,19.78 32.34,22.43 30,20.84 27.66,22.43 28.51,19.78 26.29,18.16 29.06,18.14" fill="#FCDD09"/>
+</svg>

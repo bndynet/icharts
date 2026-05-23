@@ -3,9 +3,12 @@ import {
   LEGEND_RESERVE,
   STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
   STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
+  applyAxisLabel,
   buildAsyncTooltipFormatter,
   buildAxisTooltipContext,
   buildLegend,
+  buildXAxis,
+  buildYAxis,
   compileRichText,
   buildSparkTooltip,
   buildTooltip,
@@ -431,6 +434,210 @@ describe('compileRichText', () => {
       image: 'https://example.com/bg.png',
     });
     expect(compiled.rich?.__ich_bg_image_0?.backgroundImage).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// AxisOptions.formatLabel — typed entry point that mirrors `legend.formatLabel`
+// for axis tick labels. Covers two paths:
+//   1. Category axis (known tick set): pre-compile each value's spec, merge
+//      rich styles into `axisLabel.rich`, register a value→index lookup so
+//      the runtime formatter resolves O(1).
+//   2. Value / time axis (dynamic ticks): RichTextSpec returns flatten to
+//      plain text — documented limitation. Plain string returns work.
+// ---------------------------------------------------------------------------
+
+describe('applyAxisLabel + axis formatLabel rich-text', () => {
+  it('plain string formatLabel: wires user function into axisLabel.formatter', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1', 'Q2', 'Q3'], series: [] },
+      { xAxis: { formatLabel: (v) => `★ ${v}` } },
+      false,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+    expect(typeof f).toBe('function');
+    expect(f('Q1', 0)).toBe('★ Q1');
+    expect(f('Q3', 2)).toBe('★ Q3');
+    expect(axisLabel.rich).toBeUndefined();
+  });
+
+  it('RichTextSpec on category axis: pre-compiles formatter text + axisLabel.rich', () => {
+    const axis = buildXAxis(
+      { categories: ['Chrome', 'Firefox', 'Safari'], series: [] },
+      {
+        xAxis: {
+          formatLabel: (v) => ({
+            segments: [
+              { text: String(v), style: { padding: [0, 6, 0, 0] } },
+              {
+                text: ' ',
+                style: {
+                  width: 18,
+                  height: 12,
+                  backgroundImage: '/flags/test.svg',
+                  verticalAlign: 'middle',
+                },
+              },
+            ],
+          }),
+        },
+      },
+      false,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number) => string;
+    // Pre-compiled output uses the per-value key prefix `xaxis_<index>` so each
+    // category gets its own slot in `axisLabel.rich`.
+    expect(f('Chrome')).toContain('{__ich_xaxis_0_0|Chrome}');
+    expect(f('Chrome')).toContain('{__ich_xaxis_0_1|');
+    expect(f('Firefox')).toContain('{__ich_xaxis_1_0|Firefox}');
+    expect(f('Safari')).toContain('{__ich_xaxis_2_0|Safari}');
+    const rich = axisLabel.rich as Record<string, Record<string, unknown>>;
+    expect(rich.__ich_xaxis_0_1.backgroundColor).toEqual({
+      image: '/flags/test.svg',
+    });
+    expect(rich.__ich_xaxis_0_1.width).toBe(18);
+    // Every category contributes its own segment-1 rich entry — the key set
+    // grows with the category list.
+    expect(Object.keys(rich)).toContain('__ich_xaxis_2_1');
+  });
+
+  it('RichTextSpec on value axis: flattens to plain text (no rich registered)', () => {
+    // Value axis path: ticks are picked at runtime by ECharts so we cannot
+    // pre-register a `rich` style map. Returns are flattened so the markup
+    // doesn't leak through as literal `{key|text}` text.
+    const axis = buildYAxis(
+      {
+        yAxis: {
+          formatLabel: (v) => ({
+            segments: [
+              { text: `$${v}`, style: { padding: [0, 4, 0, 0] } },
+              { text: ' ↑', style: { color: '#22c55e' } },
+            ],
+          }),
+        },
+      },
+      1,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+    expect(typeof f).toBe('function');
+    // Plain text concatenation — no `{key|...}` markup, no rich block.
+    expect(f(100, 0)).toBe('$100 ↑');
+    expect(axisLabel.rich).toBeUndefined();
+  });
+
+  it('falls back to raw value when formatLabel throws', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1', 'Q2'], series: [] },
+      {
+        xAxis: {
+          formatLabel: () => {
+            throw new Error('boom');
+          },
+        },
+      },
+      false,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+    expect(f('Q1', 0)).toBe('Q1');
+  });
+
+  it('falls back to raw value when formatLabel returns a non-string', () => {
+    const axis = buildYAxis(
+      {
+        yAxis: {
+          // Force a non-string / non-spec return at runtime — the type system
+          // catches this at compile time but a mistaken `return undefined`
+          // from an early-exit lookup must keep the axis usable.
+          formatLabel: (() => undefined) as unknown as (v: string | number) => string,
+        },
+      },
+      1,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+    expect(f(42, 0)).toBe('42');
+  });
+
+  it('time axis: dateFormat is honored when formatLabel is absent', () => {
+    const axis = buildXAxis(
+      { categories: [], series: [] },
+      { xAxis: { dateFormat: 'YYYY' } },
+      true,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    expect(typeof axisLabel.formatter).toBe('function');
+  });
+
+  it('time axis: formatLabel takes precedence over dateFormat', () => {
+    const axis = buildXAxis(
+      { categories: [], series: [] },
+      {
+        xAxis: {
+          dateFormat: 'YYYY',
+          formatLabel: (v) => `t=${v}`,
+        },
+      },
+      true,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: number, i: number) => string;
+    expect(f(0, 0)).toBe('t=0');
+  });
+
+  it('omits axisLabel.formatter when neither formatLabel nor dateFormat is set', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1'], series: [] },
+      {},
+      false,
+    )[0];
+    expect(axis.axisLabel).toBeUndefined();
+  });
+
+  it('applyAxisLabel: integrates with bar-race-style literal yAxis (rich-text)', () => {
+    // Mirrors how `bar.ts` race wires `applyAxisLabel` into its hand-authored
+    // category yAxis literal. The bar adapter test below exercises the same
+    // path through `resolveBarOptions`; this isolates the helper itself.
+    const axis: Record<string, unknown> = {
+      type: 'category',
+      data: ['China', 'India', 'USA'],
+      inverse: true,
+    };
+    applyAxisLabel(
+      axis,
+      {
+        formatLabel: (name) => ({
+          segments: [
+            { text: String(name), style: { padding: [0, 6, 0, 0] } },
+            {
+              text: ' ',
+              style: {
+                width: 18,
+                height: 12,
+                backgroundImage: `/flags/${name}.svg`,
+                verticalAlign: 'middle',
+              },
+            },
+          ],
+        }),
+      },
+      false,
+      ['China', 'India', 'USA'],
+      'yaxis_race',
+    );
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number) => string;
+    expect(f('China')).toContain('{__ich_yaxis_race_0_0|China}');
+    const rich = axisLabel.rich as Record<string, Record<string, unknown>>;
+    expect(rich.__ich_yaxis_race_0_1.backgroundColor).toEqual({
+      image: '/flags/China.svg',
+    });
+    expect(rich.__ich_yaxis_race_2_1.backgroundColor).toEqual({
+      image: '/flags/USA.svg',
+    });
   });
 });
 

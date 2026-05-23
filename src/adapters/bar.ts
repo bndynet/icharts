@@ -3,6 +3,7 @@ import type { ChartSetupResult, RenderContext } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './common/race-utils.js';
 import {
+  applyAxisLabel,
   buildTitle,
   buildLegend,
   buildGrid,
@@ -54,11 +55,16 @@ export function resolveBarOptions(
       : buildTooltip(options, 'axis', 'shadow', isTime, ctx),
   };
 
+  // Categories laid out left→right normally, top→bottom when horizontal.
+  // Reversing for horizontal flips ECharts' default ascending y-axis so the
+  // first category sits at the top — matches the visual order users expect.
+  const horizontalCategories = isHorizontal
+    ? [...data.categories].reverse()
+    : data.categories;
+
   const categoryAxis: Record<string, unknown> = {
     type: 'category',
-    data: isHorizontal
-      ? [...data.categories].reverse()
-      : data.categories,
+    data: horizontalCategories,
     boundaryGap: true,
     splitLine: { show: false },
     splitArea: { show: false },
@@ -73,12 +79,33 @@ export function resolveBarOptions(
     eOption.xAxis = [{ show: false, ...categoryAxis }];
     eOption.yAxis = [{ show: false, ...valueAxis }];
   } else if (isHorizontal) {
+    // Horizontal: y-axis is the category axis. Wire `options.yAxis.formatLabel`
+    // (with rich-text support pre-compiled from the reversed category list).
+    applyAxisLabel(
+      categoryAxis,
+      options.yAxis ?? {},
+      false,
+      horizontalCategories,
+      'yaxis_horizontal',
+    );
     eOption.yAxis = [categoryAxis];
     eOption.xAxis = [valueAxis];
   } else {
-    eOption.xAxis = isTime
-      ? buildXAxis(data, options, true)
-      : [categoryAxis];
+    if (isTime) {
+      eOption.xAxis = buildXAxis(data, options, true);
+    } else {
+      // Vertical category x-axis: same RichText-aware wiring as buildXAxis,
+      // applied directly to the literal so the rest of the literal's defaults
+      // (boundaryGap, splitLine, splitArea) don't drift from sibling charts.
+      applyAxisLabel(
+        categoryAxis,
+        options.xAxis ?? {},
+        false,
+        data.categories,
+        'xaxis_bar',
+      );
+      eOption.xAxis = [categoryAxis];
+    }
     eOption.yAxis = [valueAxis];
   }
 
@@ -189,6 +216,34 @@ function resolveBarRaceOptions(
     raceSeries.colorBy = 'data';
   }
 
+  const yAxisLiteral: Record<string, unknown> = {
+    type: 'category',
+    data: data.categories,
+    inverse: true,
+    // Keep racer labels visible while removing the axis chrome.
+    axisLine: { show: false },
+    axisTick: { show: false },
+    splitLine: { show: false },
+    splitArea: { show: false },
+    animationDuration: 300,
+    animationDurationUpdate: 300,
+    ...(yAxisShow !== undefined ? { show: yAxisShow } : {}),
+    // `max` controls how many bars fit in the viewport. ECharts wants the
+    // last *visible* index, so topN=10 → max=9. Omit when unset to show all.
+    ...(race.topN !== undefined ? { max: race.topN - 1 } : {}),
+  };
+  // Wire `options.yAxis.formatLabel` with full rich-text support (categories
+  // are stable across frames so the per-segment style map can be pre-
+  // compiled and registered on `axisLabel.rich`). Common use case: prefix
+  // each racer label with a flag / avatar / status icon.
+  applyAxisLabel(
+    yAxisLiteral,
+    options.yAxis ?? {},
+    false,
+    data.categories,
+    'yaxis_race',
+  );
+
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
     legend: enableColorByCategory ? { show: false } : buildLegend([seriesName], options),
@@ -201,22 +256,7 @@ function resolveBarRaceOptions(
       splitArea: { show: false },
       ...(xAxisShow !== undefined ? { show: xAxisShow } : {}),
     },
-    yAxis: {
-      type: 'category',
-      data: data.categories,
-      inverse: true,
-      // Keep racer labels visible while removing the axis chrome.
-      axisLine: { show: false },
-      axisTick: { show: false },
-      splitLine: { show: false },
-      splitArea: { show: false },
-      animationDuration: 300,
-      animationDurationUpdate: 300,
-      ...(yAxisShow !== undefined ? { show: yAxisShow } : {}),
-      // `max` controls how many bars fit in the viewport. ECharts wants the
-      // last *visible* index, so topN=10 → max=9. Omit when unset to show all.
-      ...(race.topN !== undefined ? { max: race.topN - 1 } : {}),
-    },
+    yAxis: yAxisLiteral,
     series: [raceSeries],
     animationDuration: 0,
     animationDurationUpdate: frameDuration,

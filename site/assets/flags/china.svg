@@ -1,0 +1,10 @@
+<svg width="60" height="40" viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flag of China">
+  <rect width="60" height="40" fill="#DE2910"/>
+  <g fill="#FFDE00">
+    <path d="M10,3 L11.41,7.34 L15.98,7.34 L12.28,10.02 L13.69,14.36 L10,11.68 L6.31,14.36 L7.72,10.02 L4.02,7.34 L8.59,7.34 Z"/>
+    <circle cx="20" cy="4" r="1.2"/>
+    <circle cx="23" cy="7" r="1.2"/>
+    <circle cx="23" cy="11" r="1.2"/>
+    <circle cx="20" cy="14" r="1.2"/>
+  </g>
+</svg>

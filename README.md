@@ -887,13 +887,13 @@ Each chart type has its own options interface that extends the base `ChartOption
     name?: string;
     dateFormat?: string;              // e.g. 'MM/DD', 'YYYY-MM-DD'
     cursorFormat?: string;            // axis-pointer label; falls back to dateFormat
-    formatLabel?: (value: string | number, index: number) => string;
+    formatLabel?: (value: string | number, index: number) => string | RichTextSpec;
     min?: number | string;            // pin lower bound (value/time axes; also 'dataMin')
     max?: number | string;            // pin upper bound (value/time axes; also 'dataMax')
   };
   yAxis?: {
     name?: string;
-    formatLabel?: (value: string | number, index: number) => string;
+    formatLabel?: (value: string | number, index: number) => string | RichTextSpec;
     min?: number | string;
     max?: number | string;
   };
@@ -913,6 +913,22 @@ Each chart type has its own options interface that extends the base `ChartOption
   }>;
 }
 ```
+
+> **Axis tick rich-text** — `xAxis.formatLabel` / `yAxis.formatLabel` accept
+> the same `string | RichTextSpec` return as `legend.formatLabel`. Use
+> `RichTextSpec` to inject icons, images, or styled segments next to tick
+> labels (flag icons after country names, status pills, multi-style values).
+> The library compiles each segment into ECharts' `{key|text}` rich-text
+> markup and registers the matching styles on `axisLabel.rich` automatically.
+>
+> RichText support is currently limited to **category axes** — vertical
+> bar / line / area x-axis with named `data.categories`, horizontal-bar
+> y-axis, and bar-race y-axis. Value and time axes pick their tick values
+> at runtime, so the per-segment style map cannot be pre-registered;
+> `RichTextSpec` returns there are flattened to plain text. Plain string
+> returns work everywhere. See the **Population by Country** chart in the
+> Dynamic Data demo for a runnable example (country name + flag SVG via
+> `RichTextStyle.backgroundImage`).
 
 ### `LineChartOptions` (extends `XYChartOptions`)
 

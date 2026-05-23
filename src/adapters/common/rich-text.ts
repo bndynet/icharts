@@ -181,6 +181,31 @@ export function safeFormatLegendLabel(
   }
 }
 
+/**
+ * Defensive wrapper around `AxisOptions.formatLabel`.
+ *
+ * Mirrors {@link safeFormatLegendLabel} but accepts `string | number` values
+ * (axis ticks). On throw or non-string / non-RichTextSpec return the entry
+ * falls back to `String(value)` so a single bad lookup can't blank the whole
+ * axis.
+ */
+export function safeFormatAxisLabel(
+  formatLabel: (value: string | number, index: number) => RichTextInput,
+  value: string | number,
+  index: number,
+  keyPrefix: string,
+): CompiledRichText {
+  try {
+    const out = formatLabel(value, index);
+    if (typeof out === 'string' || isRichTextSpec(out)) {
+      return compileRichText(out, keyPrefix);
+    }
+    return compileRichText(String(value), keyPrefix);
+  } catch {
+    return compileRichText(String(value), keyPrefix);
+  }
+}
+
 export function stripRichTextMarkup(label: string): string {
   if (!label.includes('{') || !label.includes('|')) return label;
   return label.replace(/\{[^|{}]+\|/g, '').replace(/\}/g, '');

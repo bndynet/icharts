@@ -436,6 +436,53 @@ describe('bar adapter', () => {
       expect(color[0]).toBe('#abcdef');
     });
 
+    // User's flag-icon use case: bar race y-axis is a category axis with
+    // names stable across frames, so RichTextSpec returns can be pre-compiled
+    // into `axisLabel.rich` — same contract as legend.formatLabel. This is
+    // the path the dynamic-data demo relies on.
+    it('threads yAxis.formatLabel rich-text into the race yAxis literal', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+        yAxis: {
+          formatLabel: (name) => ({
+            segments: [
+              { text: String(name), style: { padding: [0, 6, 0, 0] } },
+              {
+                text: ' ',
+                style: {
+                  width: 18,
+                  height: 12,
+                  backgroundImage: `/flags/${name}.svg`,
+                  verticalAlign: 'middle',
+                },
+              },
+            ],
+          }),
+        },
+      });
+      const yAxis = option.yAxis as Record<string, unknown>;
+      const axisLabel = yAxis.axisLabel as Record<string, unknown>;
+      const f = axisLabel.formatter as (v: string | number) => string;
+      expect(f('USA')).toContain('{__ich_yaxis_race_0_0|USA}');
+      expect(f('China')).toContain('{__ich_yaxis_race_1_0|China}');
+      const rich = axisLabel.rich as Record<string, Record<string, unknown>>;
+      expect(rich.__ich_yaxis_race_0_1.backgroundColor).toEqual({
+        image: '/flags/USA.svg',
+      });
+    });
+
+    it('plain string yAxis.formatLabel works (no rich block emitted)', () => {
+      const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {
+        variant: 'race',
+        yAxis: { formatLabel: (name) => `→ ${name}` },
+      });
+      const yAxis = option.yAxis as Record<string, unknown>;
+      const axisLabel = yAxis.axisLabel as Record<string, unknown>;
+      const f = axisLabel.formatter as (v: string | number, i: number) => string;
+      expect(f('USA', 0)).toBe('→ USA');
+      expect(axisLabel.rich).toBeUndefined();
+    });
+
     describe('with colorByCategory', () => {
       it('emits one color per racer (categories palette)', () => {
         const { option } = resolveBarOptions(frame([100, 200, 150, 80, 60]), {

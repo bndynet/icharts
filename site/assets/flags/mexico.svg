@@ -1,0 +1,7 @@
+<svg width="60" height="40" viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flag of Mexico">
+  <rect width="20" height="40" x="0" fill="#006847"/>
+  <rect width="20" height="40" x="20" fill="#FFFFFF"/>
+  <rect width="20" height="40" x="40" fill="#CE1126"/>
+  <ellipse cx="30" cy="20" rx="5" ry="3.5" fill="none" stroke="#8B5A2B" stroke-width="0.6"/>
+  <path d="M27,20 Q30,17 33,20 Q30,23 27,20 Z" fill="#8B5A2B"/>
+</svg>

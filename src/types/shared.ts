@@ -166,7 +166,38 @@ export interface AxisOptions {
    */
   show?: boolean;
   name?: string;
-  formatLabel?: (value: string | number, index: number) => string;
+  /**
+   * Customize the text rendered for each axis tick label.
+   *
+   * Receives the **tick value** (category name for `type: 'category'`, raw
+   * numeric value for `type: 'value'`, ms timestamp for `type: 'time'`) plus
+   * its zero-based index and returns the display label. Accepts plain
+   * strings OR a structured {@link RichTextSpec}; the latter is auto-
+   * compiled to ECharts rich text (`{key|text}` + `axisLabel.rich`) by
+   * `buildXAxis` / `buildYAxis`.
+   *
+   * Common use cases:
+   *  - inject icons / images next to category names (flags, avatars,
+   *    status pills) via `RichTextStyle.backgroundImage`
+   *  - localize / abbreviate / truncate long values
+   *  - return raw rich-text segments (`{key|text}`) when paired with
+   *    `options.echarts.[xy]Axis.axisLabel.rich`
+   *
+   * **RichText support is currently limited to category axes** (vertical
+   * bar / line / area x-axis with named `data.categories`, horizontal-bar
+   * and bar-race y-axis). Value and time axes pick their tick values at
+   * runtime, so we cannot pre-register the `axisLabel.rich` style map
+   * upfront — `RichTextSpec` returns are rendered as plain concatenated
+   * text in those cases (segment styles are dropped). Plain string returns
+   * always work everywhere.
+   *
+   * Constraints:
+   *  - Text-only (string or `RichTextSpec`) — no DOM / HTML. Axis labels
+   *    are rendered on canvas; HTML belongs in `tooltip.customHtml`.
+   *  - When `formatLabel` throws, the entry falls back to the raw value
+   *    (so a single bad lookup can't blank out the whole axis).
+   */
+  formatLabel?: (value: string | number, index: number) => RichTextInput;
   /**
    * Date/time format for time-axis tick labels.
    * Uses dayjs / Moment.js compatible tokens:

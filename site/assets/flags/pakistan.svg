@@ -1,0 +1,7 @@
+<svg width="60" height="40" viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Flag of Pakistan">
+  <rect width="60" height="40" fill="#01411C"/>
+  <rect width="15" height="40" x="0" fill="#FFFFFF"/>
+  <circle cx="38" cy="20" r="7" fill="#FFFFFF"/>
+  <circle cx="40" cy="20" r="6" fill="#01411C"/>
+  <polygon points="46,20 47.41,21.4 48.71,18.59 47.05,19.95 47.41,17.55" fill="#FFFFFF"/>
+</svg>
