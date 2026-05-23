@@ -109,6 +109,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 6. **Spark charts** — hide legend/axes/grid appropriately; keep tooltips minimal (see `line.ts`, `bar.ts`).
 7. **Tooltips** — for async `options.tooltip.customHtml`, use `createAsyncTooltipFormatter` from `async-tooltip.ts` and normalized contexts from `tooltip-context.ts` (see `pie.ts`, `chord.ts`).
 8. **No parallel frameworks** — do not introduce a second chart abstraction; extend the existing adapter registry.
+9. **Global font-family guard for runtime payloads** — any adapter that performs additional runtime `chart.setOption(payload, ...)` writes (typically inside `onInit` / observers) MUST call `applyConfiguredFontFamilyToOption(payload, getConfig().fontFamily)` before `setOption`. Import from `src/adapters/common/index.ts` (single source of truth: `src/adapters/common/font-family.ts`). This guard is required even when the static option path is already covered by `core.ts`, because runtime payloads bypass `core`'s pre-`setOption` injection.
 
 ### File naming
 
@@ -454,6 +455,14 @@ npm run build   # when exports or build pipeline may be affected
 ```
 
 Add unit tests under `src/**/*.test.ts` for new `isXxxData` guards and color/validation logic.
+
+**Font-family guard checklist (required when touching chart text or runtime setOption paths):**
+
+- [ ] If the adapter has any runtime `chart.setOption(payload, ...)` path (e.g. `onInit`, `ResizeObserver`, event callbacks), call `applyConfiguredFontFamilyToOption(payload, getConfig().fontFamily)` before `setOption`.
+- [ ] Add/extend tests that assert `configure({ fontFamily: '...' })` reaches BOTH:
+  - static resolved option (`resolveXxxOptions(...).option`), and
+  - runtime payload (`onInit`/observer `setOption` payload), including `rich` token styles when present.
+- [ ] Verify no text path silently falls back to ECharts defaults due to empty/undefined `fontFamily`.
 
 ## External / custom chart types (runtime only)
 

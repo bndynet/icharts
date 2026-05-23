@@ -192,13 +192,25 @@ describe('pie adapter', () => {
       expect(formatter('Premium')).toBe('Premium (420)');
     });
 
-    it('applies configure({ fontFamily }) to center-label graphic text', () => {
+    it('applies configure({ fontFamily }) to center-label rich text in onInit payload', () => {
       configure({ fontFamily: 'Inter, sans-serif' });
       const result = resolvePieOptions(sample, {
         variant: 'doughnut',
         centerLabels: ['3715', 'Total'],
       });
-      const graphic = optOf(result).graphic as Array<Record<string, unknown>>;
+      const setOptionCalls: Array<Record<string, unknown>> = [];
+      const chart = {
+        isDisposed: () => false,
+        getWidth: () => 360,
+        getHeight: () => 280,
+        getDom: () => ({}) as HTMLElement,
+        setOption: (payload: Record<string, unknown>) => {
+          setOptionCalls.push(payload);
+        },
+      } as unknown as import('echarts').ECharts;
+      result.onInit?.(chart);
+      const payload = setOptionCalls[setOptionCalls.length - 1] as Record<string, unknown>;
+      const graphic = payload.graphic as Array<Record<string, unknown>>;
       const style = (graphic[0]?.style ?? {}) as Record<string, unknown>;
       expect(style.fontFamily).toBe('Inter, sans-serif');
       const rich = (style.rich ?? {}) as Record<string, Record<string, unknown>>;

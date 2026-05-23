@@ -7,3 +7,4 @@ export * from './axis.js';
 export * from './tooltip.js';
 export * from './rich-text.js';
 export * from './shared.js';
+export * from './font-family.js';
