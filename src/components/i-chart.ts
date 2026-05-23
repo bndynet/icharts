@@ -1,5 +1,5 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 import type { ChartData, AnyChartOptions, IChartInstance } from '../types.js';
 import { IChart } from '../core.js';
 
@@ -15,7 +15,6 @@ import { IChart } from '../core.js';
  * ></i-chart>
  * ```
  */
-@customElement('i-chart')
 export class IChartElement extends LitElement {
   static override styles = css`
     :host {
@@ -99,4 +98,18 @@ declare global {
   interface HTMLElementTagNameMap {
     'i-chart': IChartElement;
   }
+}
+
+// Register the custom element only when a `customElements` registry is
+// available (browsers, jsdom, Lit's `@lit-labs/ssr-dom-shim`). In pure
+// Node SSR runtimes without the shim, this is a deliberate no-op so
+// `import '@bndynet/icharts'` doesn't throw — the chart is created
+// client-side via `createChart()` / mounting `<i-chart>` regardless.
+// The `customElements.get('i-chart')` check also handles HMR /
+// multi-bundle scenarios where the tag may already be registered.
+if (
+  typeof customElements !== 'undefined' &&
+  !customElements.get('i-chart')
+) {
+  customElements.define('i-chart', IChartElement);
 }

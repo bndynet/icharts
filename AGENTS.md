@@ -57,7 +57,21 @@ src/
   async-tooltip.ts    # Async tooltip formatter helper
   tooltip-context.ts  # Normalized tooltip contexts (pie, sankey, chord)
   api.ts              # createChart()
-  index.ts            # Public exports
+  installers/         # Browser-only side-effects (echarts.use(...) for the
+                      # @echarts-x wordcloud + liquid-fill plugins).
+                      # Imported ONLY from the main entry; never from
+                      # `index-core.ts` / `core.ts` / adapters. See
+                      # "SSR / module-load safety".
+    index.ts          # Registers `@echarts-x/custom-word-cloud` and
+                      # `@echarts-x/custom-liquid-fill` at module load.
+  index.ts            # Main entry — public API + `<i-chart>` web component
+                      # registration + `./installers/index.js` side-effect.
+                      # Browser-only (the @echarts-x packages touch
+                      # `window` / `document` at module load).
+  index-core.ts       # SSR-safe entry — same public API minus the web
+                      # component and minus the @echarts-x installers.
+                      # Resolves to `@bndynet/icharts/core`. Safe to import
+                      # in Node / Next.js / Nuxt / Astro / SvelteKit / Vite SSR.
 site/                 # Demo/docs site (Vue + @bndynet/vue-site)
 dist/                 # Build output — do not edit by hand
 ```
@@ -284,6 +298,39 @@ In **`src/adapters/**`** (and other chart option builders), **do not** assign li
 - **Non-data UI** — tooltip error text, axis/grid defaults from ECharts theme (not per-series palette).
 - **Last-resort fallback** — only inside shared color utilities (e.g. `resolveColorsForNodes` fallback), not per chart type.
 - **Tests** — fixed hex in `*.test.ts` fixtures is fine.
+
+## SSR / module-load safety (read before adding adapters, installers, or third-party deps)
+
+The library ships **two ESM entries** with different SSR contracts:
+
+| Source                     | Subpath import                       | What it pulls in                                                                              | Server-import safety                                                                                                |
+|----------------------------|--------------------------------------|------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| `src/index.ts`             | `import '@bndynet/icharts'`          | full API + `<i-chart>` web component (Lit) + `@echarts-x` plugin installers (wordcloud + liquid-progress) | **browser-only** — `@echarts-x/custom-word-cloud` touches `window` / `document` at module load                      |
+| `src/index-core.ts`        | `import '@bndynet/icharts/core'`     | full API minus the web component, minus the `@echarts-x` installers                            | **SSR-safe** — no `window` / `document` / `customElements` / `HTMLElement` references in the module-load graph      |
+
+Both entries are wired into `package.json` `exports` and built by `tsup.config.ts` as `dist/index.{js,cjs}` and `dist/index-core.{js,cjs}`.
+
+### Rules
+
+1. **Nothing reachable from `src/index-core.ts` may touch browser globals at module load.** The transitive import graph today includes `src/core.ts`, `src/api.ts`, every file under `src/adapters/`, `src/themes/`, `src/utils.ts`, `src/config.ts`, `src/registry.ts`, `src/disconnect-sentinel.ts`, `src/async-tooltip.ts`, `src/tooltip-context.ts`, and every file under `src/types/`. In any of those files do **not**:
+   - Reference at the top level: `window`, `document`, `navigator`, `customElements`, `HTMLElement`, `ShadowRoot`, `ResizeObserver`, `MutationObserver`, `IntersectionObserver`, `Image`, `Canvas`, `globalThis.crypto.subtle`, etc.
+   - `new` any DOM / browser class at the top level (`new ResizeObserver(...)`, `new Image()`, `document.createElement(...)`, …).
+   - Statically `import` a third-party package whose module body references the above (e.g. `@echarts-x/custom-word-cloud`). These belong under `src/installers/`.
+
+   Every browser-global reference must be **lazy** (inside a function body, constructor, `onInit` hook, observer callback, …) and **guarded** with `typeof X !== 'undefined'` (or an equivalent feature probe). Canonical examples to mirror:
+   - `src/disconnect-sentinel.ts` — function-local `class extends HTMLElement`, `typeof customElements/HTMLElement === 'undefined'` early-returns.
+   - `src/adapters/common/text-measure.ts` — `typeof document === 'undefined'` guard inside `getMeasureCtx()`; cached result memoized as `null` on the server.
+   - `src/adapters/common/icon-symbol.ts` — `typeof window === 'undefined'` in `resolveDevicePixelRatio()`; `typeof document === 'undefined' || typeof Image === 'undefined'` inside the async render path.
+   - `src/adapters/pie.ts` — `typeof ResizeObserver === 'undefined'` early-return in `attachResizeObserver`.
+   - `src/components/i-chart.ts` — the `customElements.define('i-chart', …)` call sits at file end inside `if (typeof customElements !== 'undefined' && !customElements.get('i-chart')) { … }`. NEVER use the `@customElement` decorator — it would call `customElements.define` unconditionally at module load.
+
+2. **Browser-only third-party side-effects live in `src/installers/`** — and **only** there. Any third-party plugin whose module body is not SSR-safe must be imported by `src/installers/index.ts` (or a sibling), and that installer module must be imported only from `src/index.ts` (the main entry). The SSR-safe `src/index-core.ts` MUST NOT import anything from `src/installers/`, directly or transitively. Today the installer covers `@echarts-x/custom-word-cloud` + `@echarts-x/custom-liquid-fill`.
+
+3. **`echarts.use(installer)` is idempotent** (it dedupes by class identity), so calling it at installer module load is safe even when multiple chart instances share the engine. That is why `src/core.ts` no longer needs `ensureWordCloudRegistered` / `ensureLiquidFillRegistered` helpers — installer registration is the main entry's contract, not the engine's.
+
+4. **SSR consumers who need wordcloud / liquid-progress** on the client must register the `@echarts-x` plugins from a client-only code path. README documents two ways: `await import('@bndynet/icharts')` (registers everything) or `await import('@bndynet/icharts/dist/installers/index.js')` (registers just the plugins). When adding a new chart type that requires a similarly browser-touching third-party plugin, follow the same pattern (extend `src/installers/index.ts`) and document the opt-in in README.
+
+5. **Tests default to `environment: 'node'`** (see `vitest.config.ts`). Any test that touches the DOM must add `@vitest-environment jsdom` as the first comment in the file — see `src/disconnect-sentinel.test.ts` for the canonical pattern. Tests that need `echarts.init` but don't need a real DOM should `vi.mock('echarts', …)` instead (see `src/core.test.ts`). Adding a top-level DOM reference in an adapter would crash every node-environment test file that imports it, which is the fastest way to discover an SSR regression locally — but treat that as a backstop, not a substitute for the lazy / guarded pattern above.
 
 ## Adding a new **built-in** chart type
 
@@ -540,6 +587,15 @@ Add unit tests under `src/**/*.test.ts` for new `isXxxData` guards and color/val
   - runtime payload (`onInit`/observer `setOption` payload), including `rich` token styles when present.
 - [ ] Verify no text path silently falls back to ECharts defaults due to empty/undefined `fontFamily`.
 
+**SSR / module-load safety checklist (required when touching `src/core.ts`, `src/api.ts`, `src/adapters/`, `src/themes/`, `src/utils.ts`, `src/types/`, or anything else reachable from `src/index-core.ts`):**
+
+- [ ] No new top-level reference to `window` / `document` / `navigator` / `customElements` / `HTMLElement` / `ShadowRoot` / `ResizeObserver` / `MutationObserver` / `IntersectionObserver` / `Image` / `Canvas`. Move every browser-global access into a function body / constructor / callback and guard with `typeof X !== 'undefined'`.
+- [ ] No new static `import` of a third-party package that references browser globals at module load. If you need such a plugin, register it from `src/installers/index.ts` (imported only by the main entry), not from `src/core.ts` / `src/adapters/`.
+- [ ] After `npm run build`, smoke-test both entries in pure Node:
+  - `node --input-type=module -e "import('./dist/index-core.js').then(m => console.log(typeof m.createChart))"` — must print `function`.
+  - `node -e "console.log(typeof require('./dist/index-core.cjs').createChart)"` — must print `function`.
+- [ ] If the new chart type requires a browser-touching third-party plugin, add the `echarts.use(...)` call to `src/installers/index.ts` AND document the SSR-side opt-in (`await import('@bndynet/icharts/dist/installers/index.js')`) in README under the SSR section.
+
 ## External / custom chart types (runtime only)
 
 For **consumer-defined** types without modifying this repo, use `registerAdapter(type, adapter)` — see README **Extensibility** section.
@@ -563,6 +619,9 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.
 - Define a chart-specific `TooltipContext*` type. `customHtml` / `appendHtml` is a public, cross-chart API — its surface must stay stable, and consumers narrow with `ctx.kind`. Reuse `TooltipContextAxis` / `TooltipContextItem` / `TooltipContextEdge`; if you genuinely need more fields, extend the shared types so every chart benefits (`color` / `sourceColor` / `targetColor` were added once, not per chart). Chart-specific knobs reach the formatter via the `toContext` closure, not via the public union. See section 3.7.
 - Wire `buildAsyncTooltipFormatter` for a graph chart (or any chart with named items whose colors come from the resolved palette) without threading `nameToColor` into the `toContext` closure. ECharts' own `params.color` for an edge is the literal string `"gradient"` when the series uses a source→target gradient (the default for sankey/chord and `'source'` mode in network), so the only reliable way to surface link endpoint colors in `customHtml` is to look them up by `source` / `target` node name. The bug is silent — there is no runtime error, just permanently `undefined` `ctx.color` / `ctx.sourceColor` / `ctx.targetColor` fields, and no existing snapshot test will catch it. See section 3.7.
+- Reference browser globals (`window`, `document`, `navigator`, `customElements`, `HTMLElement`, `ShadowRoot`, `ResizeObserver`, `MutationObserver`, `IntersectionObserver`, `Image`, `Canvas`, …) at module load (top level) in any file reachable from `src/index-core.ts` — currently `src/core.ts`, `src/api.ts`, all of `src/adapters/`, `src/themes/`, `src/utils.ts`, `src/config.ts`, `src/registry.ts`, `src/disconnect-sentinel.ts`, `src/async-tooltip.ts`, `src/tooltip-context.ts`, every file under `src/types/`. Defer to function bodies / constructors / callbacks and guard with `typeof X !== 'undefined'`. Re-introducing a top-level browser-global reference silently breaks `@bndynet/icharts/core` for every SSR consumer; `typecheck` and the current test suite will NOT catch it. See **SSR / module-load safety**.
+- Add a static `import` of a third-party package that references browser globals at module load (e.g. `@echarts-x/custom-word-cloud`) from anywhere except `src/installers/index.ts`. Doing so re-poisons the SSR-safe `@bndynet/icharts/core` subpath and reverses the entire refactor that introduced the `src/installers/` directory. See **SSR / module-load safety**.
+- Re-decorate `IChartElement` with `@customElement('i-chart')`. The decorator calls `customElements.define` unconditionally at module load, which throws (or silently misbehaves) in any environment without a `customElements` registry. The runtime-guarded `customElements.define` block at the bottom of `src/components/i-chart.ts` is the only correct registration path.
 
 ## Git and PR expectations
 

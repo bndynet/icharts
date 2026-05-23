@@ -1,6 +1,4 @@
 import * as echarts from 'echarts';
-import wordCloudInstaller from '@echarts-x/custom-word-cloud';
-import liquidFillInstaller from '@echarts-x/custom-liquid-fill';
 import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
 import { ChartType } from './types/base.js';
 import { isGaugeData, mergeGaugeData } from './types/gauge.js';
@@ -15,20 +13,16 @@ import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
 import { chartRegistry } from './registry.js';
 import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
 
-let wordCloudRegistered = false;
-let liquidFillRegistered = false;
-
-function ensureWordCloudRegistered(): void {
-  if (wordCloudRegistered) return;
-  echarts.use(wordCloudInstaller);
-  wordCloudRegistered = true;
-}
-
-function ensureLiquidFillRegistered(): void {
-  if (liquidFillRegistered) return;
-  echarts.use(liquidFillInstaller);
-  liquidFillRegistered = true;
-}
+// NOTE: `@echarts-x/custom-word-cloud` + `@echarts-x/custom-liquid-fill`
+// are NOT imported here. Both packages touch `window` / `document` at
+// module-load time, which would break the SSR-safe
+// `@bndynet/icharts/core` subpath. Their `echarts.use(...)`
+// registration is performed by `./installers/index.ts`, which is
+// imported as a side-effect *only* from the browser-first main entry
+// (`src/index.ts`). `echarts.use(...)` is idempotent, so this engine
+// happily renders wordcloud / liquid-progress charts whenever the
+// installers have been registered ahead of time on the active
+// `echarts` global.
 
 /**
  * Core chart engine that manages an ECharts instance and provides the
@@ -139,8 +133,6 @@ export class IChart implements IChartInstance {
     data: ChartData,
     options: AnyChartOptions = {},
   ) {
-    ensureWordCloudRegistered();
-    ensureLiquidFillRegistered();
     ensureThemesRegistered();
     this._type = type;
     this._data = data;

@@ -2,7 +2,11 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig([
   {
-    entry: ['src/index.ts'],
+    // Two entries:
+    //  - `src/index.ts`       → main entry (auto-registers <i-chart>)
+    //  - `src/index-core.ts`  → SSR-safe subpath (`@bndynet/icharts/core`,
+    //                            same public API minus the web component)
+    entry: ['src/index.ts', 'src/index-core.ts'],
     format: ['esm', 'cjs'],
     dts: true,
     clean: true,

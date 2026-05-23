@@ -76,6 +76,48 @@ chart.dispose();
 </script>
 ```
 
+### Option 4 — SSR / Server-Side Rendering (Next.js, Nuxt, Astro, SvelteKit, Vite SSR…)
+
+Import from the SSR-safe subpath `@bndynet/icharts/core` so the module
+graph never touches the `<i-chart>` web component, Lit, or the
+`@echarts-x` plugin installers. Chart instances are still created
+**only on the client** inside a lifecycle hook (`onMounted`,
+`useEffect`, `'use client'` boundary, …):
+
+```ts
+// SSR-safe: this import does not access `window` / `document` /
+// `customElements` and is safe to evaluate on the server.
+import { createChart } from '@bndynet/icharts/core';
+
+// In client-only lifecycle code:
+onMounted(() => {
+  createChart(el.value, 'line', {
+    categories: ['Jan', 'Feb', 'Mar'],
+    series: [{ name: 'Sales', data: [10, 20, 30] }],
+  });
+});
+```
+
+| Entry                              | Auto-loads `<i-chart>`                       | Auto-loads wordcloud + liquid-progress | Safe to import on the server |
+|------------------------------------|----------------------------------------------|----------------------------------------|------------------------------|
+| `@bndynet/icharts` (default)       | yes (no-op when `customElements` is absent)  | yes                                    | no — the `@echarts-x` plugins reference `window` / `document` at module load |
+| `@bndynet/icharts/core` (SSR)      | no                                           | no                                     | yes                          |
+
+If you import the default entry from a server bundle, keep the
+import inside a client-only branch (Next.js `'use client'` files,
+Nuxt `<client-only>` islands, dynamic `await import()` inside
+`onMounted`, …). If you use the `/core` subpath but still need
+**wordcloud** or **liquid-progress** charts on the client, register
+the `@echarts-x` plugins from the same client-only branch — for
+example by importing the main entry, or surgically:
+
+```ts
+// Anywhere that is guaranteed to run only in the browser:
+await import('@bndynet/icharts'); // registers wordcloud + liquid-fill
+// …or, more narrowly:
+await import('@bndynet/icharts/dist/installers/index.js');
+```
+
 ---
 
 ## Chart Types
