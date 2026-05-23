@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   LEGEND_RESERVE,
   STACKED_TEXT_DEFAULT_GLYPH_PADDING_EM,
   STACKED_TEXT_DEFAULT_VISIBLE_GAP_PX,
+  buildAsyncTooltipFormatter,
+  buildAxisTooltipContext,
   buildLegend,
   compileRichText,
   buildSparkTooltip,
@@ -1538,5 +1540,315 @@ describe('computeStackedTextOffsets', () => {
     // secondary = (36 + 4.5)/2 = 20.25 → 20.3.
     expect(result.primaryOffsetY).toBe(-9.3);
     expect(result.secondaryOffsetY).toBe(20.3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildAsyncTooltipFormatter — replace / append / both semantics
+//
+// The helper is the single composition point for `tooltip.customHtml`
+// (replace) + `tooltip.appendHtml` (append). Every adapter (axis, pie,
+// sankey, chord, network, word-cloud, tree) routes through it, so these
+// tests pin the unified contract once instead of duplicating the same
+// matrix across seven adapter test files.
+// ---------------------------------------------------------------------------
+
+async function flushTooltipMicrotasks(): Promise<void> {
+  // Same drain helper that async-tooltip.test.ts uses — the formatter
+  // chains its async work through `Promise.resolve().then(...)` so a
+  // single tick is not enough.
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve();
+  }
+}
+
+describe('buildAxisTooltipContext', () => {
+  it('propagates resolved series colors from ECharts params into each series entry', () => {
+    const params = [
+      {
+        axisValue: 'Mon',
+        dataIndex: 0,
+        seriesName: 'Visitors',
+        value: 120,
+        marker: '<span></span>',
+        color: '#5470c6',
+      },
+      {
+        axisValue: 'Mon',
+        dataIndex: 0,
+        seriesName: 'Buyers',
+        value: 45,
+        marker: '<span></span>',
+        color: '#91cc75',
+      },
+    ];
+    const ctx = buildAxisTooltipContext(params, {}, false);
+    expect(ctx.kind).toBe('axis');
+    expect(ctx.series).toHaveLength(2);
+    expect(ctx.series[0].color).toBe('#5470c6');
+    expect(ctx.series[1].color).toBe('#91cc75');
+    expect(ctx.series[0].name).toBe('Visitors');
+    expect(ctx.series[1].name).toBe('Buyers');
+  });
+
+  it('leaves color undefined when ECharts params do not carry a color field', () => {
+    const params = [
+      {
+        axisValue: 'Mon',
+        dataIndex: 0,
+        seriesName: 'NoColor',
+        value: 1,
+        marker: '<span></span>',
+      },
+    ];
+    const ctx = buildAxisTooltipContext(params, {}, false);
+    expect(ctx.series[0].color).toBeUndefined();
+  });
+
+  it('ignores non-string color values (defensive guard against ECharts gradient objects)', () => {
+    const params = [
+      {
+        axisValue: 'Mon',
+        dataIndex: 0,
+        seriesName: 'Gradient',
+        value: 1,
+        marker: '<span></span>',
+        color: { type: 'linear', colorStops: [] },
+      },
+    ];
+    const ctx = buildAxisTooltipContext(params, {}, false);
+    expect(ctx.series[0].color).toBeUndefined();
+  });
+});
+
+describe('buildAsyncTooltipFormatter', () => {
+  const stubContext = (params: unknown) => {
+    const r = (params ?? {}) as { name?: string; dataIndex?: number };
+    return {
+      kind: 'item' as const,
+      dataIndex: r.dataIndex ?? 0,
+      name: String(r.name ?? ''),
+      value: 0,
+    };
+  };
+  const defaultSync = (params: unknown) =>
+    `SYNC(${(params as { name: string }).name})`;
+
+  it('returns undefined when neither customHtml nor appendHtml is set', () => {
+    const formatter = buildAsyncTooltipFormatter({
+      options: {},
+      defaultSync,
+      toContext: stubContext,
+    });
+    expect(formatter).toBeUndefined();
+  });
+
+  it('replaces the default sync body when only customHtml is set (no built-in row)', async () => {
+    const formatter = buildAsyncTooltipFormatter({
+      options: {
+        tooltip: {
+          customHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<b id="rep">${ctx.name}</b>` : '',
+        },
+      },
+      defaultSync,
+      toContext: stubContext,
+    })!;
+    const cb = vi.fn();
+    formatter({ name: 'A', dataIndex: 0 }, 't0', cb);
+    await flushTooltipMicrotasks();
+    const html = cb.mock.calls[0][1] as string;
+    expect(html).toContain('id="rep"');
+    expect(html).toContain('>A<');
+    // The built-in `SYNC(...)` row must NOT appear — customHtml owns
+    // the entire body, including the wrap separator (no
+    // `icharts-tooltip-extra` rule between two halves).
+    expect(html).not.toContain('SYNC(A)');
+    expect(html).not.toContain('icharts-tooltip-extra');
+  });
+
+  it('appends below the default sync body when only appendHtml is set', async () => {
+    const formatter = buildAsyncTooltipFormatter({
+      options: {
+        tooltip: {
+          appendHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<i id="ext">extra-${ctx.name}</i>` : '',
+        },
+      },
+      defaultSync,
+      toContext: stubContext,
+    })!;
+    const cb = vi.fn();
+    formatter({ name: 'B', dataIndex: 1 }, 't0', cb);
+    await flushTooltipMicrotasks();
+    const html = cb.mock.calls[0][1] as string;
+    expect(html).toContain('SYNC(B)'); // default sync row preserved
+    expect(html).toContain('id="ext"');
+    expect(html).toContain('extra-B');
+    // Default `wrap` separator wires sync ↔ extra with the
+    // `icharts-tooltip-extra` rule.
+    expect(html).toContain('icharts-tooltip-extra');
+  });
+
+  it('composes when both are set: customHtml is the body, appendHtml appears below', async () => {
+    const formatter = buildAsyncTooltipFormatter({
+      options: {
+        tooltip: {
+          customHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<b id="body">B-${ctx.name}</b>` : '',
+          appendHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<i id="ext">A-${ctx.name}</i>` : '',
+        },
+      },
+      defaultSync,
+      toContext: stubContext,
+    })!;
+    const cb = vi.fn();
+    formatter({ name: 'X', dataIndex: 0 }, 't0', cb);
+    await flushTooltipMicrotasks();
+    const html = cb.mock.calls[0][1] as string;
+    // Replaced body present.
+    expect(html).toContain('id="body"');
+    expect(html).toContain('B-X');
+    // Default sync row gone (customHtml replaced it).
+    expect(html).not.toContain('SYNC(X)');
+    // Append row present, below the body, separated by the dashed rule
+    // emitted by the helper's own `icharts-tooltip-append` wrapper.
+    expect(html).toContain('id="ext"');
+    expect(html).toContain('A-X');
+    expect(html).toContain('icharts-tooltip-append');
+    // Body must come before the append fragment in the rendered HTML.
+    expect(html.indexOf('id="body"')).toBeLessThan(html.indexOf('id="ext"'));
+  });
+
+  it('renders only the side that returns content when one async hook is empty', async () => {
+    const formatter = buildAsyncTooltipFormatter({
+      options: {
+        tooltip: {
+          customHtml: async () => 'BODY',
+          appendHtml: async () => '', // empty → no separator, no append slot
+        },
+      },
+      defaultSync,
+      toContext: stubContext,
+    })!;
+    const cb = vi.fn();
+    formatter({ name: 'X', dataIndex: 0 }, 't0', cb);
+    await flushTooltipMicrotasks();
+    const html = cb.mock.calls[0][1] as string;
+    expect(html).toContain('BODY');
+    expect(html).not.toContain('icharts-tooltip-append');
+  });
+
+  // -----------------------------------------------------------------------
+  // Adapter integration — confirms each graph adapter wires `nameToColor`
+  // into the `toContext` closure so user `customHtml` / `appendHtml`
+  // callbacks see populated `color` / `sourceColor` / `targetColor`
+  // fields. The tooltip-context unit tests pin the mapping; this layer
+  // pins that the adapters actually feed the map in.
+  // -----------------------------------------------------------------------
+
+  type IntegrationFormatter = (
+    params: unknown,
+    ticket: string,
+    cb: (ticket: string, html: string) => void,
+  ) => string;
+
+  async function captureCtxFromTooltip(
+    tooltip: Record<string, unknown>,
+    params: unknown,
+  ): Promise<unknown> {
+    const formatter = tooltip.formatter as IntegrationFormatter;
+    formatter(params, 't0', () => {});
+    await flushTooltipMicrotasks();
+    return capturedCtxHolder.value;
+  }
+
+  // Shared mutable holder — easier than re-declaring per test since
+  // each captureCtxFromTooltip call runs in sequence within a test.
+  const capturedCtxHolder: { value: unknown } = { value: undefined };
+
+  function withCaptureHook(): { customHtml: (ctx: unknown) => Promise<string> } {
+    capturedCtxHolder.value = undefined;
+    return {
+      customHtml: async (ctx: unknown) => {
+        capturedCtxHolder.value = ctx;
+        return 'ok';
+      },
+    };
+  }
+
+  it('sankey adapter: edge tooltip ctx exposes sourceColor / targetColor', async () => {
+    const tooltip = resolveSankeyOptions(
+      { nodes: [{ name: 'A' }, { name: 'B' }], links: [{ source: 'A', target: 'B', value: 1 }] },
+      { tooltip: withCaptureHook() },
+    ).tooltip as Record<string, unknown>;
+
+    const ctx = (await captureCtxFromTooltip(tooltip, {
+      dataType: 'edge',
+      dataIndex: 0,
+      data: { source: 'A', target: 'B', value: 1 },
+    })) as { kind: string; sourceColor?: string; targetColor?: string };
+
+    expect(ctx.kind).toBe('edge');
+    expect(typeof ctx.sourceColor).toBe('string');
+    expect(typeof ctx.targetColor).toBe('string');
+    expect(ctx.sourceColor).not.toBe(ctx.targetColor);
+  });
+
+  it('sankey adapter: node tooltip ctx exposes resolved palette color', async () => {
+    const tooltip = resolveSankeyOptions(
+      { nodes: [{ name: 'A' }, { name: 'B' }], links: [{ source: 'A', target: 'B', value: 1 }] },
+      { tooltip: withCaptureHook() },
+    ).tooltip as Record<string, unknown>;
+
+    const ctx = (await captureCtxFromTooltip(tooltip, {
+      name: 'A',
+      value: 5,
+      dataIndex: 0,
+    })) as { kind: string; color?: string };
+
+    expect(ctx.kind).toBe('item');
+    expect(typeof ctx.color).toBe('string');
+    expect(ctx.color!.length).toBeGreaterThan(0);
+  });
+
+  it('chord adapter: edge tooltip ctx exposes sourceColor / targetColor', async () => {
+    const tooltip = resolveChordOptions(
+      { nodes: [{ name: 'A' }, { name: 'B' }], links: [{ source: 'A', target: 'B', value: 1 }] },
+      { tooltip: withCaptureHook() },
+    ).option.tooltip as Record<string, unknown>;
+
+    const ctx = (await captureCtxFromTooltip(tooltip, {
+      dataType: 'edge',
+      dataIndex: 0,
+      data: { source: 'A', target: 'B', value: 1 },
+    })) as { kind: string; sourceColor?: string; targetColor?: string };
+
+    expect(ctx.kind).toBe('edge');
+    expect(typeof ctx.sourceColor).toBe('string');
+    expect(typeof ctx.targetColor).toBe('string');
+    expect(ctx.sourceColor).not.toBe(ctx.targetColor);
+  });
+
+  it('honors options.tooltip.placeholder while async hooks are pending', async () => {
+    let release!: (s: string) => void;
+    const formatter = buildAsyncTooltipFormatter({
+      options: {
+        tooltip: {
+          appendHtml: () =>
+            new Promise<string>((resolve) => {
+              release = resolve;
+            }),
+          placeholder: 'Fetching…',
+        },
+      },
+      defaultSync,
+      toContext: stubContext,
+    })!;
+    const placeholder = formatter({ name: 'A', dataIndex: 0 }, 't0', vi.fn());
+    expect(placeholder).toContain('Fetching…');
+    release('done');
+    await flushTooltipMicrotasks();
   });
 });

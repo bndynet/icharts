@@ -714,15 +714,62 @@ Each chart type has its own options interface that extends the base `ChartOption
     /** Format each rendered value (axis-mode, pie slice, sankey/chord node/edge). */
     formatValue?: (value: number | string, name: string) => string;
     /**
-     * Append asynchronously loaded HTML below the chart's default tooltip body.
+     * Replace the chart's default synchronous tooltip body with custom
+     * asynchronously loaded HTML. The user-supplied function fully owns the
+     * tooltip body — the built-in name / value / percent / axis row is
+     * NOT rendered when this hook is set. Use `appendHtml` instead when you
+     * want to keep the default body and add extras below it.
+     *
      * Receives a normalized TooltipContext — narrow with `ctx.kind`:
      *   - 'axis' for line / bar / area
-     *   - 'item' for pie slice, sankey/chord node
-     *   - 'edge' for sankey/chord link
+     *   - 'item' for pie slice, sankey/chord/network/tree node, word in word-cloud
+     *   - 'edge' for sankey/chord/network link
+     *
+     * ctx fields by kind:
+     *   - axis: axisValueLabel, dataIndex, rawAxisValue,
+     *           series: [{ name, value, marker?, color? }]
+     *   - item: name, value, dataIndex, marker?, color?,
+     *           percent? (pie only)
+     *   - edge: source, target, value, dataIndex,
+     *           sourceColor?, targetColor?
+     *
+     * Color semantics:
+     *   - `color` / `series[i].color` is the resolved hex/rgb of that
+     *     slice / series / node, respecting `options.colors` /
+     *     `options.colorMap` / `node.color` / theme palette.
+     *   - `sourceColor` / `targetColor` (edge) are looked up from the
+     *     source/target node names (NOT ECharts' `params.color`, which
+     *     is the literal string "gradient" for sankey/chord links by
+     *     default). They report the source/target NODE color and do
+     *     not reflect per-link `lineStyle.color` overrides on
+     *     `data.links[i]`.
+     *
+     * Can be combined with `appendHtml`: customHtml provides the body,
+     * appendHtml is rendered below it with a thin separator.
+     *
      * Not applied to spark variants or when `tooltip.enabled === false`.
      */
     customHtml?: (ctx: TooltipContext) => Promise<string>;
-    /** Shown while `customHtml` is pending. Default: 'Loading…' */
+    /**
+     * Append asynchronously loaded HTML below the synchronous tooltip body.
+     *
+     * The "synchronous body" is whichever of these the chart resolves to:
+     *   - the chart's built-in default sync row (when `customHtml` is not
+     *     set), or
+     *   - the HTML returned by `customHtml` (when it is set).
+     *
+     * appendHtml's output is rendered below that body, separated by a thin
+     * dashed rule. This is the option to reach for when you want to keep
+     * the default tooltip layout and just **add extras** (latency, owner,
+     * last-updated timestamp, …) — unlike `customHtml` which fully replaces
+     * the default body.
+     *
+     * Receives the same normalized TooltipContext as `customHtml` and
+     * shares the same `placeholder` while pending. Not applied to spark
+     * variants or when `tooltip.enabled === false`.
+     */
+    appendHtml?: (ctx: TooltipContext) => Promise<string>;
+    /** Shown while `customHtml` / `appendHtml` is pending. Default: 'Loading…' */
     placeholder?: string;
     /**
      * Attach the tooltip DOM to `<body>` so it escapes ancestors with

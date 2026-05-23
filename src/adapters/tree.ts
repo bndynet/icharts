@@ -6,13 +6,13 @@ import type {
   TreeNodeIconSpec,
 } from '../types.js';
 import type { ChartSetupResult, RenderContext } from './index.js';
-import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { getConfig } from '../config.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
   applyConfiguredFontFamilyToOption,
   buildTitle,
+  buildAsyncTooltipFormatter,
   compileRichText,
   getLabelFontSize,
   getTitleReserve,
@@ -966,20 +966,20 @@ export function resolveTreeOptions(
     appendToBody: resolveAppendToBody(options, ctx),
     position: resolveTooltipPosition(options),
   };
-  if (options.tooltip?.customHtml) {
-    const customHtml = options.tooltip.customHtml;
-    tooltip.formatter = createAsyncTooltipFormatter({
-      // Tree `customHtml` owns the full tooltip body (name, avatar, …).
-      // Other chart types append below their default sync row; tree nodes
-      // are usually fully custom when this hook is used.
-      formatSync: () => '',
-      customHtml: (params) =>
-        Promise.resolve(customHtml(sankeyChordParamsToTooltipContext(params))),
-      placeholder: options.tooltip.placeholder,
-    });
-  } else {
-    tooltip.formatter = (params: unknown) => treeTooltipSyncHtml(params, options);
-  }
+  // Tree tooltip semantics:
+  //   - `customHtml` owns the full tooltip body (name, avatar, …) — the
+  //     built-in name row is skipped. Same convention as every other
+  //     chart type post the unified `customHtml = replace` semantics.
+  //   - `appendHtml` keeps the default name row and adds extras below it.
+  //   - Both can compose: customHtml's body + appendHtml's extras below.
+  // The shared helper wires this exactly.
+  const treeFormatter = buildAsyncTooltipFormatter({
+    options,
+    defaultSync: (params) => treeTooltipSyncHtml(params, options),
+    toContext: (params) => sankeyChordParamsToTooltipContext(params, nameToColor),
+  });
+  tooltip.formatter =
+    treeFormatter ?? ((params: unknown) => treeTooltipSyncHtml(params, options));
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),

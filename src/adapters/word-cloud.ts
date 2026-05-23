@@ -1,9 +1,9 @@
 import type { TooltipContextItem, WordCloudChartOptions, WordCloudData } from '../types.js';
 import type { RenderContext } from './index.js';
-import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
   buildTitle,
+  buildAsyncTooltipFormatter,
   getTitleReserve,
   resolveAppendToBody,
   resolveTooltipPosition,
@@ -72,6 +72,7 @@ function wordCloudParamsToTooltipContext(params: unknown): TooltipContextItem {
     name,
     value,
     marker: typeof pr.marker === 'string' ? pr.marker : undefined,
+    color: typeof pr.color === 'string' ? pr.color : undefined,
   };
 }
 
@@ -112,18 +113,13 @@ export function resolveWordCloudOptions(
     appendToBody: resolveAppendToBody(options, ctx),
     position: resolveTooltipPosition(options),
   };
-  if (options.tooltip?.customHtml) {
-    const customHtml = options.tooltip.customHtml;
-    tooltip.formatter = createAsyncTooltipFormatter({
-      formatSync: (params) => wordCloudTooltipSyncHtml(params, options),
-      customHtml: (params) =>
-        Promise.resolve(customHtml(wordCloudParamsToTooltipContext(params))),
-      placeholder: options.tooltip.placeholder,
-    });
-  } else {
-    tooltip.formatter = (params: unknown) =>
-      wordCloudTooltipSyncHtml(params, options);
-  }
+  const wordCloudFormatter = buildAsyncTooltipFormatter({
+    options,
+    defaultSync: (params) => wordCloudTooltipSyncHtml(params, options),
+    toContext: wordCloudParamsToTooltipContext,
+  });
+  tooltip.formatter =
+    wordCloudFormatter ?? ((params: unknown) => wordCloudTooltipSyncHtml(params, options));
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),

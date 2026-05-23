@@ -105,9 +105,14 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
      - XY / pie / bar / area → write `merged.color = colors` after `deepMerge`.
      - Graph (`sankey`, `chord`, custom `{ nodes, links }` types) → use `mapGraphNodesForECharts()` for the shape, then `paintGraphNodes()` to inject `itemStyle.color` on each node after merge.
      - Area + spark → also call `buildSparkAreaGradient(colors[i])` per series.
+   - **Third consumer (tooltip context)** — when the adapter wires `customHtml` / `appendHtml` via `buildAsyncTooltipFormatter`, the same `name → color` map fed to `paintGraphNodes` is also threaded into the tooltip's `toContext` closure so user callbacks can render accurate `color` / `sourceColor` / `targetColor` swatches. Compute once, consume twice (assembly + tooltip). See **3.7 Tooltip context — color contract** for the full contract.
    - `core.ts` does **not** post-process colors. There is no central `applyChartColors` step anymore — what the adapter returns is what ECharts receives.
 6. **Spark charts** — hide legend/axes/grid appropriately; keep tooltips minimal (see `line.ts`, `bar.ts`).
-7. **Tooltips** — for async `options.tooltip.customHtml`, use `createAsyncTooltipFormatter` from `async-tooltip.ts` and normalized contexts from `tooltip-context.ts` (see `pie.ts`, `chord.ts`).
+7. **Tooltips** — for async tooltip hooks (`tooltip.customHtml` / `tooltip.appendHtml`), route through `buildAsyncTooltipFormatter` (in `src/adapters/common/tooltip.ts`, re-exported from `common/index.ts`) instead of calling `createAsyncTooltipFormatter` directly. The helper is the single composition point for the unified contract:
+   - `customHtml` **replaces** the default sync tooltip body (the built-in name / value / axis row is NOT rendered).
+   - `appendHtml` **appends** below the sync body (default sync OR `customHtml` output) with a thin dashed separator.
+   - Both can be combined: `customHtml` is the body, `appendHtml` is below it.
+   The helper returns `undefined` when neither hook is set so the caller can fall back to its existing default-sync formatter (or let ECharts' built-in tooltip render). Pair it with the chart's own `*ParamsToTooltipContext` from `tooltip-context.ts` to normalize ECharts' raw `params` into `TooltipContext`. See `pie.ts`, `chord.ts`, `tree.ts` for canonical wiring.
 8. **No parallel frameworks** — do not introduce a second chart abstraction; extend the existing adapter registry.
 9. **Global font-family guard for runtime payloads** — any adapter that performs additional runtime `chart.setOption(payload, ...)` writes (typically inside `onInit` / observers) MUST call `applyConfiguredFontFamilyToOption(payload, getConfig().fontFamily)` before `setOption`. Import from `src/adapters/common/index.ts` (single source of truth: `src/adapters/common/font-family.ts`). This guard is required even when the static option path is already covered by `core.ts`, because runtime payloads bypass `core`'s pre-`setOption` injection.
 
@@ -410,6 +415,77 @@ Any text your adapter renders on the chart canvas (data labels, node labels, axi
 
 **Why this matters.** ECharts ships built-in defaults for every `<seriesType>.label` that ignore our `ChartThemeColors` tokens. Any series type without a theme override silently falls back to ECharts' default — typically a near-black color that becomes unreadable on dark themes. The contract is two-sided: adapter must NOT set `color` (so a theme switch can repaint), AND theme must populate the surface (so there's something to repaint to). Skipping either side breaks dark-theme rendering for that chart and won't fail any existing adapter test, because adapter snapshots only assert the structural fields the adapter emits — they don't notice that `color` is missing.
 
+### 3.7 Tooltip context — color contract (when wiring `customHtml` / `appendHtml`)
+
+If your adapter wires `buildAsyncTooltipFormatter` (i.e. it honors `tooltip.customHtml` / `tooltip.appendHtml`), you opt into a contract identical in spirit to **3.6 Theme integration for canvas text**: same fields need to be populated from BOTH sides — type-side and adapter-side — or color rendering in `customHtml` silently breaks. No existing test catches a missing wire-up for a new chart.
+
+#### Type side — reuse, don't fork
+
+- [ ] **Do not** define a chart-specific `TooltipContext*` type. `customHtml` is a public, cross-chart API; every consumer narrows with `ctx.kind`, so each kind has to mean the same thing across every chart type. The three shared types already cover every built-in chart family:
+  - `TooltipContextAxis` — line / bar / area / radar (axis-trigger; one entry per series at the hovered position).
+  - `TooltipContextItem` — pie slice, sankey / chord / network / tree node, word-cloud word (item-trigger; single data point).
+  - `TooltipContextEdge` — sankey / chord / network link (edge-trigger; source → target pair).
+- [ ] Chart-specific knobs (date format, value formatter, the chart's own `XxxChartOptions`) reach the formatter via the `toContext` closure — they do NOT belong on the public `TooltipContext` union. If you genuinely need a new shared field, propose extending the existing type so every chart benefits (e.g. `color` / `sourceColor` / `targetColor` were added once, not per chart).
+
+#### Mapper side — pick the right factory, or write a thin wrapper
+
+| Chart kind | Mapper to use | Lives in |
+|---|---|---|
+| Axis-trigger (line / bar / area / radar / …) | `buildAxisTooltipContext` | `src/adapters/common/tooltip.ts` (called inside `buildTooltip`) |
+| Single-item with `{ name, value }` ECharts params | `pieParamsToTooltipContext` | `src/tooltip-context.ts` |
+| Graph (item + edge in one mapper) | `sankeyChordParamsToTooltipContext` | `src/tooltip-context.ts` |
+
+Only write your own mapper when the ECharts `params` shape genuinely differs — `wordCloudParamsToTooltipContext` is the reference (it unpacks `value: [name, number]` because the wordcloud series stores values as a 2-tuple). Even then, **return one of the three shared types** — never invent a new shape.
+
+#### Adapter side — compute `nameToColor` BEFORE the tooltip
+
+The `name → color` map you build for `paintGraphNodes` is the same one the tooltip needs. Compute it once, thread it into both consumers in the same order every other graph adapter follows:
+
+```ts
+// 1. Resolve colors — this is the only source of truth for "name → color".
+const colors = resolveColorsForNodes(data.nodes, options);
+const nameToColor = new Map(data.nodes.map((n, i) => [n.name, colors[i]]));
+
+// 2. Wire the tooltip. The closure captures `nameToColor`; without it,
+//    `ctx.color` / `ctx.sourceColor` / `ctx.targetColor` are permanently
+//    undefined for every hover.
+const formatter = buildAsyncTooltipFormatter({
+  options,
+  defaultSync: (params) => syncHtml(params, options),
+  toContext: (params) => sankeyChordParamsToTooltipContext(params, nameToColor),
+});
+
+// 3. … build the rest of the option, deepMerge, then:
+merged.color = colors;
+paintGraphNodes(merged, '<seriesType>', nameToColor);
+```
+
+For non-graph charts that still need item colors (e.g. pie reuses `pieParamsToTooltipContext`), `params.color` is already a real hex on the node/slice side — no `nameToColor` map needed. The map is only mandatory when the chart has **edges** (where `params.color` is the literal string `"gradient"` by default) or when you want to override ECharts' own color resolution.
+
+#### Network's two-branch case (canonical reference)
+
+When a chart's color comes from different sources depending on configuration (e.g. network: per-category palette when `categories` exist, per-node palette otherwise), build the `nameToColor` map so it ALWAYS reflects what ECharts will paint — including per-node `color` overrides winning over the category color. See `src/adapters/network.ts` for the reference; the early-color-resolution block is what feeds both the tooltip closure and the final `merged.color` assignment.
+
+#### Tests — required when you wire any color into the context
+
+- [ ] Add at least one adapter-level test asserting `customHtml` receives populated `color` / `sourceColor` / `targetColor` for the kinds your adapter emits. The capture pattern is:
+  ```ts
+  let captured: unknown;
+  const option = resolveXxxOptions(data, {
+    tooltip: {
+      customHtml: async (ctx) => { captured = ctx; return 'ok'; },
+    },
+  });
+  const formatter = (option.tooltip as Record<string, unknown>).formatter as TooltipFormatter;
+  formatter(<fake params>, 't0', () => {});
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  // assert captured.kind / color / sourceColor / targetColor here
+  ```
+  See `src/adapters/network.test.ts` (`tooltip context — sourceColor / targetColor on edge hover`) and the sankey/chord cases in `src/adapters/common.test.ts` for the canonical assertions.
+- [ ] For the unit-level `params → context` mapping (no adapter, no ECharts), extend `src/tooltip-context.test.ts` — pin the new behavior at the mapper level so an adapter regression points at the right file.
+
+**Why this matters.** Skipping the `nameToColor` argument is a silent regression: the tooltip keeps rendering, the user's `customHtml` keeps receiving a `ctx`, but every color field is `undefined`. No existing adapter test will catch it for a new chart, because adapter snapshots only assert the structural fields the adapter emits — they don't notice that the closure is missing an argument. The mandatory test above is what locks the contract.
+
 ### 4. Registry (`src/adapters/index.ts`)
 
 ```ts
@@ -485,6 +561,8 @@ For **consumer-defined** types without modifying this repo, use `registerAdapter
 - Add chart-specific fields to base `ChartOptions`. Every chart-specific knob (variants, axes, sizing, slice fields, gauge width, race namespace, …) lives on the owning `XxxChartOptions` subtype; base `ChartOptions` only holds truly cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `labelFontSize`, `tooltip`, `echarts`). `grid` lives only on `XYChartOptions`; `legend` lives only on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions`. New adapters that resolve `ChartOptions` instead of their own `XxxChartOptions` are violating the convention.
 - Wrap a chart's own general options inside a sub-object/named type when they could be flat. `BarChartOptions.barWidth` / `colorByCategory` / `PieChartOptions.sliceBorderRadius` live directly on the subtype — no `bar?: BarOptions` or `slice?: PieSliceOptions` wrappers. Reserve sub-objects (`race?: BarRaceOptions`, …) for **variant-bound or scoped sub-features** only.
 - Put new chart-specific type declarations in `src/types.ts` (the backwards-compat barrel). New chart types belong in their own `src/types/<chart>.ts` file.
+- Define a chart-specific `TooltipContext*` type. `customHtml` / `appendHtml` is a public, cross-chart API — its surface must stay stable, and consumers narrow with `ctx.kind`. Reuse `TooltipContextAxis` / `TooltipContextItem` / `TooltipContextEdge`; if you genuinely need more fields, extend the shared types so every chart benefits (`color` / `sourceColor` / `targetColor` were added once, not per chart). Chart-specific knobs reach the formatter via the `toContext` closure, not via the public union. See section 3.7.
+- Wire `buildAsyncTooltipFormatter` for a graph chart (or any chart with named items whose colors come from the resolved palette) without threading `nameToColor` into the `toContext` closure. ECharts' own `params.color` for an edge is the literal string `"gradient"` when the series uses a source→target gradient (the default for sankey/chord and `'source'` mode in network), so the only reliable way to surface link endpoint colors in `customHtml` is to look them up by `source` / `target` node name. The bug is silent — there is no runtime error, just permanently `undefined` `ctx.color` / `ctx.sourceColor` / `ctx.targetColor` fields, and no existing snapshot test will catch it. See section 3.7.
 
 ## Git and PR expectations
 

@@ -6,7 +6,6 @@ import type {
 } from '../types.js';
 import type * as echarts from 'echarts';
 import type { ChartSetupResult, RenderContext } from './index.js';
-import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { getConfig } from '../config.js';
 import {
   formatPieTooltipSyncHtml,
@@ -17,6 +16,7 @@ import {
   type EdgeReserves,
   buildTitle,
   buildLegend,
+  buildAsyncTooltipFormatter,
   compileRichText,
   getLabelFontSize,
   getLegendReserve,
@@ -168,14 +168,13 @@ export function resolvePieOptions(
     appendToBody: resolveAppendToBody(options, ctx),
     position: resolveTooltipPosition(options),
   };
-  if (options.tooltip?.customHtml) {
-    const customHtml = options.tooltip.customHtml;
-    tooltip.formatter = createAsyncTooltipFormatter({
-      formatSync: (params) => formatPieTooltipSyncHtml(params, options),
-      customHtml: (params) =>
-        Promise.resolve(customHtml(pieParamsToTooltipContext(params))),
-      placeholder: options.tooltip.placeholder,
-    });
+  const pieFormatter = buildAsyncTooltipFormatter({
+    options,
+    defaultSync: (params) => formatPieTooltipSyncHtml(params, options),
+    toContext: pieParamsToTooltipContext,
+  });
+  if (pieFormatter) {
+    tooltip.formatter = pieFormatter;
   }
 
   const centerLabels = normalizeCenterLabels(

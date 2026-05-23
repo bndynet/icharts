@@ -6,12 +6,12 @@ import type {
   NetworkVariant,
 } from '../types.js';
 import type { RenderContext } from './index.js';
-import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColors, resolveColorsForNodes } from '../utils.js';
 import {
   buildLegend,
   buildTitle,
+  buildAsyncTooltipFormatter,
   getLabelFontSize,
   getLegendReserve,
   getTitleReserve,
@@ -542,6 +542,41 @@ export function resolveNetworkOptions(
     series.labelLayout = { hideOverlap: true };
   }
 
+  // Resolve the palette up front — `nameToColor` is consumed by both the
+  // tooltip context (so `customHtml`/`appendHtml` can surface node and
+  // edge endpoint colors) and the final `merged.color` / `paintGraphNodes`
+  // assignment below. Computing it once here keeps the two consumers in
+  // lockstep.
+  //
+  // Color assembly: categories own the palette (so the legend swatch and
+  // every member node share the same color). Per-node `color` overrides
+  // (already projected onto `itemStyle.color` from `buildNodeData`) win
+  // over the category color in the `nameToColor` map too, so a tooltip
+  // never reports a different color than ECharts paints. Networks without
+  // categories fall back to one color per node so the graph doesn't
+  // render as a single-color blob.
+  let paletteColors: string[];
+  const nameToColor = new Map<string, string>();
+  if (hasCategories) {
+    paletteColors = resolveColors(categories, options);
+    for (const node of data.nodes) {
+      if (node.color) {
+        nameToColor.set(node.name, node.color);
+        continue;
+      }
+      const idx =
+        node.category !== undefined ? catToIdx.get(node.category) : undefined;
+      if (idx !== undefined) {
+        nameToColor.set(node.name, paletteColors[idx]);
+      }
+    }
+  } else {
+    paletteColors = resolveColorsForNodes(data.nodes, options);
+    data.nodes.forEach((n: NetworkNode, i) => {
+      nameToColor.set(n.name, n.color ?? paletteColors[i]);
+    });
+  }
+
   const tooltip: Record<string, unknown> = {
     trigger: 'item',
     confine: true,
@@ -549,17 +584,13 @@ export function resolveNetworkOptions(
     appendToBody: resolveAppendToBody(options, ctx),
     position: resolveTooltipPosition(options),
   };
-  if (options.tooltip?.customHtml) {
-    const customHtml = options.tooltip.customHtml;
-    tooltip.formatter = createAsyncTooltipFormatter({
-      formatSync: (params) => networkTooltipSyncHtml(params, options),
-      customHtml: (params) =>
-        Promise.resolve(customHtml(sankeyChordParamsToTooltipContext(params))),
-      placeholder: options.tooltip.placeholder,
-    });
-  } else {
-    tooltip.formatter = (params: unknown) => networkTooltipSyncHtml(params, options);
-  }
+  const networkFormatter = buildAsyncTooltipFormatter({
+    options,
+    defaultSync: (params) => networkTooltipSyncHtml(params, options),
+    toContext: (params) => sankeyChordParamsToTooltipContext(params, nameToColor),
+  });
+  tooltip.formatter =
+    networkFormatter ?? ((params: unknown) => networkTooltipSyncHtml(params, options));
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
@@ -573,21 +604,9 @@ export function resolveNetworkOptions(
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
 
-  // Color assembly: categories own the palette (so the legend swatch and
-  // every member node share the same color). Per-node `color` overrides
-  // are already on `itemStyle.color` from `buildNodeData`. Networks
-  // without categories fall back to one color per node so the graph
-  // doesn't render as a single-color blob.
-  if (hasCategories) {
-    merged.color = resolveColors(categories, options);
-  } else {
-    const nodeColors = resolveColorsForNodes(data.nodes, options);
-    merged.color = nodeColors;
-    paintGraphNodes(
-      merged,
-      'graph',
-      new Map(data.nodes.map((n: NetworkNode, i) => [n.name, nodeColors[i]])),
-    );
+  merged.color = paletteColors;
+  if (!hasCategories) {
+    paintGraphNodes(merged, 'graph', nameToColor);
   }
 
   return merged;

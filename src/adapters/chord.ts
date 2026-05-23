@@ -1,10 +1,10 @@
 import type { ChordData, ChordChartOptions } from '../types.js';
 import type { ChartSetupResult, RenderContext } from './index.js';
-import { createAsyncTooltipFormatter } from '../async-tooltip.js';
 import { sankeyChordParamsToTooltipContext } from '../tooltip-context.js';
 import { deepMerge, resolveColorsForNodes } from '../utils.js';
 import {
   buildTitle,
+  buildAsyncTooltipFormatter,
   getLabelFontSize,
   resolveAppendToBody,
   resolveTooltipPosition,
@@ -36,6 +36,13 @@ export function resolveChordOptions(
   const p = options.padding ?? 12;
 
   const nodes = mapGraphNodesForECharts(data.nodes);
+
+  // Resolve the palette up front — `nameToColor` is consumed by both the
+  // tooltip context (so `customHtml`/`appendHtml` can surface node and
+  // edge endpoint colors) and `paintGraphNodes` at the end of the
+  // function. Computing it once here keeps the two consumers in lockstep.
+  const colors = resolveColorsForNodes(data.nodes, options);
+  const nameToColor = new Map(data.nodes.map((n, i) => [n.name, colors[i]]));
 
   const series: Record<string, unknown> = {
     type: 'chord',
@@ -78,17 +85,13 @@ export function resolveChordOptions(
     appendToBody: resolveAppendToBody(options, ctx),
     position: resolveTooltipPosition(options),
   };
-  if (options.tooltip?.customHtml) {
-    const customHtml = options.tooltip.customHtml;
-    tooltip.formatter = createAsyncTooltipFormatter({
-      formatSync: (params) => chordTooltipSyncHtml(params, options),
-      customHtml: (params) =>
-        Promise.resolve(customHtml(sankeyChordParamsToTooltipContext(params))),
-      placeholder: options.tooltip.placeholder,
-    });
-  } else {
-    tooltip.formatter = (params: unknown) => chordTooltipSyncHtml(params, options);
-  }
+  const chordFormatter = buildAsyncTooltipFormatter({
+    options,
+    defaultSync: (params) => chordTooltipSyncHtml(params, options),
+    toContext: (params) => sankeyChordParamsToTooltipContext(params, nameToColor),
+  });
+  tooltip.formatter =
+    chordFormatter ?? ((params: unknown) => chordTooltipSyncHtml(params, options));
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
@@ -98,13 +101,8 @@ export function resolveChordOptions(
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
 
-  const colors = resolveColorsForNodes(data.nodes, options);
   merged.color = colors;
-  paintGraphNodes(
-    merged,
-    'chord',
-    new Map(data.nodes.map((n, i) => [n.name, colors[i]])),
-  );
+  paintGraphNodes(merged, 'chord', nameToColor);
 
   return { option: merged };
 }

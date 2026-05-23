@@ -1126,6 +1126,62 @@ describe('tree adapter', () => {
       expect(html).not.toContain('icharts-tooltip-extra');
     });
 
+    it('tooltip.appendHtml renders the default name row above the user extras', async () => {
+      const option = resolveTreeOptions(sample, {
+        tooltip: {
+          appendHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<span id="ext">extra-${ctx.name}</span>` : '',
+        },
+      });
+      const formatter = (option.tooltip as Record<string, unknown>)
+        .formatter as (
+        params: unknown,
+        ticket: string,
+        cb: (ticket: string, html: string) => void,
+      ) => string;
+      const callback = vi.fn();
+      formatter({ name: 'A', dataIndex: 0 }, 't0', callback);
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      const html = callback.mock.calls[0][1] as string;
+      // Default tree name row preserved.
+      expect(html).toContain('A');
+      // User extras appended.
+      expect(html).toContain('id="ext"');
+      expect(html).toContain('extra-A');
+      // Wired through createAsyncTooltipFormatter's default `wrap`
+      // separator (sync vs extra), so the rule shows up.
+      expect(html).toContain('icharts-tooltip-extra');
+    });
+
+    it('tooltip.customHtml + appendHtml compose: custom body, then appended extras', async () => {
+      const option = resolveTreeOptions(sample, {
+        tooltip: {
+          customHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<span id="body">B-${ctx.name}</span>` : '',
+          appendHtml: async (ctx) =>
+            ctx.kind === 'item' ? `<span id="ext">A-${ctx.name}</span>` : '',
+        },
+      });
+      const formatter = (option.tooltip as Record<string, unknown>)
+        .formatter as (
+        params: unknown,
+        ticket: string,
+        cb: (ticket: string, html: string) => void,
+      ) => string;
+      const callback = vi.fn();
+      formatter({ name: 'A', dataIndex: 0 }, 't0', callback);
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      const html = callback.mock.calls[0][1] as string;
+      // Custom body shown.
+      expect(html).toContain('id="body"');
+      // Appended extras after, separated by the helper's own dashed
+      // rule (separate from the wrap separator since customHtml replaced
+      // the default sync row).
+      expect(html).toContain('id="ext"');
+      expect(html).toContain('icharts-tooltip-append');
+      expect(html.indexOf('id="body"')).toBeLessThan(html.indexOf('id="ext"'));
+    });
+
     it('formatNodeLabel falls back to raw name when formatter throws', () => {
       const s = getSeries(
         resolveTreeOptions(sample, {

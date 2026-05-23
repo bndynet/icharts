@@ -1,9 +1,11 @@
 import type {
   ChartOptions,
+  TooltipContext,
   TooltipContextAxis,
   TooltipOptions,
 } from '../../types.js';
 import { createAsyncTooltipFormatter } from '../../async-tooltip.js';
+import type { AsyncTooltipFormatter } from '../../async-tooltip.js';
 import type { RenderContext } from '../index.js';
 import { formatDateByPattern } from './date-utils.js';
 
@@ -71,12 +73,18 @@ export function buildAxisTooltipContext(
   }
 
   const series = items.map((p: unknown) => {
-    const item = p as { marker?: string; seriesName?: string; value?: unknown };
+    const item = p as {
+      marker?: string;
+      seriesName?: string;
+      value?: unknown;
+      color?: string;
+    };
     const val = Array.isArray(item.value) ? (item.value as [unknown, unknown])[1] : item.value;
     return {
       name: item.seriesName ?? '',
       value: val as number | string,
       marker: item.marker,
+      color: typeof item.color === 'string' ? item.color : undefined,
     };
   });
 
@@ -175,15 +183,16 @@ export function buildTooltip(
     result.show = false;
   }
 
-  if (tooltip.customHtml && trigger === 'axis') {
-    const customHtml = tooltip.customHtml;
-    result.formatter = createAsyncTooltipFormatter({
-      formatSync: (params) => formatAxisTooltipSyncHtml(params, tooltip, isTimeAxis),
-      customHtml: (params) =>
-        Promise.resolve(customHtml(buildAxisTooltipContext(params, tooltip, isTimeAxis))),
-      placeholder: tooltip.placeholder,
+  if ((tooltip.customHtml || tooltip.appendHtml) && trigger === 'axis') {
+    const formatter = buildAsyncTooltipFormatter({
+      options,
+      defaultSync: (params) => formatAxisTooltipSyncHtml(params, tooltip, isTimeAxis),
+      toContext: (params) => buildAxisTooltipContext(params, tooltip, isTimeAxis),
     });
-    return result;
+    if (formatter) {
+      result.formatter = formatter;
+      return result;
+    }
   }
 
   if (tooltip.formatValue) {
@@ -197,4 +206,50 @@ export function buildTooltip(
   }
 
   return result;
+}
+
+/**
+ * Compose `tooltip.customHtml` + `tooltip.appendHtml` into a single ECharts
+ * tooltip formatter. Returns `undefined` when neither hook is set, so the
+ * caller can fall back to its existing default-sync path (or let ECharts'
+ * built-in tooltip render).
+ *
+ * Semantics (matches the doc on {@link TooltipOptions.customHtml} /
+ * {@link TooltipOptions.appendHtml}):
+ *
+ *   - `customHtml` only — replaces the synchronous body. The default sync
+ *     row is **not** rendered.
+ *   - `appendHtml` only — keeps the default synchronous body and appends
+ *     the user HTML below it (separator already supplied by
+ *     {@link createAsyncTooltipFormatter}'s `wrap`).
+ *   - both — `customHtml` provides the sync body (the built-in default is
+ *     skipped), and `appendHtml`'s output is rendered below it inside the
+ *     wrapper's `extra` slot, separated by a thin dashed rule.
+ */
+export function buildAsyncTooltipFormatter(opts: {
+  options: ChartOptions;
+  defaultSync: (params: unknown) => string;
+  toContext: (params: unknown) => TooltipContext;
+}): AsyncTooltipFormatter | undefined {
+  const tooltip = opts.options.tooltip ?? {};
+  const replaceFn = tooltip.customHtml;
+  const appendFn = tooltip.appendHtml;
+  if (!replaceFn && !appendFn) return undefined;
+
+  const APPEND_SEPARATOR =
+    '<div class="icharts-tooltip-append" style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(128,128,128,.3)">';
+
+  return createAsyncTooltipFormatter({
+    formatSync: replaceFn ? () => '' : opts.defaultSync,
+    customHtml: async (params) => {
+      const context = opts.toContext(params);
+      const replaceHtml = replaceFn ? await replaceFn(context) : '';
+      const appendHtml = appendFn ? await appendFn(context) : '';
+      const a = (replaceHtml ?? '').toString();
+      const b = (appendHtml ?? '').toString();
+      if (a && b) return `${a}${APPEND_SEPARATOR}${b}</div>`;
+      return a || b;
+    },
+    placeholder: tooltip.placeholder,
+  });
 }

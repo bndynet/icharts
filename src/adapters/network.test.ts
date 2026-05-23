@@ -1014,4 +1014,129 @@ describe('network adapter', () => {
       expect(label.fontSize).toBe(edgeLabel.fontSize);
     });
   });
+
+  describe('tooltip context — sourceColor / targetColor on edge hover', () => {
+    // ECharts re-invokes the tooltip formatter on every mouse move. The
+    // async tooltip pipeline returns a placeholder string synchronously
+    // and resolves the final HTML via `callback(ticket, html)` once the
+    // user's `customHtml` promise resolves. These tests drain that
+    // microtask queue and capture the ctx the user callback received.
+
+    type TooltipFormatter = (
+      params: unknown,
+      ticket: string,
+      cb: (ticket: string, html: string) => void,
+    ) => string;
+
+    function getFormatter(option: Record<string, unknown>): TooltipFormatter {
+      return (option.tooltip as Record<string, unknown>).formatter as TooltipFormatter;
+    }
+
+    async function captureCtx(
+      data: NetworkData,
+      options: Parameters<typeof resolveNetworkOptions>[1],
+      params: unknown,
+    ) {
+      let captured: unknown;
+      const option = resolveNetworkOptions(data, {
+        ...options,
+        tooltip: {
+          ...options?.tooltip,
+          customHtml: async (ctx) => {
+            captured = ctx;
+            return 'ok';
+          },
+        },
+      });
+      const formatter = getFormatter(option);
+      formatter(params, 't0', () => {});
+      // Drain async tooltip microtasks (matches the pattern used in
+      // tree.test.ts and common.test.ts for the same formatter helper).
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+      return captured;
+    }
+
+    it('with-categories: edge ctx exposes source/target colors from the category palette', async () => {
+      const ctx = await captureCtx(
+        sample,
+        {},
+        {
+          dataType: 'edge',
+          dataIndex: 0,
+          data: { source: 'Alice', target: 'Carol', value: 1 },
+        },
+      );
+      expect(ctx).toMatchObject({
+        kind: 'edge',
+        source: 'Alice',
+        target: 'Carol',
+      });
+      // Alice → Team A (category 0), Carol → Team B (category 1). The
+      // exact hex depends on the active theme palette, but both must be
+      // present and non-empty.
+      const e = ctx as { sourceColor?: string; targetColor?: string };
+      expect(typeof e.sourceColor).toBe('string');
+      expect(e.sourceColor!.length).toBeGreaterThan(0);
+      expect(typeof e.targetColor).toBe('string');
+      expect(e.targetColor!.length).toBeGreaterThan(0);
+      // Distinct categories → distinct colors.
+      expect(e.sourceColor).not.toBe(e.targetColor);
+    });
+
+    it('with-categories: per-node `color` override wins over the category color in edge ctx', async () => {
+      const overridden: NetworkData = {
+        ...sample,
+        nodes: sample.nodes.map((n) =>
+          n.name === 'Alice' ? { ...n, color: '#ff00ff' } : n,
+        ),
+      };
+      const ctx = await captureCtx(
+        overridden,
+        {},
+        {
+          dataType: 'edge',
+          dataIndex: 0,
+          data: { source: 'Alice', target: 'Carol', value: 1 },
+        },
+      );
+      const e = ctx as { sourceColor?: string };
+      expect(e.sourceColor).toBe('#ff00ff');
+    });
+
+    it('without categories: edge ctx exposes per-node palette colors', async () => {
+      const ctx = await captureCtx(
+        noCategoryData,
+        {},
+        {
+          dataType: 'edge',
+          dataIndex: 0,
+          data: { source: 'A', target: 'B', value: 1 },
+        },
+      );
+      const e = ctx as {
+        kind: string;
+        sourceColor?: string;
+        targetColor?: string;
+      };
+      expect(e.kind).toBe('edge');
+      expect(typeof e.sourceColor).toBe('string');
+      expect(typeof e.targetColor).toBe('string');
+      expect(e.sourceColor).not.toBe(e.targetColor);
+    });
+
+    it('node hover ctx exposes color from the resolved palette', async () => {
+      const ctx = await captureCtx(noCategoryData, {}, {
+        name: 'A',
+        value: 1,
+        dataIndex: 0,
+        // Real ECharts also sets `params.color` for node hovers; the
+        // nameToColor map wins, but we still want the field to be
+        // populated even when `params.color` is missing.
+      });
+      const e = ctx as { kind: string; color?: string };
+      expect(e.kind).toBe('item');
+      expect(typeof e.color).toBe('string');
+      expect(e.color!.length).toBeGreaterThan(0);
+    });
+  });
 });

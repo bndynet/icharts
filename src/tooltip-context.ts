@@ -6,6 +6,11 @@ import type {
 
 /**
  * Map ECharts pie `item` tooltip params to {@link TooltipContextItem}.
+ *
+ * Reads `params.color` for the resolved slice color — ECharts populates
+ * this with the same hex/rgb value it used to paint the slice, so it
+ * already reflects `options.colors` / `options.colorMap` / theme palette
+ * after our color pipeline has run.
  */
 export function pieParamsToTooltipContext(params: unknown): TooltipContextItem {
   const x = params as {
@@ -14,6 +19,7 @@ export function pieParamsToTooltipContext(params: unknown): TooltipContextItem {
     percent?: number;
     dataIndex?: number;
     marker?: string;
+    color?: string;
   };
   return {
     kind: 'item',
@@ -22,6 +28,7 @@ export function pieParamsToTooltipContext(params: unknown): TooltipContextItem {
     value: x.value,
     percent: x.percent,
     marker: x.marker,
+    color: typeof x.color === 'string' ? x.color : undefined,
   };
 }
 
@@ -46,27 +53,50 @@ export function formatPieTooltipSyncHtml(params: unknown, options: ChartOptions)
 }
 
 /**
- * Map Sankey or Chord tooltip params to {@link TooltipContext}.
+ * Map Sankey / Chord / Network / Tree tooltip params to {@link TooltipContext}.
+ *
+ * `nameToColor` is optional but **required for color fields to populate**:
+ *
+ *   - node hover (`kind: 'item'`) → `color = nameToColor.get(name)`
+ *     (falls back to `params.color` when the map doesn't have an entry —
+ *     ECharts' own `params.color` is a real hex on the node side, never
+ *     `"gradient"`).
+ *   - edge hover (`kind: 'edge'`) → `sourceColor = nameToColor.get(source)`,
+ *     `targetColor = nameToColor.get(target)`. There is no `params.color`
+ *     fallback here because ECharts reports the literal string
+ *     `"gradient"` for sankey/chord links by default.
+ *
+ * Without the map both color fields are `undefined` and the rest of the
+ * context still works — this keeps the function callable from custom
+ * adapters that don't have a name→color lookup handy.
  */
 export function sankeyChordParamsToTooltipContext(
   params: unknown,
+  nameToColor?: ReadonlyMap<string, string>,
 ): TooltipContext {
   const pr = params as Record<string, unknown>;
   if (pr.dataType === 'edge') {
     const d = pr.data as Record<string, unknown>;
+    const source = String(d.source);
+    const target = String(d.target);
     return {
       kind: 'edge',
       dataIndex: (pr.dataIndex as number) ?? 0,
-      source: String(d.source),
-      target: String(d.target),
+      source,
+      target,
       value: d.value as number | string,
+      sourceColor: nameToColor?.get(source),
+      targetColor: nameToColor?.get(target),
     };
   }
+  const name = String(pr.name ?? '');
+  const fallbackColor = typeof pr.color === 'string' ? pr.color : undefined;
   return {
     kind: 'item',
     dataIndex: (pr.dataIndex as number) ?? 0,
-    name: String(pr.name ?? ''),
+    name,
     value: (pr.value as number | string) ?? '',
     marker: pr.marker as string | undefined,
+    color: nameToColor?.get(name) ?? fallbackColor,
   };
 }
