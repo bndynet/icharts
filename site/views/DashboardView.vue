@@ -275,6 +275,7 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import {
   createChart,
   configure,
@@ -309,6 +310,26 @@ import {
 } from './dashboard-data.js';
 
 const { theme: siteTheme } = useTheme();
+const route = useRoute();
+
+// ── Query-string driven defaults ──────────────────────────────────────────
+// The site uses `createWebHashHistory`, so query strings live AFTER the
+// hash: `/#/dashboard?fullmode`. Reading `route.query` here at setup time
+// lets us seed `activeTheme` (and skip the first-paint hint blink) before
+// any chart is created — so `?fullmode` lands the user directly in the
+// sci-fi HUD layout, no flash of the default theme.
+//
+// `fullmode` is a no-value flag — `?fullmode` parses to `null`, which is
+// distinct from "absent" (`undefined`). The `'fullmode' in route.query`
+// check handles both `?fullmode` and `?fullmode=1` uniformly.
+//
+// The sci-fi CSS already hides the sidebar and recenters the content
+// column via `body:has(.dashboard.is-scifi) .site-sidebar { display: none }`
+// (see the non-scoped style block at the bottom of this file), so
+// "fullmode" is implemented purely by switching to the `dash-scifi`
+// icharts theme — no extra layout plumbing needed here.
+const FULLMODE_THEME = 'dash-scifi';
+const wantsFullMode = 'fullmode' in route.query;
 
 // `useTheme().setTheme` is imported through `@bndynet/vue-site`, which Vite
 // pre-bundles into a separate module instance from the one the package's
@@ -446,7 +467,11 @@ const themeOptions: DashThemeOption[] = [
 // Start with no dashboard theme selected — the page inherits whichever site
 // theme (light/dark) is already active. The segmented control only applies a
 // dashboard palette once the user explicitly picks one.
-const activeTheme = ref<string>('');
+//
+// Exception: `?fullmode` in the URL seeds the sci-fi theme so the page
+// opens directly in the HUD layout (sidebar hidden, dark palette, neon
+// chart colors) without a flash of the default theme.
+const activeTheme = ref<string>(wantsFullMode ? FULLMODE_THEME : '');
 
 // Blink the "Dashboard theme" picker border on first paint so first-time
 // visitors notice the page-level palette switcher in the top-right. Flipped
@@ -533,7 +558,17 @@ onMounted(() => {
   // Don't force a dashboard theme on first paint — let the site's current
   // light/dark theme drive the palette until the user picks one from the
   // segmented control above.
+  //
+  // Exception: `?fullmode` seeds `activeTheme` at setup time. When that
+  // happens we also need to flip the site light/dark mode to match the
+  // dashboard theme's `colorMode` (mirroring what `watch(activeTheme)`
+  // does on user picks), otherwise the site chrome stays in the wrong
+  // mode while the dashboard renders in sci-fi dark.
   if (activeTheme.value) {
+    const meta = themeOptions.find((o) => o.value === activeTheme.value);
+    if (meta && siteTheme.value !== meta.colorMode) {
+      syncSiteTheme(meta.colorMode);
+    }
     switchTheme(activeTheme.value);
   }
   refreshCurrentTheme();
@@ -691,7 +726,10 @@ onMounted(() => {
   };
   window.addEventListener('resize', resizeHandler);
 
-  highlightThemePicker.value = true;
+  // Skip the picker hint when the user already arrived via `?fullmode` —
+  // they've explicitly opted into a theme, so prompting them to pick one
+  // would be noise.
+  highlightThemePicker.value = !wantsFullMode;
 });
 
 // Re-apply the active dashboard theme whenever the user picks a different
