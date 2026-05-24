@@ -67,6 +67,12 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.graph.edgeLabel.color).toBe(COLORS.textPrimary);
   });
 
+  it('sankey.label has a `surface`-colored text halo (so vertical-variant labels stay readable on palette-colored nodes; harmless on horizontal where labels sit beside the node)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.sankey.label.textBorderColor).toBe(COLORS.surface);
+    expect(theme.sankey.label.textBorderWidth).toBe(2);
+  });
+
   it('sankey.label.color follows textPrimary (sankey node labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.sankey.label.color).toBe(COLORS.textPrimary);
@@ -80,6 +86,77 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
   it('tree.label.color follows textPrimary (tree node labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.tree.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('treemap.label.color follows textPrimary (treemap rectangle labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('treemap.label has a `surface`-colored text halo (so dark text stays readable on mid-tone palette rectangles)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.label.textBorderColor).toBe(COLORS.surface);
+    expect(theme.treemap.label.textBorderWidth).toBe(2);
+  });
+
+  it('treemap.upperLabel has the same `surface`-colored halo as label (drilled-in parent bar reads on the same palette colors)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.upperLabel.textBorderColor).toBe(COLORS.surface);
+    expect(theme.treemap.upperLabel.textBorderWidth).toBe(2);
+  });
+
+  it('treemap.upperLabel.color follows textPrimary (parent-name bar when enabled)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.upperLabel.color).toBe(COLORS.textPrimary);
+  });
+
+  it('treemap.itemStyle.borderColor follows itemDivider when defined', () => {
+    const colors: ChartThemeColors = { ...COLORS, itemDivider: '#abcdef' };
+    const theme = buildEChartsTheme(colors, PALETTE);
+    expect(theme.treemap.itemStyle.borderColor).toBe('#abcdef');
+  });
+
+  it('treemap.itemStyle.borderColor falls back to surface when itemDivider is omitted', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.itemStyle.borderColor).toBe(COLORS.surface);
+  });
+
+  it('treemap.breadcrumb resting fill follows gridLine (subtle elevation above the card — using surface would match card-bg and hide the chip)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.breadcrumb.itemStyle.color).toBe(COLORS.gridLine);
+  });
+
+  it('treemap.breadcrumb resting border follows axisLine (one tier above the fill)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.breadcrumb.itemStyle.borderColor).toBe(COLORS.axisLine);
+  });
+
+  it('treemap.breadcrumb resting text color follows textPrimary (readable on gridLine)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.breadcrumb.itemStyle.textStyle.color).toBe(
+      COLORS.textPrimary,
+    );
+  });
+
+  it('treemap.breadcrumb emphasis fill follows axisLine (overrides ECharts hardcoded orange #e6a23c hover default)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.breadcrumb.emphasis.itemStyle.color).toBe(
+      COLORS.axisLine,
+    );
+  });
+
+  it('treemap.breadcrumb emphasis border follows textSecondary (one tier above the hover fill)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.breadcrumb.emphasis.itemStyle.borderColor).toBe(
+      COLORS.textSecondary,
+    );
+  });
+
+  it('treemap.breadcrumb emphasis text color follows textPrimary (stays readable on hover)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe(
+      COLORS.textPrimary,
+    );
   });
 
   it('custom.label.color follows textPrimary (wordcloud + liquidprogress labels)', () => {
@@ -104,6 +181,10 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.sankey.label.color).toBe('#aaaaaa');
     expect(a.chord.label.color).toBe('#aaaaaa');
     expect(a.tree.label.color).toBe('#aaaaaa');
+    expect(a.treemap.label.color).toBe('#aaaaaa');
+    expect(a.treemap.upperLabel.color).toBe('#aaaaaa');
+    expect(a.treemap.breadcrumb.itemStyle.textStyle.color).toBe('#aaaaaa');
+    expect(a.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe('#aaaaaa');
     expect(a.custom.label.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
@@ -114,6 +195,10 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(b.sankey.label.color).toBe('#bbbbbb');
     expect(b.chord.label.color).toBe('#bbbbbb');
     expect(b.tree.label.color).toBe('#bbbbbb');
+    expect(b.treemap.label.color).toBe('#bbbbbb');
+    expect(b.treemap.upperLabel.color).toBe('#bbbbbb');
+    expect(b.treemap.breadcrumb.itemStyle.textStyle.color).toBe('#bbbbbb');
+    expect(b.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe('#bbbbbb');
     expect(b.custom.label.color).toBe('#bbbbbb');
   });
 
@@ -186,6 +271,16 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.tree.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
   });
 
+  it('treemap.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
+  it('treemap.upperLabel.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.treemap.upperLabel.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
   it('custom.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.custom.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
@@ -203,6 +298,8 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
       theme.sankey.label.fontSize,
       theme.chord.label.fontSize,
       theme.tree.label.fontSize,
+      theme.treemap.label.fontSize,
+      theme.treemap.upperLabel.fontSize,
       theme.custom.label.fontSize,
     ];
     for (const size of sizes) {

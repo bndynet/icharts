@@ -142,6 +142,7 @@ import {
   isRadarData,
   isNetworkData,
   isTreeData,
+  isTreemapData,
   isWordCloudData,
 } from '../types.js';
 import type {
@@ -156,6 +157,7 @@ import type {
   RadarData,
   NetworkData,
   TreeData,
+  TreemapData,
   WordCloudData,
   LineChartOptions,
   BarChartOptions,
@@ -168,6 +170,7 @@ import type {
   RadarChartOptions,
   NetworkChartOptions,
   TreeChartOptions,
+  TreemapChartOptions,
   WordCloudChartOptions,
 } from '../types.js';
 import { resolveLineOptions, resolveAreaOptions } from './line.js';
@@ -180,6 +183,7 @@ import { resolveChordOptions } from './chord.js';
 import { resolveRadarOptions } from './radar.js';
 import { resolveNetworkOptions } from './network.js';
 import { resolveTreeSetup } from './tree.js';
+import { resolveTreemapOptions } from './treemap.js';
 import { resolveWordCloudOptions } from './word-cloud.js';
 
 // Each built-in adapter narrows the generic `ChartData` / `ChartOptions` it
@@ -265,6 +269,17 @@ registerAdapter(ChartType.Tree, {
   validate: isTreeData,
   resolve: (data, options, ctx) =>
     resolveTreeSetup(data as TreeData, options as TreeChartOptions, ctx),
+});
+
+registerAdapter(ChartType.Treemap, {
+  validate: isTreemapData,
+  resolve: (data, options, ctx) => ({
+    option: resolveTreemapOptions(
+      data as TreemapData,
+      options as TreemapChartOptions,
+      ctx,
+    ),
+  }),
 });
 
 registerAdapter(ChartType.WordCloud, {

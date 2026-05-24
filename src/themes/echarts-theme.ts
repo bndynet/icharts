@@ -2,6 +2,41 @@ import type { ChartThemeColors } from './types.js';
 import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/common/text-measure.js';
 
 /**
+ * "Outlined label" defaults for series labels that sit on top of palette
+ * colors. A `surface`-colored halo around the glyph keeps text legible
+ * on any underlying fill — without it, `textPrimary` (near-black on
+ * light, near-white on dark) drops into mid-tone palette tints (amber,
+ * cyan, etc.) and becomes hard to read.
+ *
+ * Use the helper in any series-type theme entry whose adapter paints
+ * the label *inside* a palette-colored shape:
+ *  - `treemap.label` / `treemap.upperLabel` — labels always sit inside
+ *    palette-tinted rectangles.
+ *  - `sankey.label` — labels sit inside the column node when
+ *    `variant === 'vertical'` (and harmlessly on the card background
+ *    when horizontal — the `surface`-colored halo simply blends into
+ *    the card and has no visual effect).
+ *
+ * `colors.surface` is deliberately the OPPOSITE side of
+ * `colors.textPrimary` in both built-in presets (white in light,
+ * slate-800 in dark — see `src/themes/presets.ts`), which is exactly
+ * what an outline needs to be to read on every palette color.
+ * 2 px is just enough to lift the glyph off mid-tone fills without
+ * looking stickered.
+ *
+ * If a future surface needs a different halo width or a wholly
+ * different stroke color, branch HERE (a second helper) — do not
+ * inline the literal at the call site, so the rationale and the
+ * matching `textBorder*` regression tests stay co-located.
+ */
+function paletteLabelHalo(colors: ChartThemeColors) {
+  return {
+    textBorderColor: colors.surface,
+    textBorderWidth: 2,
+  };
+}
+
+/**
  * Build a full ECharts theme object from `ChartThemeColors` and a series palette.
  * Registered via `echarts.registerTheme(name, buildEChartsTheme(colors, palette))`.
  *
@@ -9,10 +44,11 @@ import { DEFAULT_LABEL_FONT_SIZE } from '../adapters/common/text-measure.js';
  *  background    → chart canvas background (transparent by default)
  *  surface       → tooltip bg, axis-pointer callout bg
  *  surfaceText   → tooltip text, axis-pointer callout text
- *  itemDivider   → pie-slice border (and future sunburst sectors / treemap
- *                  cells / sankey & network node borders); falls back to
- *                  `surface` when undefined so themes registered before this
- *                  token existed keep their previous behaviour
+ *  itemDivider   → pie-slice border + treemap rectangle gap (and future
+ *                  sunburst sectors / sankey & network node borders);
+ *                  falls back to `surface` when undefined so themes
+ *                  registered before this token existed keep their
+ *                  previous behaviour
  *  textPrimary   → chart title, legend, pie labels, gauge detail (value),
  *                  radar indicator names (axisName), markPoint labels,
  *                  bar/line value labels (incl. race value labels and
@@ -169,7 +205,26 @@ export function buildEChartsTheme(
       edgeLabel: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // network link labels (when showLinkLabel)
     },
     sankey: {
-      label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // sankey node labels
+      // Sankey node labels render on the canvas. The adapter
+      // (`src/adapters/sankey.ts`) positions them on the SIDE of
+      // each column node when `variant === 'default'` (horizontal —
+      // labels sit on the card background) and INSIDE the node
+      // when `variant === 'vertical'` (columns stack top-to-bottom,
+      // and sideways labels would overlap adjacent columns).
+      //
+      // The `vertical` variant therefore paints text directly on
+      // palette-colored rectangles, with the same readability
+      // problem as treemap. Apply the shared "outlined label"
+      // halo so vertical sankey labels stay legible on any
+      // palette tint. The same halo is HARMLESS on horizontal
+      // sankey labels — the `surface` stroke color matches the
+      // card background, so it blends in and has no visual
+      // effect when the label sits beside (not on) a node.
+      label: {
+        color:    colors.textPrimary,
+        fontSize: DEFAULT_LABEL_FONT_SIZE,
+        ...paletteLabelHalo(colors),
+      },
     },
     chord: {
       label: { color: colors.textPrimary, fontSize: DEFAULT_LABEL_FONT_SIZE }, // chord node labels (outside the ring)
@@ -187,6 +242,83 @@ export function buildEChartsTheme(
       // agrees with axis spines on dark themes — without this they
       // fall back to a near-black ECharts default and disappear.
       lineStyle: { color: colors.axisLine },
+    },
+    treemap: {
+      // Labels rendered inside each rectangle. Adapter
+      // (`src/adapters/treemap.ts`) emits `series.label` without a
+      // `color` / `textBorderColor` / `textBorderWidth` key so this
+      // theme entry drives the repaint when the user switches themes
+      // — same two-sided contract as every other label-rendering
+      // chart family above.
+      //
+      // Treemap labels sit ON TOP of palette-colored rectangles
+      // (blue / green / red / yellow / …), so `textPrimary` alone
+      // is not enough — a dark text on a mid-tone yellow or a light
+      // text on a mid-tone cyan loses contrast and becomes hard to
+      // read. The fix is the classic "outlined label" pattern —
+      // see `paletteLabelHalo` above for the shared rationale.
+      //
+      // Same treatment for `upperLabel` (the bar painted across the
+      // top of a parent rectangle when drilled in) — it sits on the
+      // exact same palette colors, so it needs the same halo.
+      label: {
+        color:    colors.textPrimary,
+        fontSize: DEFAULT_LABEL_FONT_SIZE,
+        ...paletteLabelHalo(colors),
+      },
+      upperLabel: {
+        color:    colors.textPrimary,
+        fontSize: DEFAULT_LABEL_FONT_SIZE,
+        ...paletteLabelHalo(colors),
+      },
+      // 1 px gap stroke between adjacent rectangles. Uses the same
+      // `itemDivider` token as pie (with `surface` fallback) so a
+      // single theme knob drives the cell-divider look across every
+      // partition-style chart.
+      itemStyle: { borderWidth: 1, borderColor: colors.itemDivider ?? colors.surface },
+      // Drill-down path chips at the bottom of the canvas. ECharts'
+      // built-in defaults are hardcoded grays (`#fff` chip bg + `#aaa`
+      // border + `#333` text) AND a hardcoded orange emphasis fill
+      // (`#e6a23c`) — both fight every theme. Wire BOTH the resting
+      // and hover/emphasis states to tokens so a single `setTheme()`
+      // sweeps the breadcrumb along with everything else.
+      //
+      // Token choice rationale (matters: the wrong tokens silently
+      // disappear into the card):
+      //   resting fill   → `gridLine` (subtle elevation above the
+      //                    typical card background; using `surface`
+      //                    here matches the card exactly in both
+      //                    built-in presets — `surface === itemDivider
+      //                    === card-bg` — and the chips vanish)
+      //   resting border → `axisLine` (one tier more prominent than
+      //                    the fill in both presets, defines the
+      //                    chip edge)
+      //   resting text   → `textPrimary`
+      //   emphasis fill  → `axisLine` (chip "presses in" by one
+      //                    elevation tier on hover)
+      //   emphasis border→ `textSecondary` (matches the hover tier)
+      //   emphasis text  → `textPrimary` (stays readable)
+      //
+      // The adapter (`src/adapters/treemap.ts`) deliberately does
+      // NOT emit any color fields on `breadcrumb.*` so this entry
+      // is the single source of truth — same two-sided contract as
+      // every other themed surface in this file.
+      breadcrumb: {
+        itemStyle: {
+          color:       colors.gridLine,
+          borderColor: colors.axisLine,
+          borderWidth: 1,
+          textStyle:   { color: colors.textPrimary },
+        },
+        emphasis: {
+          itemStyle: {
+            color:       colors.axisLine,
+            borderColor: colors.textSecondary,
+            borderWidth: 1,
+            textStyle:   { color: colors.textPrimary },
+          },
+        },
+      },
     },
     custom: {
       // Wordcloud and liquidprogress are implemented via ECharts custom

@@ -98,6 +98,8 @@ export {
   type TreeDirection,
   type TreeLabelFormatterContext,
   type TreeNodeIconSpec,
+  type TreemapData,
+  type TreemapDataItem,
   type WordCloudData,
   type WordCloudDataItem,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
@@ -113,6 +115,7 @@ export {
   type RadarChartOptions,
   type NetworkChartOptions,
   type TreeChartOptions,
+  type TreemapChartOptions,
   type WordCloudChartOptions,
   // Shared option building blocks
   type SeriesOptions,
@@ -147,6 +150,7 @@ export {
   isRadarData,
   isNetworkData,
   isTreeData,
+  isTreemapData,
   isWordCloudData,
   isLiquidProgressData,
   mergeLiquidProgressData,

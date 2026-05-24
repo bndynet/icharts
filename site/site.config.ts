@@ -61,6 +61,11 @@ export default defineConfig({
           page: () => import('./views/charts/TreeCharts.vue'),
         },
         {
+          label: 'Treemap',
+          icon: 'layout-grid',
+          page: () => import('./views/charts/TreemapCharts.vue'),
+        },
+        {
           label: 'Word Cloud',
           icon: 'cloud',
           page: () => import('./views/charts/WordCloudCharts.vue'),

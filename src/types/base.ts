@@ -16,6 +16,7 @@ export enum ChartType {
   Radar = 'radar',
   Network = 'network',
   Tree = 'tree',
+  Treemap = 'treemap',
   WordCloud = 'wordcloud',
 }
 

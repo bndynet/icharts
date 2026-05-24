@@ -16,6 +16,7 @@ import type { ChordData, ChordChartOptions } from './chord.js';
 import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
 import type { NetworkVariant, NetworkData, NetworkChartOptions } from './network.js';
 import type { TreeData, TreeChartOptions } from './tree.js';
+import type { TreemapData, TreemapChartOptions } from './treemap.js';
 import type {
   WordCloudVariant,
   WordCloudData,
@@ -51,6 +52,7 @@ export type ChartData =
   | RadarData
   | NetworkData
   | TreeData
+  | TreemapData
   | WordCloudData;
 
 /**
@@ -76,6 +78,7 @@ export type AnyChartOptions =
   | RadarChartOptions
   | NetworkChartOptions
   | TreeChartOptions
+  | TreemapChartOptions
   | WordCloudChartOptions;
 
 // ---------------------------------------------------------------------------

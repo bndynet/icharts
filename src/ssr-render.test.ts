@@ -134,6 +134,41 @@ describe('renderChartToSVGString — adapter output reaches the markup', () => {
     expect(svg).toContain('Cherry');
   });
 
+  it('renders a treemap with hierarchical data + drill-down disabled', () => {
+    // Treemap is a body-centered chart that uses ECharts' native
+    // `treemap` series — no @echarts-x plugin, no DOM-only renderer.
+    // Locking SSR support here so a future regression (e.g. an
+    // adapter change that reaches for `window` lazily) is caught
+    // by the regression net.
+    const treemapData = [
+      {
+        name: 'src',
+        children: [
+          { name: 'components', value: 18 },
+          { name: 'adapters', value: 42 },
+        ],
+      },
+      { name: 'tests', value: 15 },
+    ];
+    const svg = renderChartToSVGString(
+      'treemap',
+      treemapData,
+      { width: 600, height: 400 },
+      { title: 'Repo Size', drilldown: false, showBreadcrumb: false },
+    );
+    expect(svg.startsWith('<svg')).toBe(true);
+    expect(svg).toContain('Repo Size');
+    // ECharts treemap renders the LEAF rectangles' labels at the
+    // first visible level (when drill-down is off, the parent
+    // rectangle is the canvas for its leaves' labels). Pin the leaf
+    // names that are guaranteed to land somewhere in the markup,
+    // not the parent name `src` (which only ever appears in the
+    // breadcrumb, and we deliberately turned that off).
+    expect(svg).toContain('adapters');
+    expect(svg).toContain('components');
+    expect(svg).toContain('tests');
+  });
+
   it('respects the requested theme (output differs from default)', () => {
     const defaultSvg = renderChartToSVGString('line', lineData, {
       width: 800,
