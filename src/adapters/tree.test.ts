@@ -125,7 +125,7 @@ describe('tree adapter', () => {
   });
 
   describe('direction → orient + label position mapping', () => {
-    it('defaults to left-to-right (orient: "LR")', () => {
+    it('defaults to "LR" (orient: "LR")', () => {
       const s = getSeries(resolveTreeOptions(sample, {}));
       expect(s.orient).toBe('LR');
       const label = s.label as Record<string, unknown>;
@@ -137,9 +137,9 @@ describe('tree adapter', () => {
       expect(leafLabel.align).toBe('left');
     });
 
-    it('left-to-right reserves BOTH edges of the active axis (root + leaf labels both grow outward)', () => {
+    it('"LR" reserves BOTH edges of the active axis (root + leaf labels both grow outward)', () => {
       const s = getSeries(
-        resolveTreeOptions(sample, { direction: 'left-to-right', padding: 10 }),
+        resolveTreeOptions(sample, { direction: 'LR', padding: 10 }),
       );
       // Active axis (horizontal) — both root-side (left) AND leaf-side
       // (right) need a label reserve, since parent labels grow left from
@@ -154,9 +154,9 @@ describe('tree adapter', () => {
       expect(s.bottom).toBe(10);
     });
 
-    it('right-to-left mirrors orient AND reserves both horizontal edges', () => {
+    it('"RL" mirrors orient AND reserves both horizontal edges', () => {
       const s = getSeries(
-        resolveTreeOptions(sample, { direction: 'right-to-left', padding: 10 }),
+        resolveTreeOptions(sample, { direction: 'RL', padding: 10 }),
       );
       expect(s.orient).toBe('RL');
       expect((s.label as Record<string, unknown>).position).toBe('right');
@@ -171,9 +171,9 @@ describe('tree adapter', () => {
       expect(s.bottom).toBe(10);
     });
 
-    it('top-to-bottom rotates labels -90° and reserves widest-label-width on top/bottom (matches ECharts tree-vertical example)', () => {
+    it('"TB" rotates labels -90° and reserves widest-label-width on top/bottom edges', () => {
       const s = getSeries(
-        resolveTreeOptions(sample, { direction: 'top-to-bottom', padding: 10 }),
+        resolveTreeOptions(sample, { direction: 'TB', padding: 10 }),
       );
       expect(s.orient).toBe('TB');
       const label = s.label as Record<string, unknown>;
@@ -204,9 +204,9 @@ describe('tree adapter', () => {
       expect((s.left as number) < (s.top as number)).toBe(true);
     });
 
-    it('bottom-to-top rotates labels +90° (counter-clockwise) so text reads bottom-to-top alongside the tree', () => {
+    it('"BT" rotates labels +90° (counter-clockwise) so text reads bottom-to-top alongside the tree', () => {
       const s = getSeries(
-        resolveTreeOptions(sample, { direction: 'bottom-to-top', padding: 10 }),
+        resolveTreeOptions(sample, { direction: 'BT', padding: 10 }),
       );
       expect(s.orient).toBe('BT');
       const label = s.label as Record<string, unknown>;
@@ -240,10 +240,10 @@ describe('tree adapter', () => {
 
     it('vertical rotation sign tracks the growth direction (TB clockwise, BT counter-clockwise)', () => {
       const tb = getSeries(
-        resolveTreeOptions(sample, { direction: 'top-to-bottom' }),
+        resolveTreeOptions(sample, { direction: 'TB' }),
       );
       const bt = getSeries(
-        resolveTreeOptions(sample, { direction: 'bottom-to-top' }),
+        resolveTreeOptions(sample, { direction: 'BT' }),
       );
       // Opposite signs — text reading direction mirrors tree direction.
       expect((tb.label as Record<string, unknown>).rotate).toBe(-90);
@@ -259,8 +259,8 @@ describe('tree adapter', () => {
     });
 
     it('horizontal layouts (LR/RL) keep labels unrotated', () => {
-      const lr = getSeries(resolveTreeOptions(sample, { direction: 'left-to-right' }));
-      const rl = getSeries(resolveTreeOptions(sample, { direction: 'right-to-left' }));
+      const lr = getSeries(resolveTreeOptions(sample, { direction: 'LR' }));
+      const rl = getSeries(resolveTreeOptions(sample, { direction: 'RL' }));
       expect((lr.label as Record<string, unknown>).rotate).toBe(0);
       expect(
         ((lr.leaves as Record<string, unknown>).label as Record<string, unknown>)
@@ -276,13 +276,13 @@ describe('tree adapter', () => {
     it('disableLabelRotate forces 0° rotation even on vertical layouts', () => {
       const tb = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'top-to-bottom',
+          direction: 'TB',
           disableLabelRotate: true,
         }),
       );
       const bt = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'bottom-to-top',
+          direction: 'BT',
           disableLabelRotate: true,
         }),
       );
@@ -313,10 +313,10 @@ describe('tree adapter', () => {
         children: [{ name: 'x' }],
       };
       const tinyLeft = getSeries(
-        resolveTreeOptions(tiny, { direction: 'left-to-right', padding: 12 }),
+        resolveTreeOptions(tiny, { direction: 'LR', padding: 12 }),
       ).left as number;
       const hugeLeft = getSeries(
-        resolveTreeOptions(huge, { direction: 'left-to-right', padding: 12 }),
+        resolveTreeOptions(huge, { direction: 'LR', padding: 12 }),
       ).left as number;
       expect(hugeLeft).toBeGreaterThan(tinyLeft);
     });
@@ -334,10 +334,10 @@ describe('tree adapter', () => {
         ],
       };
       const shortRight = getSeries(
-        resolveTreeOptions(shortLeaves, { direction: 'left-to-right', padding: 12 }),
+        resolveTreeOptions(shortLeaves, { direction: 'LR', padding: 12 }),
       ).right as number;
       const longRight = getSeries(
-        resolveTreeOptions(longLeaves, { direction: 'left-to-right', padding: 12 }),
+        resolveTreeOptions(longLeaves, { direction: 'LR', padding: 12 }),
       ).right as number;
       expect(longRight).toBeGreaterThan(shortRight);
     });
@@ -345,7 +345,7 @@ describe('tree adapter', () => {
     it('hiding labels collapses the label-driven reserves back to padding', () => {
       const noLabels = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'left-to-right',
+          direction: 'LR',
           padding: 10,
           showNodeLabel: false,
         }),
@@ -364,7 +364,7 @@ describe('tree adapter', () => {
       };
       const s = getSeries(
         resolveTreeOptions(monsterRoot, {
-          direction: 'left-to-right',
+          direction: 'LR',
           padding: 12,
         }),
       );
@@ -385,7 +385,7 @@ describe('tree adapter', () => {
       expect(withTitle).toBeGreaterThan(baseline);
     });
 
-    it('bottom-to-top still flows the title widget through to the top inset', () => {
+    it('"BT" still flows the title widget through to the top inset', () => {
       // BT's top edge is the LEAF edge (root is at the bottom), so the
       // top inset competes between the leaf-label reserve and the title
       // widget via `max(reserveFor('top'), titleR)`. We hide labels here
@@ -395,14 +395,14 @@ describe('tree adapter', () => {
       // whether the title actually flowed through.
       const noTitle = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'bottom-to-top',
+          direction: 'BT',
           padding: 10,
           showNodeLabel: false,
         }),
       ).top as number;
       const withTitle = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'bottom-to-top',
+          direction: 'BT',
           padding: 10,
           showNodeLabel: false,
           title: 'X',
@@ -1248,13 +1248,13 @@ describe('tree adapter', () => {
     it('long rich labels expand active-edge reserve (no clipping regression)', () => {
       const plain = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'left-to-right',
+          direction: 'LR',
           padding: 12,
         }),
       );
       const rich = getSeries(
         resolveTreeOptions(sample, {
-          direction: 'left-to-right',
+          direction: 'LR',
           padding: 12,
           formatNodeLabel: ({ name, isLeaf }) =>
             isLeaf

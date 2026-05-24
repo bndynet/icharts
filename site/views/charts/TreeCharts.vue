@@ -34,7 +34,7 @@
   ],
 }, {
   title: 'Project Hierarchy',
-  // direction defaults to 'left-to-right'
+  // direction defaults to 'LR'
 });</pre>
       </template>
     </DemoCard>
@@ -42,18 +42,18 @@
     <DemoCard
       ref="tbCard"
       title="Top → Bottom (labels rotate -90°)"
-      tag="direction='top-to-bottom'"
+      tag="direction='TB'"
       card-style="grid-column: 1 / -1;"
       box-style="height: 600px;"
     >
       <template #code>
-        <pre v-pre class="code-block">// Vertical layouts auto-rotate labels -90° (read top-to-bottom),
-// matching ECharts' own `tree-vertical` reference example.
-// Long node names like 'AgglomerativeCluster' stack vertically
-// instead of competing for horizontal space with siblings.
+        <pre v-pre class="code-block">// Vertical layouts auto-rotate labels -90° so text reads top-to-bottom
+// alongside the downward-growing tree. Long node names like
+// 'AgglomerativeCluster' stack vertically instead of competing for
+// horizontal space with siblings.
 createChart(el, 'tree', projectData, {
   title: 'Project Hierarchy',
-  direction: 'top-to-bottom',
+  direction: 'TB',
 });</pre>
       </template>
     </DemoCard>
@@ -61,27 +61,27 @@ createChart(el, 'tree', projectData, {
     <DemoCard
       ref="rlCard"
       title="Right → Left"
-      tag="direction='right-to-left'"
+      tag="direction='RL'"
       box-style="height: 460px;"
     >
       <template #code>
         <pre v-pre class="code-block">createChart(el, 'tree', orgData, {
   title: 'Reverse Tree',
-  direction: 'right-to-left',
+  direction: 'RL',
 });</pre>
       </template>
     </DemoCard>
 
     <DemoCard
       ref="btCard"
-      title="Bottom → Top (mirror of top-to-bottom)"
-      tag="direction='bottom-to-top'"
+      title="Bottom → Top (mirror of TB)"
+      tag="direction='BT'"
       box-style="height: 460px;"
     >
       <template #code>
         <pre v-pre class="code-block">createChart(el, 'tree', orgData, {
   title: 'Roots Up',
-  direction: 'bottom-to-top',
+  direction: 'BT',
 });</pre>
       </template>
     </DemoCard>
@@ -147,10 +147,9 @@ createChart(el, 'tree', {
 // uniform configuration.)
 //
 // Both shapes go through the canvas-baking pipeline whenever the user
-// asks for a border: ECharts' `image://` symbol can't paint
-// `itemStyle.border*` natively, so the lib bakes the frame INTO the
-// PNG and swaps it in. `shape: 'square'` without a border keeps the
-// faster native-image path for back-compat.
+// asks for a border — the lib bakes the frame INTO the PNG and swaps
+// it in. `shape: 'square'` without a border keeps the faster
+// native-image path for back-compat.
 import avatarUrl from '../../assets/avatar.png';
 
 const ICON_VARIANTS = [
@@ -170,7 +169,7 @@ function pickIconVariant(name) {
 }
 
 createChart(el, 'tree', orgPeopleData, {
-  direction: 'top-to-bottom',
+  direction: 'TB',
   disableLabelRotate: true,
   formatNodeIcon: ({ name }) => ({
     image: avatarUrl,
@@ -439,22 +438,22 @@ onMounted(() => {
   });
   createChart(rlCard.value!.chartEl!, 'tree', orgData, {
     title: 'Reverse Tree',
-    direction: 'right-to-left',
+    direction: 'RL',
   });
   createChart(tbCard.value!.chartEl!, 'tree', projectData, {
     title: 'Project Hierarchy',
-    direction: 'top-to-bottom',
+    direction: 'TB',
   });
   createChart(btCard.value!.chartEl!, 'tree', orgData, {
     title: 'Roots Up',
-    direction: 'bottom-to-top',
+    direction: 'BT',
   });
   createChart(collapsedCard.value!.chartEl!, 'tree', collapsedData, {
     title: 'Initially Collapsed Tree',
     initialTreeDepth: 2,
   });
   createChart(avatarCard.value!.chartEl!, 'tree', orgPeopleData, {
-    direction: 'top-to-bottom',
+    direction: 'TB',
     disableLabelRotate: true,
     // No `initialTreeDepth` — we want every leaf visible so the
     // 5-variant showcase is fully on screen (otherwise hashing only

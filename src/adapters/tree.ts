@@ -77,21 +77,17 @@ const TREE_LABEL_LINE_HEIGHT_RATIO = 1.5;
 /**
  * Per-direction layout metadata. Two label-rendering regimes:
  *
- * `'horizontal'` layouts (LR, RL) — labels render horizontally,
+ * `'horizontal'` layouts (`'LR'`, `'RL'`) — labels render horizontally,
  * extending OUTSIDE each node along the X axis. Parent labels grow
  * toward the root edge, leaf labels grow toward the opposite edge.
  * Both side edges therefore need a label-width reserve; vertical
  * clipping is just half line-height (negligible next to padding).
  *
- * `'vertical'` layouts (TB, BT) — labels are rotated 90° so they read
- * in the same direction the tree grows: TB rotates labels **clockwise**
- * (`-90`) so text reads top-to-bottom alongside a downward-growing
- * tree; BT rotates labels **counter-clockwise** (`+90`) so text reads
- * bottom-to-top alongside an upward-growing tree. Matches ECharts'
- * [`tree-vertical`](https://echarts.apache.org/examples/en/editor.html?c=tree-vertical)
- * example for TB; BT uses the opposite rotation sign so the text
- * direction follows the tree direction (rather than slavishly copying
- * the official example, which uses the same rotation for both).
+ * `'vertical'` layouts (`'TB'`, `'BT'`) — labels are rotated 90° so they
+ * read in the same direction the tree grows: `'TB'` rotates labels
+ * **clockwise** (`-90`) so text reads top-to-bottom alongside a
+ * downward-growing tree; `'BT'` rotates labels **counter-clockwise**
+ * (`+90`) so text reads bottom-to-top alongside an upward-growing tree.
  *
  * Practical wins of rotated labels in vertical layouts:
  *   - tall narrow node names ("AgglomerativeCluster") fit naturally in
@@ -128,7 +124,7 @@ interface DirectionLayout {
 }
 
 const DIRECTION_LAYOUT: Record<TreeDirection, DirectionLayout> = {
-  'left-to-right': {
+  LR: {
     orient: 'LR',
     axis: 'horizontal',
     parentPosition: 'left',
@@ -139,7 +135,7 @@ const DIRECTION_LAYOUT: Record<TreeDirection, DirectionLayout> = {
     rootEdge: 'left',
     leafEdge: 'right',
   },
-  'right-to-left': {
+  RL: {
     orient: 'RL',
     axis: 'horizontal',
     parentPosition: 'right',
@@ -150,12 +146,12 @@ const DIRECTION_LAYOUT: Record<TreeDirection, DirectionLayout> = {
     rootEdge: 'right',
     leafEdge: 'left',
   },
-  // TB: clockwise rotation (`-90`). Text reads top-to-bottom alongside
+  // 'TB': clockwise rotation (`-90`). Text reads top-to-bottom alongside
   // the tree. With `rotate: -90`, the unrotated text's RIGHT end lands
   // at the BOTTOM of the rendered glyph — so to anchor parent labels
   // above the node (and grow them UPWARD into the top reserve) we use
   // `align: 'right'`. Leaf labels mirror with `align: 'left'`.
-  'top-to-bottom': {
+  TB: {
     orient: 'TB',
     axis: 'vertical',
     parentPosition: 'top',
@@ -166,16 +162,16 @@ const DIRECTION_LAYOUT: Record<TreeDirection, DirectionLayout> = {
     rootEdge: 'top',
     leafEdge: 'bottom',
   },
-  // BT: counter-clockwise rotation (`+90`) so text reads bottom-to-top,
+  // 'BT': counter-clockwise rotation (`+90`) so text reads bottom-to-top,
   // matching the tree's upward growth direction. With `rotate: +90`
   // the unrotated text's RIGHT end lands at the TOP of the rendered
-  // glyph — flipped vs. TB. To anchor parent labels BELOW the node
+  // glyph — flipped vs. 'TB'. To anchor parent labels BELOW the node
   // (and grow them DOWNWARD into the bottom reserve), we still need
   // the rotated bottom to sit on the anchor: that's `align: 'right'`
   // (whose unrotated right-end is now the rotated top), so the
   // unrotated left-end (rotated bottom) sits at the anchor and text
   // grows away from the node. Leaf labels mirror with `align: 'left'`.
-  'bottom-to-top': {
+  BT: {
     orient: 'BT',
     axis: 'vertical',
     parentPosition: 'bottom',
@@ -779,8 +775,8 @@ function resolveRoamMode(
  * radar). Both the root-side and leaf-side edges receive a measured
  * label reserve (parents grow toward the root, leaves grow toward the
  * opposite edge — so both directions can clip). Vertical layouts
- * (`top-to-bottom` / `bottom-to-top`) rotate labels -90° so they read
- * top-to-bottom; the rotation swaps the geometry, putting full
+ * (`'TB'` / `'BT'`) rotate labels 90° so they read along the tree's
+ * growth direction; the rotation swaps the geometry, putting full
  * label-width onto the active vertical axis and a thin font-height
  * strip onto the perpendicular horizontal axis.
  *
@@ -795,7 +791,7 @@ export function resolveTreeOptions(
   options: TreeChartOptions,
   ctx?: RenderContext,
 ): Record<string, unknown> {
-  const direction: TreeDirection = options.direction ?? 'left-to-right';
+  const direction: TreeDirection = options.direction ?? 'LR';
   const layout = DIRECTION_LAYOUT[direction];
   const labelRotate = options.disableLabelRotate ? 0 : layout.labelRotate;
 

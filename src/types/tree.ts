@@ -5,22 +5,17 @@ import type { RichTextInput } from './shared.js';
 /**
  * Growth direction of the tree.
  *
- * - `'left-to-right'`  (default, ECharts `orient: 'LR'`) — root on the left,
- *   leaves expand to the right.
- * - `'right-to-left'`  (ECharts `'RL'`) — root on the right, leaves expand left.
- * - `'top-to-bottom'`  (ECharts `'TB'`) — root on top, leaves expand downward.
- * - `'bottom-to-top'`  (ECharts `'BT'`) — root on bottom, leaves expand upward.
+ * - `'LR'` (default) — root on the left, leaves expand to the right.
+ * - `'RL'` — root on the right, leaves expand to the left.
+ * - `'TB'` — root on top, leaves expand downward.
+ * - `'BT'` — root on bottom, leaves expand upward.
  *
- * Internally the adapter translates these descriptive names into ECharts'
- * two-letter `orient` codes and flips the node-label position so labels
- * always point away from the tree body (parents toward the root edge,
- * leaves toward the opposite edge).
+ * The adapter flips the node-label position so labels always point away
+ * from the tree body (parents toward the root edge, leaves toward the
+ * opposite edge), and for vertical directions (`'TB'` / `'BT'`) rotates
+ * labels 90° so the reading direction tracks the tree's growth.
  */
-export type TreeDirection =
-  | 'left-to-right'
-  | 'right-to-left'
-  | 'top-to-bottom'
-  | 'bottom-to-top';
+export type TreeDirection = 'LR' | 'RL' | 'TB' | 'BT';
 
 /**
  * A single node in the tree. Minimal by design — the only required field
@@ -162,7 +157,7 @@ export function isTreeData(data: ChartData): data is TreeData {
  */
 export interface TreeChartOptions extends ChartOptions {
   /**
-   * Tree growth direction. See {@link TreeDirection}. Default: `'left-to-right'`.
+   * Tree growth direction. See {@link TreeDirection}. Default: `'LR'`.
    */
   direction?: TreeDirection;
   /**
@@ -201,11 +196,10 @@ export interface TreeChartOptions extends ChartOptions {
    */
   expandAndCollapse?: boolean;
   /**
-   * Disable automatic label rotation for vertical directions (`top-to-bottom`
-   * / `bottom-to-top`).
+   * Disable automatic label rotation for vertical directions (`'TB'` / `'BT'`).
    *
-   * - `false` (default): uses direction-aware rotation (`-90` for TB,
-   *   `+90` for BT).
+   * - `false` (default): uses direction-aware rotation (`-90` for `'TB'`,
+   *   `+90` for `'BT'`).
    * - `true`: forces both parent and leaf label `rotate` to `0`.
    */
   disableLabelRotate?: boolean;
