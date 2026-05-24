@@ -14,7 +14,7 @@ Built-in types: `line`, `area`, `bar`, `pie`, `gauge`, `sankey`, `chord`. Consum
 
 Stack: TypeScript (ESM), ECharts 6, Lit 3 (`experimentalDecorators` in `tsconfig.json`), `@bndynet/color-hub` for themes/colors.
 
-**Public API reference:** treat **README.md** as the source of truth for `ChartOptions`, data shapes, and user-facing examples. Do not duplicate large option tables here.
+**Public API reference:** **README.md** is the entry point (install, quick start, chart-type table, theming, API). Per-chart **data formats** and **options** live in **`docs/chart-<family>.md`** (e.g. `docs/chart-xy.md`, `docs/chart-pie.md`); cross-cutting `ChartOptions` in **`docs/chart-options-common.md`**. Do not duplicate large option tables in AGENTS.md.
 
 ## Repository layout
 
@@ -150,7 +150,9 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Documentation
 
-- **README.md** — user-facing API, data formats, chart type table, variants.
+- **README.md** — install, quick start, chart type table, theming, global/instance API, extensibility.
+- **docs/chart-*.md** — per-chart data format + options (user-facing detail moved out of README).
+- **docs/chart-options-common.md** — base `ChartOptions` shared by every chart type.
 - **AGENTS.md** — agent workflow (this file). Keep in sync with structural changes.
 - **docs/COLORS.md** — internal design guide for the color pipeline (resolver layer, assembly layer, theme tokens, per-chart placement rules). Read before adding a new chart type or touching `src/utils.ts` color helpers.
 - **docs/LAYOUT.md** — internal design guide for the title + legend layout pipeline (`buildTitle` / `buildLegend` for appearance, `getTitleReserve` / `getLegendReserve` for per-edge pixel slots, grid vs body-centered consumer patterns). Read when adding a chart that renders a title or legend or extending either API.
@@ -606,11 +608,11 @@ registerAdapter(ChartType.Chord, {
 
 - [ ] Export the new `XxxData` and `XxxChartOptions` types (both are part of the public API), along with the `isXxxData` guard and any new variant union.
 
-### 6. README.md
+### 6. README.md + docs
 
-- [ ] Add row to **Chart Types** table (type string + variants).
-- [ ] Add **Data Formats** section with a TypeScript example.
-- [ ] Mention new `ChartOptions` fields if any.
+- [ ] Add row to **Chart Types** table in README (type string + variants).
+- [ ] Create or extend **`docs/chart-<type>.md`** with data format (TypeScript shape) and `XxxChartOptions` fields; link from README **Data Formats** and **Options Reference** tables.
+- [ ] Mention new options in the chart doc; README tables only need the link row.
 
 ### 7. Demo (`site/views/charts/` + `site/site.config.ts`)
 
