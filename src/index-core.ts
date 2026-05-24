@@ -13,6 +13,24 @@ export { IChart } from './core.js';
 // Imperative API
 export { createChart } from './api.js';
 
+// Server-side rendering — produces a complete `<svg>...</svg>` string
+// from `(type, data, options)` without touching `window` / `document`
+// / `customElements` / `<canvas>`. Pair with `sharp` or
+// `@resvg/resvg-js` if you need PNG output. See `src/ssr-render.ts`
+// for the full plugin / fallback contract.
+export {
+  renderChartToSVGString,
+  type RenderChartToSVGStringOptions,
+} from './ssr-render.js';
+
+// SSR-safe plugin installers. Server consumers call these once before
+// rendering plugin-backed chart types, instead of importing `echarts`
+// + `@echarts-x/*` directly. Today only `installLiquidProgress()`
+// ships — wordcloud is browser-only because the `@echarts-x/custom-
+// word-cloud` package isn't SSR-renderable (see `src/ssr-plugins.ts`
+// for the full rationale).
+export { installLiquidProgress } from './ssr-plugins.js';
+
 // Tooltip helpers (any chart type via echarts.tooltip.formatter)
 export {
   createAsyncTooltipFormatter,

@@ -57,6 +57,18 @@ src/
   async-tooltip.ts    # Async tooltip formatter helper
   tooltip-context.ts  # Normalized tooltip contexts (pie, sankey, chord)
   api.ts              # createChart()
+  ssr-render.ts       # `renderChartToSVGString(type, data, ssr, options?)` —
+                      # headless ECharts SSR rendering. Pure-Node entry for
+                      # generating <svg>...</svg> images. Re-exported from
+                      # `index-core.ts`. See "SSR / module-load safety →
+                      # Public SSR API".
+  ssr-plugins.ts      # SSR-safe named-function installers for
+                      # @echarts-x/* plugins that ARE renderable in pure
+                      # Node (currently `installLiquidProgress` only).
+                      # Hides the `echarts` + `@echarts-x/*` package
+                      # boundaries from SSR consumers. Re-exported from
+                      # `index-core.ts`. See "SSR / module-load safety →
+                      # Plugin installer policy".
   installers/         # Browser-only side-effects (echarts.use(...) for the
                       # @echarts-x wordcloud + liquid-fill plugins).
                       # Imported ONLY from the main entry; never from
@@ -308,7 +320,44 @@ The library ships **two ESM entries** with different SSR contracts:
 | `src/index.ts`             | `import '@bndynet/icharts'`          | full API + `<i-chart>` web component (Lit) + `@echarts-x` plugin installers (wordcloud + liquid-progress) | **browser-only** — `@echarts-x/custom-word-cloud` touches `window` / `document` at module load                      |
 | `src/index-core.ts`        | `import '@bndynet/icharts/core'`     | full API minus the web component, minus the `@echarts-x` installers                            | **SSR-safe** — no `window` / `document` / `customElements` / `HTMLElement` references in the module-load graph      |
 
-Both entries are wired into `package.json` `exports` and built by `tsup.config.ts` as `dist/index.{js,cjs}` and `dist/index-core.{js,cjs}`.
+Both entries are wired into `package.json` `exports` and built by `tsup.config.ts` as `dist/index.{js,cjs}` and `dist/index-core.{js,cjs}`. The main entry `export *`-re-exports everything from `index-core.js` so any symbol added to the SSR-safe entry is automatically available from the main entry too — including `renderChartToSVGString` (see below).
+
+### Public SSR API: `renderChartToSVGString`
+
+`src/ssr-render.ts` exports `renderChartToSVGString(type, data, ssr, options?)` and the `RenderChartToSVGStringOptions` interface. This is the **canonical way to generate a chart image on the server**: the function spins up a headless ECharts instance via `echarts.init(null, theme, { renderer: 'svg', ssr: true, width, height })`, runs the standard adapter pipeline (`resolveEChartsOption`), applies the global font-family guard, and returns a complete `<svg>...</svg>` string. The instance is `dispose()`d in a `try`/`finally` so a hot request loop never leaks engine state.
+
+**When you might extend it:**
+
+- The function supports any chart type registered in the adapter registry — `wordcloud` and `liquidprogress` work too, but only after the consumer registers the matching `@echarts-x/*` installer (the SSR-safe entry deliberately doesn't auto-register them; see rule 4 below). Document the registration step in the per-chart README section if your new chart type also needs a plugin.
+- If a future feature needs a different ECharts SSR knob (e.g. `pixelRatio` for raster output, `clipPath` defaults), extend `RenderChartToSVGStringOptions` and forward the field through to `echarts.init` / `renderToSVGString` — keep the new knob optional with a sensible default so the signature stays backwards-compatible.
+- Do **not** broaden the function to accept a `null` for `ssr` and infer dimensions from elsewhere. The function explicitly throws when `width` / `height` are missing or non-finite, because a headless instance has no DOM to size against and a silent fallback would render an empty SVG. The runtime guard is the public contract — keep it.
+- Do **not** add `node-canvas` or any other native dependency to render PNG inside the lib. README documents the `sharp` / `@resvg/resvg-js` standalone-conversion pattern; SSR consumers who don't need PNG shouldn't pay for the native dependency.
+
+**SSR rendering vs. browser rendering — known fallbacks** (already documented in the function's JSDoc and README §4b, listed here for adapter authors):
+
+- Canvas-based label measurement falls back to a `chars × 7px` estimate (`src/adapters/common/text-measure.ts` already guards `typeof document === 'undefined'`).
+- `ResizeObserver` is unavailable; pie's pixel-perfect center/radius recompute is replaced by the static percent fallback (`src/adapters/pie.ts` `attachResizeObserver` already early-returns).
+- ECharts' SVG renderer approximates text widths internally; very long labels can wrap differently from the browser canvas.
+
+These trade-offs are intrinsic to the SSR contract. If a new adapter would behave noticeably worse than its browser counterpart in SSR mode (label clipping, missing markers, broken layout), document the gap in `renderChartToSVGString`'s JSDoc and the README "SSR-mode fallbacks" list, and add a regression assertion to `src/ssr-render.test.ts`.
+
+### Plugin installer policy (server-side `@echarts-x/*` registration)
+
+The SSR-safe entry deliberately does NOT auto-register the `@echarts-x/*` plugins on import (`src/installers/index.ts` is a browser-only side-effect, imported only by the main entry). Server consumers register the plugin they need explicitly through `src/ssr-plugins.ts`, which exposes **named, idempotent installer functions**. The point is API surface: a consumer of `@bndynet/icharts/core` should NEVER have to `import * as echarts from 'echarts'` or `import x from '@echarts-x/...'` — those packages are internal to this library and the install wrappers keep that boundary clean.
+
+Currently `src/ssr-plugins.ts` ships one installer: `installLiquidProgress()`. Adding a new SSR plugin installer is a deliberate, three-part contract:
+
+1. **Verify the plugin actually renders in pure Node** before adding a wrapper. The bar is two-fold:
+   - **Module-load safety:** `await import('@echarts-x/<plugin>')` must succeed in a plain Node process with no DOM polyfills. Wrap the check in a tiny throwaway script (`node --input-type=module -e "..."`) — if it throws on `window` / `document` / `customElements` at module load, **do not** add a wrapper. The plugin is browser-only by construction.
+   - **Render-time safety:** after `echarts.use(plugin)`, `renderChartToSVGString('<type>', data, { width, height })` must return a non-empty SVG. If it crashes on a missing DOM API at render-time (e.g. wordcloud's `canvas.addEventListener`), **do not** add a wrapper. A working `installXxx()` against a plugin that can't actually render would be a worse footgun than no wrapper at all — the consumer would discover the crash on every request instead of at install time.
+
+2. **Add the wrapper to `src/ssr-plugins.ts`** as a single-line `echarts.use(<plugin>)` function. Keep the body minimal — the value of this file is the API boundary, not the implementation. Mirror the JSDoc style of `installLiquidProgress`: explain that it's idempotent, that ECharts dedupes by class identity, and give an Express-style usage example so consumers see the "once at boot OR per request" idiom.
+
+3. **Re-export from `src/index-core.ts`** in the same `export { installLiquidProgress } from './ssr-plugins.js'` block, add a regression test to `src/ssr-plugins.test.ts` mirroring the existing structure (function-typeof + end-to-end render + idempotency + API-boundary check), and document the new chart type's server-side opt-in in README's "Plugin-backed chart types under `/core`" subsection.
+
+If a plugin **fails** either gate in step 1, the right move is the wordcloud pattern: leave it out of `ssr-plugins.ts` entirely, add a `Note on <plugin>:` comment block at the bottom of `src/ssr-plugins.ts` explaining what fails and why (so future agents don't waste time re-discovering the limitation), and document the chart type as browser-only in the README "Plugin-backed chart types" subsection. **Do not** ship an installer wrapped in a try/catch that silently swallows the failure, and **do not** ship a wrapper that requires the consumer to provide their own `window` / canvas polyfill — both make the failure mode invisible.
+
+`src/installers/index.ts` continues to be the browser-side bulk registrar (registers everything on import). The two files share no code on purpose: the browser path is side-effect + bulk + transparent; the SSR path is named functions + per-plugin + explicit. Drift between them is expected — when an `@echarts-x/*` plugin works only in the browser, only `installers/index.ts` registers it.
 
 ### Rules
 
@@ -592,9 +641,13 @@ Add unit tests under `src/**/*.test.ts` for new `isXxxData` guards and color/val
 - [ ] No new top-level reference to `window` / `document` / `navigator` / `customElements` / `HTMLElement` / `ShadowRoot` / `ResizeObserver` / `MutationObserver` / `IntersectionObserver` / `Image` / `Canvas`. Move every browser-global access into a function body / constructor / callback and guard with `typeof X !== 'undefined'`.
 - [ ] No new static `import` of a third-party package that references browser globals at module load. If you need such a plugin, register it from `src/installers/index.ts` (imported only by the main entry), not from `src/core.ts` / `src/adapters/`.
 - [ ] After `npm run build`, smoke-test both entries in pure Node:
-  - `node --input-type=module -e "import('./dist/index-core.js').then(m => console.log(typeof m.createChart))"` — must print `function`.
-  - `node -e "console.log(typeof require('./dist/index-core.cjs').createChart)"` — must print `function`.
-- [ ] If the new chart type requires a browser-touching third-party plugin, add the `echarts.use(...)` call to `src/installers/index.ts` AND document the SSR-side opt-in (`await import('@bndynet/icharts/dist/installers/index.js')`) in README under the SSR section.
+  - `node --input-type=module -e "import('./dist/index-core.js').then(m => console.log(typeof m.createChart, typeof m.renderChartToSVGString, typeof m.installLiquidProgress))"` — must print `function function function`.
+  - `node -e "console.log(typeof require('./dist/index-core.cjs').createChart, typeof require('./dist/index-core.cjs').renderChartToSVGString, typeof require('./dist/index-core.cjs').installLiquidProgress)"` — must print `function function function`.
+  - `node --input-type=module -e "import('./dist/index-core.js').then(m => { const s = m.renderChartToSVGString('line', { categories: ['a'], series: [{ name:'s', data:[1] }] }, { width: 200, height: 100 }); console.log(s.length, s.startsWith('<svg')); })"` — must print a positive length and `true`. This is the end-to-end SSR rendering smoke test; if it fails, the new code reintroduced a browser global on the SSR path or broke the `renderChartToSVGString` contract.
+- [ ] If the new chart type requires a browser-touching third-party plugin:
+  - Add the `echarts.use(...)` call to `src/installers/index.ts` for the browser path (`@bndynet/icharts` main entry).
+  - **Decide whether the plugin is SSR-renderable** by running the two-gate check from the **Plugin installer policy** section above (Node import + headless render). If both gates pass, add a matching `installXxx()` wrapper to `src/ssr-plugins.ts`, re-export from `src/index-core.ts`, and add a regression test to `src/ssr-plugins.test.ts`. If either gate fails, leave the SSR path uninstalled, add a `Note on <plugin>:` block to `src/ssr-plugins.ts` explaining the failure, and document the chart type as browser-only in the README "Plugin-backed chart types under `/core`" subsection.
+- [ ] If the new chart type's behavior degrades noticeably under SSR (label clipping, missing markers, broken layout) compared to its browser counterpart, document the gap in `renderChartToSVGString`'s JSDoc + the README "SSR-mode fallbacks" list, and add a regression assertion to `src/ssr-render.test.ts`.
 
 ## External / custom chart types (runtime only)
 

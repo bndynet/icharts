@@ -80,9 +80,14 @@ chart.dispose();
 
 Import from the SSR-safe subpath `@bndynet/icharts/core` so the module
 graph never touches the `<i-chart>` web component, Lit, or the
-`@echarts-x` plugin installers. Chart instances are still created
-**only on the client** inside a lifecycle hook (`onMounted`,
-`useEffect`, `'use client'` boundary, …):
+`@echarts-x` plugin installers. There are two distinct SSR scenarios
+this entry supports:
+
+#### 4a. Client-side chart, SSR-safe import (the common case)
+
+The page is server-rendered to HTML, the chart is instantiated **on the
+client** inside a lifecycle hook (`onMounted`, `useEffect`, `'use client'`
+boundary, …). The server import only needs to be safe to evaluate.
 
 ```ts
 // SSR-safe: this import does not access `window` / `document` /
@@ -98,25 +103,139 @@ onMounted(() => {
 });
 ```
 
-| Entry                              | Auto-loads `<i-chart>`                       | Auto-loads wordcloud + liquid-progress | Safe to import on the server |
-|------------------------------------|----------------------------------------------|----------------------------------------|------------------------------|
-| `@bndynet/icharts` (default)       | yes (no-op when `customElements` is absent)  | yes                                    | no — the `@echarts-x` plugins reference `window` / `document` at module load |
-| `@bndynet/icharts/core` (SSR)      | no                                           | no                                     | yes                          |
+#### 4b. Server-rendered chart image (no browser needed)
+
+Generate a complete `<svg>...</svg>` document directly on the server —
+inline it into HTML, save it to disk, attach it to an email, or pipe it
+through `sharp` / `@resvg/resvg-js` to produce PNG. No DOM, no canvas,
+no headless browser required. Powered by ECharts 6's built-in SSR mode.
+
+```ts
+import { renderChartToSVGString } from '@bndynet/icharts/core';
+import { writeFileSync } from 'node:fs';
+
+const svg = renderChartToSVGString(
+  'line',                                                              // chart type
+  {                                                                    // data
+    categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
+    series: [
+      { name: 'Revenue', data: [120, 200, 150, 80, 270] },
+      { name: 'Cost',    data: [90,  170, 130, 60, 210] },
+    ],
+  },
+  { width: 800, height: 400 },                                         // SSR options
+  { title: 'Quarterly Revenue', theme: 'default' },                    // chart options
+);
+
+writeFileSync('chart.svg', svg);
+```
+
+`RenderChartToSVGStringOptions` controls the rendered viewport:
+
+| Field            | Required | Description                                                                                         |
+|------------------|----------|-----------------------------------------------------------------------------------------------------|
+| `width`          | yes      | Viewport width in px (used as the SVG coordinate system).                                           |
+| `height`         | yes      | Viewport height in px.                                                                              |
+| `locale`         | no       | ECharts locale (default `'EN'`).                                                                    |
+| `useViewBox`     | no       | `true` (default) → root `<svg>` carries `width` + `height` + `viewBox`. `false` → no `viewBox` (strictly fixed-size). |
+
+The underlying ECharts instance is created and disposed entirely
+inside the function, so calling it in a hot request loop never leaks
+engine state.
+
+To convert the SVG to PNG (for emails, social cards, server-side
+rasterization), use a standalone library — icharts deliberately stays
+SVG-only so SSR consumers don't pay for a native canvas dependency
+they may not need:
+
+```ts
+import { renderChartToSVGString } from '@bndynet/icharts/core';
+import { Resvg } from '@resvg/resvg-js';
+
+const svg = renderChartToSVGString(
+  'pie',
+  [{ name: 'Apple', value: 30 }, { name: 'Banana', value: 50 }, { name: 'Cherry', value: 20 }],
+  { width: 800, height: 500 },
+  { title: 'Fruit Mix', legend: { show: true, position: 'bottom' } },
+);
+
+const png = new Resvg(svg).render().asPng();   // Buffer
+// or with sharp:
+//   const png = await sharp(Buffer.from(svg)).png().toBuffer();
+```
+
+**SSR-mode fallbacks** — a few canvas-based features degrade
+gracefully when no DOM / canvas is available:
+
+- Label-width measurement falls back to a `chars × 7px` estimate, so
+  race-chart `grid.right` headroom and tree label widths can drift by
+  1–2 px from browser output.
+- `ResizeObserver` is unavailable, so the pie adapter's resize-driven
+  pixel-perfect center / radius recompute is replaced by the static
+  percent fallback (still legible, slightly less centered).
+- ECharts' SVG renderer approximates text widths internally, so very
+  long labels can wrap differently than in the browser. Pad your
+  widths slightly if you depend on exact parity.
+
+These trade-offs are intrinsic to the SSR contract; the library
+documents them but does not paper over them with hidden polyfills.
+
+#### Entry-point cheat sheet
+
+| Entry                              | Auto-loads `<i-chart>`                       | Auto-loads wordcloud + liquid-progress | Safe to import on the server | `renderChartToSVGString` |
+|------------------------------------|----------------------------------------------|----------------------------------------|------------------------------|--------------------------|
+| `@bndynet/icharts` (default)       | yes (no-op when `customElements` is absent)  | yes                                    | no — the `@echarts-x` plugins reference `window` / `document` at module load | yes (re-exported from /core) |
+| `@bndynet/icharts/core` (SSR)      | no                                           | no                                     | yes                          | yes                          |
 
 If you import the default entry from a server bundle, keep the
 import inside a client-only branch (Next.js `'use client'` files,
 Nuxt `<client-only>` islands, dynamic `await import()` inside
-`onMounted`, …). If you use the `/core` subpath but still need
-**wordcloud** or **liquid-progress** charts on the client, register
-the `@echarts-x` plugins from the same client-only branch — for
-example by importing the main entry, or surgically:
+`onMounted`, …).
 
-```ts
-// Anywhere that is guaranteed to run only in the browser:
-await import('@bndynet/icharts'); // registers wordcloud + liquid-fill
-// …or, more narrowly:
-await import('@bndynet/icharts/dist/installers/index.js');
-```
+#### Plugin-backed chart types under `/core` (`liquidprogress`, `wordcloud`)
+
+The SSR-safe entry deliberately does NOT auto-register the
+`@echarts-x/*` plugins on import. Opt in per chart type:
+
+- **`liquidprogress` (server + client):** call the SSR-safe installer
+  once at boot. It hides the `echarts` and `@echarts-x/*` packages —
+  you stay on `@bndynet/icharts/core`-only imports.
+
+  ```ts
+  import { installLiquidProgress, renderChartToSVGString } from '@bndynet/icharts/core';
+
+  installLiquidProgress(); // idempotent — call once at boot or per request
+
+  const svg = renderChartToSVGString(
+    'liquidprogress',
+    { value: 0.65 },
+    { width: 400, height: 400 },
+    { title: 'CPU' },
+  );
+  ```
+
+  For the **client** path under `/core`, the same `installLiquidProgress()`
+  call works from a client-only branch (`onMounted`, `useEffect`, …).
+  Or simply pull in the main entry via dynamic import — that registers
+  liquidprogress + wordcloud both:
+
+  ```ts
+  await import('@bndynet/icharts');                          // both plugins
+  await import('@bndynet/icharts/dist/installers/index.js'); // narrower, same effect
+  ```
+
+- **`wordcloud` (browser-only):** the `@echarts-x/custom-word-cloud`
+  package requires a real `window` at module-load and a real `<canvas>`
+  with `addEventListener` at render-time — both fundamental browser
+  dependencies that `renderChartToSVGString` cannot fake. There is
+  intentionally no `installWordCloud()` helper. Render wordcloud only
+  on the client, via `createChart('wordcloud', …)` from the main
+  `@bndynet/icharts` entry (or from a client-only branch when using
+  `/core`).
+
+  If you genuinely need wordcloud as a server-rendered image, run
+  the chart in a real browser (Playwright / Puppeteer) and screenshot
+  it — there is no pure-Node path today.
 
 ---
 
