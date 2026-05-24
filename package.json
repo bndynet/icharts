@@ -29,7 +29,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "verify:ssr": "npx tsx scripts/verify-ssr.ts"
   },
   "dependencies": {
     "@bndynet/color-hub": "^0.1.0",
