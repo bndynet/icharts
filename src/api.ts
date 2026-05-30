@@ -1,13 +1,27 @@
-import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
+import type {
+  ChartData,
+  AnyChartOptions,
+  IChartInstance,
+  ChartTypeRegistry,
+  ChartDataFor,
+  ChartOptionsFor,
+} from './types.js';
 import { IChart } from './core.js';
 
 /**
  * Create a chart imperatively.
  *
- * `options` is typed as the {@link AnyChartOptions} union so a chart-specific
- * literal (e.g. `{ innerRadius: '50%' }` for pie, `{ gaugeWidth: 12 }` for
- * gauge) type-checks without forcing the caller to import the matching
- * subtype. Pass the concrete `XxxChartOptions` type for stricter validation.
+ * The `type` argument drives full type inference: passing a registered type
+ * literal (e.g. `'pie'`) narrows `data` to its data shape (`PieData`) and
+ * `options` to its options shape (`PieChartOptions`, including the narrowed
+ * `variant`), so mismatches are caught at compile time and editors offer
+ * accurate completions. Passing an arbitrary `string` (dynamic type, or a
+ * custom type not folded into {@link ChartTypeRegistry}) falls back to the
+ * broad {@link ChartData} / {@link AnyChartOptions} unions.
+ *
+ * Custom chart types registered via `registerAdapter` become first-class by
+ * augmenting {@link ChartTypeRegistry} via declaration merging — see its
+ * docs for the pattern.
  *
  * @example
  * ```ts
@@ -19,11 +33,16 @@ import { IChart } from './core.js';
  * chart.dispose();
  * ```
  */
-export function createChart(
+export function createChart<T extends keyof ChartTypeRegistry | (string & {})>(
   el: HTMLElement,
-  type: string,
-  data: ChartData,
-  options: AnyChartOptions = {},
-): IChartInstance {
-  return new IChart(el, type, data, options);
+  type: T,
+  data: ChartDataFor<T>,
+  options: ChartOptionsFor<T> = {} as ChartOptionsFor<T>,
+): IChartInstance<T> {
+  return new IChart(
+    el,
+    type,
+    data as ChartData,
+    options as AnyChartOptions,
+  ) as unknown as IChartInstance<T>;
 }

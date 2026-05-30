@@ -124,10 +124,11 @@ describe('IChart engine — RenderContext threading', () => {
   });
 });
 
-describe('IChart engine — wordcloud theme switch repaint', () => {
-  it('clears the instance before applying a new theme for wordcloud charts', () => {
-    registerAdapter('wordcloud', {
+describe('IChart engine — clearOnThemeChange adapter capability', () => {
+  it('clears the instance before applying a new theme when the adapter opts in', () => {
+    registerAdapter('clear-on-theme-stub', {
       validate: () => true,
+      clearOnThemeChange: true,
       resolve: () => ({
         option: {
           series: [{ type: 'custom', renderItem: 'wordCloud', coordinateSystem: 'none' }],
@@ -135,7 +136,7 @@ describe('IChart engine — wordcloud theme switch repaint', () => {
       }),
     });
 
-    const chart = new IChart(fakeContainer(), 'wordcloud', stubData);
+    const chart = new IChart(fakeContainer(), 'clear-on-theme-stub', stubData);
     const ec = chart.getEChartsInstance() as unknown as {
       clear: ReturnType<typeof vi.fn>;
     };
@@ -143,6 +144,71 @@ describe('IChart engine — wordcloud theme switch repaint', () => {
 
     chart.setTheme('dark');
     expect(ec.clear).toHaveBeenCalledTimes(1);
+    chart.dispose();
+  });
+
+  it('does NOT clear on theme switch when the adapter omits the flag', () => {
+    // 'observed-stub' (registered in the top-level beforeEach) has no
+    // clearOnThemeChange flag — the engine must not clear for it.
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as {
+      clear: ReturnType<typeof vi.fn>;
+    };
+
+    chart.setTheme('dark');
+    expect(ec.clear).not.toHaveBeenCalled();
+    chart.dispose();
+  });
+});
+
+describe('IChart engine — mergeData adapter capability', () => {
+  it('folds successive update() data through adapter.mergeData when both pass validate', () => {
+    const mergeData = vi.fn(
+      (prev: ChartData, next: ChartData) =>
+        ({ ...(prev as object), ...(next as object) }) as ChartData,
+    );
+    const seen: ChartData[] = [];
+    registerAdapter('merge-stub', {
+      validate: (d) => d !== null && typeof d === 'object' && 'value' in d,
+      mergeData,
+      resolve: (data) => {
+        seen.push(data);
+        return { option: { series: [] } };
+      },
+    });
+
+    const chart = new IChart(
+      fakeContainer(),
+      'merge-stub',
+      { value: 1, max: 10 } as unknown as ChartData,
+    );
+    chart.update({ value: 2 } as unknown as ChartData);
+
+    expect(mergeData).toHaveBeenCalledTimes(1);
+    // max carried forward from the prior frame by the shallow merge stub.
+    expect(seen[seen.length - 1]).toEqual({ value: 2, max: 10 });
+    chart.dispose();
+  });
+
+  it('replaces data wholesale when the adapter has no mergeData', () => {
+    const seen: ChartData[] = [];
+    registerAdapter('replace-stub', {
+      validate: () => true,
+      resolve: (data) => {
+        seen.push(data);
+        return { option: { series: [] } };
+      },
+    });
+
+    const chart = new IChart(
+      fakeContainer(),
+      'replace-stub',
+      { value: 1, max: 10 } as unknown as ChartData,
+    );
+    chart.update({ value: 2 } as unknown as ChartData);
+
+    // No merge: the new frame replaces the old one entirely (max dropped).
+    expect(seen[seen.length - 1]).toEqual({ value: 2 });
     chart.dispose();
   });
 });

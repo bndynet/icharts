@@ -1,12 +1,10 @@
 import * as echarts from 'echarts';
 import type { ChartData, AnyChartOptions, IChartInstance } from './types.js';
-import { ChartType } from './types/base.js';
-import { isGaugeData, mergeGaugeData } from './types/gauge.js';
 import {
-  isLiquidProgressData,
-  mergeLiquidProgressData,
-} from './types/liquid-progress.js';
-import { resolveEChartsOption, type RenderContext } from './adapters/index.js';
+  resolveEChartsOption,
+  getAdapter,
+  type RenderContext,
+} from './adapters/index.js';
 import { getConfig } from './config.js';
 import { applyConfiguredFontFamilyToOption } from './adapters/common/font-family.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
@@ -154,16 +152,18 @@ export class IChart implements IChartInstance {
 
   update(newData?: ChartData, newOptions?: AnyChartOptions): void {
     if (newData !== undefined) {
+      // Live-updating adapters (gauge, liquid-progress, or any custom type)
+      // opt into cross-frame data merging via `adapter.mergeData`. Only fold
+      // when both the prior and incoming data pass the adapter's own guard,
+      // so a partial `{ value }` patch carries `max` / `label` forward;
+      // everything else replaces wholesale (the default).
+      const adapter = getAdapter(this._type);
       this._data =
-        this._type === ChartType.Gauge &&
-          isGaugeData(this._data) &&
-          isGaugeData(newData)
-          ? mergeGaugeData(this._data, newData)
-          : this._type === ChartType.LiquidProgress &&
-              isLiquidProgressData(this._data) &&
-              isLiquidProgressData(newData)
-            ? mergeLiquidProgressData(this._data, newData)
-            : newData;
+        adapter?.mergeData &&
+        adapter.validate(this._data) &&
+        adapter.validate(newData)
+          ? adapter.mergeData(this._data, newData)
+          : newData;
     }
     if (newOptions) this._options = { ...this._options, ...newOptions };
 
@@ -187,11 +187,12 @@ export class IChart implements IChartInstance {
     const name = resolveThemeName(theme);
     if (this._activeTheme !== name) {
       this._activeTheme = name;
-      // Wordcloud uses a custom-series renderer; on theme switches, some
-      // ECharts custom-series pipelines can leave stale display elements in
-      // place during diff/merge, which shows up as duplicated/overlapped
-      // words. Clearing before re-apply ensures a clean repaint.
-      if (this._type === ChartType.WordCloud) {
+      // Some custom-series renderers (e.g. wordcloud) leave stale display
+      // elements in place during ECharts' diff/merge on a theme switch,
+      // which shows up as duplicated/overlapped marks. Adapters opt into a
+      // pre-repaint clear via `clearOnThemeChange`; the engine no longer
+      // hardcodes per-type behavior here.
+      if (getAdapter(this._type)?.clearOnThemeChange) {
         this.ecInstance.clear?.();
       }
       this.ecInstance.setTheme(name);

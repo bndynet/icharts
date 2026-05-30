@@ -62,7 +62,12 @@ export {
 } from './adapters/common/index.js';
 
 // Adapter registry (extensibility)
-export { registerAdapter, type ChartAdapter, type ChartSetupResult } from './adapters/index.js';
+export {
+  registerAdapter,
+  getAdapter,
+  type ChartAdapter,
+  type ChartSetupResult,
+} from './adapters/index.js';
 
 // Types
 export {
@@ -71,6 +76,10 @@ export {
   type ChartOptions,
   type AnyChartOptions,
   type IChartInstance,
+  type ChartTypeRegistry,
+  type RegisteredChartType,
+  type ChartDataFor,
+  type ChartOptionsFor,
   // Data shapes (per-chart aliases; `LineData`/`BarData`/`AreaData` all alias XYData)
   type XYData,
   type XYDataSeries,

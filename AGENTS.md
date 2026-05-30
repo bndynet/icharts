@@ -47,7 +47,8 @@ src/
                       #   chord.ts           → ChordNode/Link/Data, ChordChartOptions,
                       #                        isChordData
                       #   instance.ts        → ChartData / ChartVariant / AnyChartOptions
-                      #                        unions and IChartInstance
+                      #                        unions, ChartTypeRegistry map +
+                      #                        ChartDataFor/ChartOptionsFor, IChartInstance<T>
                       #   index.ts           → barrel re-exporting every file above
   types.ts            # Backwards-compat barrel: `export * from './types/index.js';`
   core.ts             # IChart engine: resolve → applyChartColors → setOption
@@ -115,7 +116,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Architecture rules
 
-1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls), `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations), and `containerWidth` / `containerHeight` (px reported by `ecInstance.getWidth()/getHeight()` each render — `undefined` when zero/non-finite — used by the gauge `percentage` variant to derive ring thickness and inner font sizes from the rendered viewport; `core.ts` re-applies on `resize()` so container-aware sizing re-flows). See `src/adapters/common/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) and `src/adapters/gauge.ts` (`autoSizePercentage`) for the canonical usage.
+1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. **Per-type engine behavior lives on the adapter, not in `core.ts`** — declare `mergeData(prev, next)` to fold partial `update()` patches into the prior frame (gauge / liquid-progress carry `max`/`label` forward; the engine only calls it when both frames pass `validate`) and `clearOnThemeChange: true` to make the engine `instance.clear()` before repainting on `setTheme()` (wordcloud's custom-series renderer needs this). `core.ts` consults these via `getAdapter(type)` and hardcodes nothing — never add a `this._type === ChartType.Xxx` branch to the engine; add the capability to the adapter instead. Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls), `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations), and `containerWidth` / `containerHeight` (px reported by `ecInstance.getWidth()/getHeight()` each render — `undefined` when zero/non-finite — used by the gauge `percentage` variant to derive ring thickness and inner font sizes from the rendered viewport; `core.ts` re-applies on `resize()` so container-aware sizing re-flows). See `src/adapters/common/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) and `src/adapters/gauge.ts` (`autoSizePercentage`) for the canonical usage.
 2. **Reuse shared builders** — `src/adapters/common/index.ts` provides `buildTitle`, `buildLegend`, `buildGrid`, `buildXAxis`, `buildYAxis`, `buildTooltip`, etc. XY charts should use `src/adapters/common/series-utils.ts` for per-series options, mark lines/points, and y-axis index handling. Do **not** call `getCommonDefaults()` unless it is wired into the adapter pipeline (currently unused by built-in adapters).
 3. **Merge user overrides, then apply the resolved palette** — end adapter functions with:
    ```ts
@@ -396,7 +397,7 @@ Every new chart type MUST add **both** a named `Data` type and a named `*ChartOp
 Type declarations are organized one file per chart family under `src/types/` (mirroring `src/adapters/<chart>.ts`):
 
 - Per-chart declarations live in `src/types/<chart>.ts` (e.g. `pie.ts` holds `PieData`, `PieVariant`, `PieChartOptions`, `isPieData`).
-- `src/types/instance.ts` composes the `ChartData` / `ChartVariant` / `AnyChartOptions` unions and declares `IChartInstance`.
+- `src/types/instance.ts` composes the `ChartData` / `ChartVariant` / `AnyChartOptions` unions, the open `ChartTypeRegistry` map (`type → { data, options }`, drives `createChart` / `IChartInstance<T>` inference; augmentable by consumers via declaration merging) with its `ChartDataFor` / `ChartOptionsFor` helpers, and declares the generic `IChartInstance<T>`.
 - `src/types/base.ts` holds `ChartType` enum + base `ChartOptions`. `src/types/shared.ts` holds cross-cutting shared option types (`TitleOptions`, `LegendOptions`, `GridOptions`, `AxisOptions`, `SeriesOptions`, `TooltipOptions`, `TooltipContext*`).
 - `src/types.ts` is a backwards-compat barrel; do not put new declarations there.
 
@@ -409,6 +410,7 @@ Checklist:
 - [ ] If the type has sub-styles, add `XxxVariant` and extend `ChartVariant` in `src/types/instance.ts`.
 - [ ] Define `XxxChartOptions extends ChartOptions` (or `extends XYChartOptions` for XY-family). Put every chart-specific knob (including the narrowed `variant?: XxxVariant`) on the subtype.
 - [ ] Add the new `XxxChartOptions` to the `AnyChartOptions` union in `src/types/instance.ts` so callers can pass a chart-specific literal to `createChart` without an explicit cast.
+- [ ] Add a `'<type>': { data: XxxData; options: XxxChartOptions }` entry to the `ChartTypeRegistry` interface in `src/types/instance.ts`. **This is what gives `createChart('<type>', …)` / `chart.update(…)` full type inference** (data + options + variant narrowed from the `type` string). Skipping it silently downgrades the new type to the broad `ChartData` / `AnyChartOptions` fallback.
 - [ ] Add the new file to `src/types/index.ts`'s re-export list.
 - [ ] Do **NOT** add chart-specific fields to base `ChartOptions`. Base `ChartOptions` is reserved for truly cross-cutting concerns: `theme`, `title`, `padding`, `colors`, `colorMap`, `labelFontSize`, `tooltip`, `echarts`. Note: `grid` lives on `XYChartOptions` only, and `legend` lives on `XYChartOptions`, `PieChartOptions`, and `RadarChartOptions` — gauge/sankey/chord do not render either.
 
@@ -447,6 +449,8 @@ Reference implementations:
 | Body-centered chart consuming title-only reserve | `src/adapters/pie.ts`, `src/adapters/gauge.ts` — read `getTitleReserve(options).top` to shift the chart body below the title widget. |
 | Centered two-line text block (constant visible gap) | `src/adapters/gauge.ts` (`percentage` variant) — uses `computeStackedTextOffsets({ primaryFontSize, secondaryFontSize, showSecondary })` to stack a (big value + caption) pair around the ring center with typographic-padding compensation. Reuse for the future donut-hole label and any custom KPI adapter. |
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` and `src/adapters/line.ts` (`race` branches) |
+| Cross-frame data merge (`adapter.mergeData`) | `src/adapters/index.ts` gauge / liquidprogress registrations → `mergeGaugeData` / `mergeLiquidProgressData` (`src/types/gauge.ts`, `src/types/liquid-progress.ts`). Engine wiring: `IChart.update` in `src/core.ts`. |
+| Clear before theme repaint (`adapter.clearOnThemeChange`) | `src/adapters/index.ts` wordcloud registration. Engine wiring: `IChart.setTheme` in `src/core.ts`. |
 | Variant-specific sub-object (`race.topN` / `race.frameDuration`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`), `src/types/line.ts` (`LineRaceOptions` → `LineChartOptions.race`) |
 | Streaming axis pinning (race) | `src/adapters/line.ts` auto-pins `xAxis.min` to `categories[0]` for time-axis race; users pin `max` themselves via `xAxis.max`. Without this, axis re-layout each frame compresses the line. |
 | Auto-measured race frame duration | `src/adapters/common/race-utils.ts` (`resolveRaceFrameDuration`) — priority: explicit `race.frameDuration` > `ctx.observedFrameMs` (clamped to `[80, 3000]` ms) > 500 ms fallback. Consumed by bar/line race resolvers so callers don't have to mirror their own `setInterval` value. `core.ts` measures the gap between consecutive `update()` calls via `performance.now()` and threads the value through `RenderContext`. |
@@ -601,6 +605,23 @@ If `resolveXxxOptions` already returns `ChartSetupResult`, pass it through:
 registerAdapter(ChartType.Chord, {
   validate: isChordData,
   resolve: (data, options) => resolveChordOptions(data as ChordData, options),
+});
+```
+
+Declare adapter-level engine capabilities here too (not in `core.ts`):
+
+```ts
+registerAdapter(ChartType.Gauge, {
+  validate: isGaugeData,
+  // Carry max/label forward on partial `update({ value })` patches.
+  mergeData: (prev, next) => mergeGaugeData(prev as GaugeData, next as GaugeData),
+  resolve: (data, options, ctx) => ({ option: resolveGaugeOptions(...), notMerge: false }),
+});
+
+registerAdapter(ChartType.WordCloud, {
+  validate: isWordCloudData,
+  clearOnThemeChange: true, // custom-series renderer needs a clear before theme repaint
+  resolve: (data, options, ctx) => ({ option: resolveWordCloudOptions(...) }),
 });
 ```
 

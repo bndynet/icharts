@@ -424,6 +424,7 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `getCurrentTheme()` | Get the active theme object |
 | `getThemeColors()` | Get the active theme's UI color tokens |
 | `registerAdapter(type, adapter)` | Register a custom chart type adapter |
+| `getAdapter(type)` | Look up the registered adapter for a type (or `undefined`) |
 
 ---
 
@@ -441,35 +442,85 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 
 ---
 
+## Type-safe by chart type
+
+`createChart` infers `data` and `options` from the `type` argument, so a
+mismatch is a **compile-time** error (not a runtime throw) and editors offer
+accurate completions for the chart you picked:
+
+```ts
+// ✅ data is narrowed to PieData, options to PieChartOptions
+createChart(el, 'pie', [{ name: 'A', value: 1 }], { variant: 'doughnut' });
+
+// ❌ compile error — XYData is not assignable to PieData
+createChart(el, 'pie', { categories: [], series: [] });
+```
+
+Passing a dynamic `string` type still works and falls back to the broad
+`ChartData` / `AnyChartOptions` unions. The same inference applies to
+`chart.update(data, options)`.
+
+---
+
 ## Extensibility
 
 Custom chart types can be registered via `registerAdapter`. Each adapter implements a `validate` guard and a `resolve` function that returns a full ECharts option object.
 
 ```ts
-import { registerAdapter, type ChartAdapter } from '@bndynet/icharts';
+import { registerAdapter, createChart, type ChartAdapter } from '@bndynet/icharts';
 
-const myAdapter: ChartAdapter = {
+interface ScatterPoint { x: number; y: number }
+
+const scatterAdapter: ChartAdapter = {
   validate(data) {
-    return Array.isArray(data) && data.every(d => 'x' in d && 'y' in d);
+    return Array.isArray(data) && data.every((d) => 'x' in d && 'y' in d);
   },
-  resolve(data, options) {
+  resolve(data) {
+    const points = data as ScatterPoint[];
     return {
       option: {
         xAxis: { type: 'value' },
         yAxis: { type: 'value' },
-        series: [{ type: 'scatter', data: (data as any[]).map(d => [d.x, d.y]) }],
+        series: [{ type: 'scatter', data: points.map((d) => [d.x, d.y]) }],
       },
     };
   },
 };
 
-registerAdapter('scatter', myAdapter);
+registerAdapter('scatter', scatterAdapter);
 
-// Use just like any built-in type
 createChart(el, 'scatter', [{ x: 1, y: 2 }, { x: 3, y: 5 }]);
 ```
 
-The optional `onInit` hook in the returned object receives the ECharts instance after the first `setOption` call, which is useful for attaching event listeners.
+### Making a custom type first-class (no `as` casts)
+
+Fold your type into `ChartTypeRegistry` via declaration merging and the
+custom `type` gets the same inference as a built-in — `createChart('scatter', …)`
+will type-check `data` as your shape with full editor completions:
+
+```ts
+declare module '@bndynet/icharts' {
+  interface ChartTypeRegistry {
+    scatter: { data: ScatterPoint[]; options: ChartOptions };
+  }
+}
+
+// data is now inferred as ScatterPoint[] — no cast in the adapter or call site
+createChart(el, 'scatter', [{ x: 1, y: 2 }]);
+```
+
+### Adapter capabilities
+
+The object returned by `resolve` and the adapter itself support a few optional hooks:
+
+| Field | On | Purpose |
+|-------|----|---------|
+| `onInit(instance)` | resolve result | Runs after the first `setOption` — attach event listeners, read canvas dimensions, etc. |
+| `notMerge` | resolve result | Forwarded to ECharts `setOption(option, notMerge)`. Default `true` (full replace); set `false` to let ECharts animate transitions across successive `update()` calls. |
+| `mergeData(prev, next)` | adapter | Fold the next `update()` data into the previous frame instead of replacing it — lets a live chart accept a partial patch (e.g. gauge `update({ value })` carries `max` / `label` forward). The engine only calls it when both frames pass `validate`. |
+| `clearOnThemeChange` | adapter | When `true`, the engine clears the instance before repainting on `setTheme()` — needed by custom-series renderers (e.g. wordcloud) that leave stale marks during diff/merge. |
+
+`getAdapter(type)` returns the registered adapter (or `undefined`) for introspection.
 
 ---
 

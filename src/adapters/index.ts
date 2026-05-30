@@ -80,6 +80,24 @@ export interface RenderContext {
  * `validate` -- returns true when `data` has the shape this adapter expects.
  * `resolve`  -- builds the ECharts option (and optional onInit hook).
  *               `ctx` is optional; adapters that don't need it ignore the arg.
+ *
+ * `mergeData` -- optional. When provided, the engine calls it on `update()`
+ *               to fold the next data into the previous frame instead of
+ *               replacing it wholesale. This lets live-updating charts
+ *               (e.g. gauge, liquid-progress) animate value transitions
+ *               across successive `chart.update({ value })` calls — the
+ *               caller can send a partial patch and the adapter decides how
+ *               to carry forward fields it isn't given. The engine only
+ *               invokes it when BOTH the previous and next data pass
+ *               `validate`, so an adapter's `mergeData` can safely narrow to
+ *               its own data shape. When omitted, the engine replaces data
+ *               (the default).
+ *
+ * `clearOnThemeChange` -- optional. When `true`, the engine calls
+ *               `instance.clear()` before re-applying on a `setTheme()`
+ *               switch. Needed by custom-series renderers (e.g. wordcloud)
+ *               whose diff/merge can leave stale display elements behind on
+ *               a theme repaint. Defaults to `false`.
  */
 export interface ChartAdapter {
   validate(data: ChartData): boolean;
@@ -88,6 +106,8 @@ export interface ChartAdapter {
     options: ChartOptions,
     ctx?: RenderContext,
   ): ChartSetupResult;
+  mergeData?(prev: ChartData, next: ChartData): ChartData;
+  clearOnThemeChange?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +123,16 @@ const adapterRegistry = new Map<string, ChartAdapter>();
  */
 export function registerAdapter(type: string, adapter: ChartAdapter): void {
   adapterRegistry.set(type, adapter);
+}
+
+/**
+ * Look up the adapter registered for a given chart type, or `undefined` when
+ * none is registered. Used by the engine to consult optional adapter
+ * capabilities (`mergeData`, `clearOnThemeChange`) without hardcoding
+ * per-type behavior.
+ */
+export function getAdapter(type: string): ChartAdapter | undefined {
+  return adapterRegistry.get(type);
 }
 
 /**
@@ -136,7 +166,9 @@ import {
   isXYData,
   isPieData,
   isGaugeData,
+  mergeGaugeData,
   isLiquidProgressData,
+  mergeLiquidProgressData,
   isSankeyData,
   isChordData,
   isRadarData,
@@ -217,6 +249,9 @@ registerAdapter(ChartType.Pie, {
 
 registerAdapter(ChartType.Gauge, {
   validate: isGaugeData,
+  // Carry max / label forward when the consumer sends a partial `{ value }`
+  // patch on each `chart.update()` tick (see mergeGaugeData).
+  mergeData: (prev, next) => mergeGaugeData(prev as GaugeData, next as GaugeData),
   resolve: (data, options, ctx) => ({
     option: resolveGaugeOptions(data as GaugeData, options as GaugeChartOptions, ctx),
     // Merge successive frames so ECharts can animate pointer / progress /
@@ -228,6 +263,11 @@ registerAdapter(ChartType.Gauge, {
 
 registerAdapter(ChartType.LiquidProgress, {
   validate: isLiquidProgressData,
+  mergeData: (prev, next) =>
+    mergeLiquidProgressData(
+      prev as LiquidProgressData,
+      next as LiquidProgressData,
+    ),
   resolve: (data, options, ctx) => ({
     option: resolveLiquidProgressOptions(
       data as LiquidProgressData,
@@ -284,6 +324,9 @@ registerAdapter(ChartType.Treemap, {
 
 registerAdapter(ChartType.WordCloud, {
   validate: isWordCloudData,
+  // The wordcloud custom-series renderer can leave stale display elements
+  // behind during ECharts' diff/merge on a theme repaint — clear first.
+  clearOnThemeChange: true,
   resolve: (data, options, ctx) => ({
     option: resolveWordCloudOptions(
       data as WordCloudData,
