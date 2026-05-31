@@ -113,10 +113,12 @@ function resolveVisualMap(
     highColor,
   ];
 
+  const resolvedMin = cfg?.min ?? minValue;
+  const resolvedMax = cfg?.max ?? maxValue;
   const out: Record<string, unknown> = {
     show: cfg?.show ?? true,
-    min: cfg?.min ?? minValue,
-    max: cfg?.max ?? maxValue,
+    min: resolvedMin,
+    max: resolvedMax,
     orient: cfg?.orient ?? 'vertical',
     left: cfg?.left ?? 'right',
     bottom: cfg?.bottom ?? 12,
@@ -136,6 +138,23 @@ function resolveVisualMap(
   if (cfg?.formatter !== undefined) out.formatter = cfg.formatter;
   if (cfg?.precision !== undefined) out.precision = cfg.precision;
   if (cfg?.pieces !== undefined) out.pieces = cfg.pieces;
+
+  // Explicitly show scale labels at both ends of the gradient bar (max at top,
+  // min at bottom for vertical orientation). ECharts does not always surface
+  // these reliably without an explicit `text` value, so we set them here as the
+  // default. User-supplied `cfg.text` wins; `pieces` mode uses its own labels.
+  if (!cfg?.pieces) {
+    if (cfg?.text !== undefined) {
+      out.text = cfg.text;
+    } else {
+      const precision = cfg?.precision;
+      const formatEnd = (n: number): string => {
+        if (precision !== undefined) return n.toFixed(precision);
+        return Number.isInteger(n) ? String(n) : n.toFixed(1);
+      };
+      out.text = [formatEnd(resolvedMax), formatEnd(resolvedMin)];
+    }
+  }
 
   return out;
 }

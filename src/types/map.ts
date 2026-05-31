@@ -57,6 +57,12 @@ export interface MapVisualMapOptions {
   /** Precision used by continuous visualMap labels. */
   precision?: number;
   /**
+   * Text labels shown at the two ends of the color bar (max end, min end).
+   * Default: auto-formatted min/max values are shown.
+   * Set to `[null, null]` or supply an explicit pair to override.
+   */
+  text?: [string | null, string | null];
+  /**
    * Explicit color ramp for continuous visualMap.
    *
    * Default (when omitted):

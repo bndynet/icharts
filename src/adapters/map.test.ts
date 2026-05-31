@@ -134,6 +134,51 @@ describe('map adapter', () => {
     ]);
   });
 
+  it('shows scale labels (text) at both ends of the gradient bar by default', () => {
+    const option = resolveMapOptions(sample, { mapName: 'demo-map' });
+    const visualMap = option.visualMap as Record<string, unknown>;
+    // min=8, max=28 — both are integers, so no decimal point
+    expect(visualMap.text).toEqual(['28', '8']);
+  });
+
+  it('shows decimal text when min/max are non-integer', () => {
+    const option = resolveMapOptions(
+      [{ name: 'A', value: 1.5 }, { name: 'B', value: 9.75 }],
+      { mapName: 'demo-map' },
+    );
+    const visualMap = option.visualMap as Record<string, unknown>;
+    expect(visualMap.text).toEqual(['9.8', '1.5']);
+  });
+
+  it('honors visualMap.precision when formatting text labels', () => {
+    const option = resolveMapOptions(sample, {
+      mapName: 'demo-map',
+      visualMap: { precision: 2 },
+    });
+    const visualMap = option.visualMap as Record<string, unknown>;
+    expect(visualMap.text).toEqual(['28.00', '8.00']);
+  });
+
+  it('allows user to override scale text labels via visualMap.text', () => {
+    const option = resolveMapOptions(sample, {
+      mapName: 'demo-map',
+      visualMap: { text: ['High', 'Low'] },
+    });
+    const visualMap = option.visualMap as Record<string, unknown>;
+    expect(visualMap.text).toEqual(['High', 'Low']);
+  });
+
+  it('omits text in pieces mode (pieces have their own labels)', () => {
+    const option = resolveMapOptions(sample, {
+      mapName: 'demo-map',
+      visualMap: {
+        pieces: [{ min: 0, max: 10, label: '低' }, { min: 10, max: 30, label: '高' }],
+      },
+    });
+    const visualMap = option.visualMap as Record<string, unknown>;
+    expect('text' in visualMap).toBe(false);
+  });
+
   it('honors visualMap overrides', () => {
     const option = resolveMapOptions(sample, {
       mapName: 'demo-map',
