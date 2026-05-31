@@ -51,9 +51,9 @@ import { getThemeColors, resolveThemeName, syncColorHubTheme } from '../themes/i
 //
 // A `ResizeObserver` on the chart's container DOM re-runs the recompute
 // whenever the container changes size (e.g. window resize, responsive
-// breakpoints). Cleanup is implicit: the observer's callback checks
-// `chart.isDisposed()` and self-disconnects, so we never leak observers
-// even though the adapter contract has no dispose hook today.
+// breakpoints). `onInit` returns the observer's teardown (a `ChartTeardown`),
+// so the engine disconnects it before the next render and on `dispose()` —
+// no per-instance state stashed on the chart, no `isDisposed()` polling.
 
 /** Fraction of the smaller available-area dimension the pie body fills.
  *  85% leaves a small visual cushion between the doughnut's outer arc and
@@ -120,19 +120,6 @@ const PIE_AUTO_RING_MIN = 8;
 const PIE_AUTO_RING_MAX = 36;
 const PIE_AUTO_RING_FALLBACK = 20;
 const NIGHTINGALE_INNER_CORNER_RADIUS = 4;
-
-/**
- * Per-chart-instance marker for the ResizeObserver. Stored as a symbol on
- * the chart so re-runs of `onInit` (each `_apply()` re-fires it) reuse the
- * same observer instead of stacking duplicates. The observer self-cleans
- * on `chart.isDisposed()` so we don't need an explicit dispose hook.
- */
-const PIE_LAYOUT_OBSERVER_KEY = '__bndyIchartsPieLayoutObserver';
-
-interface PieLayoutObserverState {
-  observer: ResizeObserver;
-  recompute: () => void;
-}
 
 export function resolvePieOptions(
   data: PieData,
@@ -436,8 +423,11 @@ function estimateHorizontalLegendRows(
 
 /**
  * Replace the static option's center/radius with pixel-accurate values
- * computed from the chart's real container dimensions. Idempotent across
- * repeated `_apply()` calls and re-runs on container resize.
+ * computed from the chart's real container dimensions, then attach a
+ * `ResizeObserver` so the layout re-flows on container resize. Returns the
+ * observer teardown (a `ChartTeardown`) for the engine to call before the
+ * next render and on dispose — or `undefined` when there's nothing to clean
+ * up (SSR / no `ResizeObserver` / detached DOM).
  */
 function applyAdaptiveLayout(
   chart: echarts.ECharts,
@@ -448,7 +438,7 @@ function applyAdaptiveLayout(
   names: ReadonlyArray<string>,
   centerLabels?: NormalizedCenterLabels,
   centerLabelOffset: [number, number] = [0, 0],
-): void {
+): (() => void) | void {
   const recompute = (): void => {
     if (chart.isDisposed()) return;
     const W = chart.getWidth();
@@ -490,46 +480,36 @@ function applyAdaptiveLayout(
   };
 
   recompute();
-  attachResizeObserver(chart, recompute);
+  return attachResizeObserver(chart, recompute);
 }
 
 /**
  * Attach a ResizeObserver to the chart's container DOM that re-runs the
- * pixel-layout recompute whenever the container changes size. Idempotent
- * per chart instance — repeated `onInit` calls (each `_apply()`) reuse
- * the same observer. The observer self-disconnects when the chart is
- * disposed so we don't leak listeners.
+ * pixel-layout recompute whenever the container changes size. Returns a
+ * teardown that disconnects the observer; the engine calls it before the
+ * next render (so each `_apply()` gets a fresh observer bound to the latest
+ * closure) and on `dispose()`. Returns `undefined` when there's no observer
+ * to manage (SSR / older browsers / detached DOM).
  */
 function attachResizeObserver(
   chart: echarts.ECharts,
   recompute: () => void,
-): void {
+): (() => void) | void {
   if (typeof ResizeObserver === 'undefined') return; // SSR / older browsers
-  const slot = chart as unknown as Record<string, unknown>;
-  const existing = slot[PIE_LAYOUT_OBSERVER_KEY] as PieLayoutObserverState | undefined;
-  if (existing) {
-    // Keep a single observer per chart instance, but always refresh the
-    // callback so theme/layout updates don't replay stale closures.
-    existing.recompute = recompute;
-    return;
-  }
-
   const dom = chart.getDom() as HTMLElement | undefined;
   if (!dom) return;
 
-  const state = {} as PieLayoutObserverState;
-  state.recompute = recompute;
   const observer = new ResizeObserver(() => {
+    // Belt-and-suspenders: the engine disconnects on dispose, but a queued
+    // resize entry could still fire in the same tick — bail if disposed.
     if (chart.isDisposed()) {
       observer.disconnect();
-      delete slot[PIE_LAYOUT_OBSERVER_KEY];
       return;
     }
-    state.recompute();
+    recompute();
   });
   observer.observe(dom);
-  state.observer = observer;
-  slot[PIE_LAYOUT_OBSERVER_KEY] = state;
+  return () => observer.disconnect();
 }
 
 // ---------------------------------------------------------------------------

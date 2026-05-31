@@ -657,7 +657,47 @@ describe('pie adapter', () => {
       expect(graphic.y).toBe(-8);
     });
 
-    it('refreshes ResizeObserver callback after theme changes (no stale center-label colors)', () => {
+    it('onInit returns a teardown that disconnects the ResizeObserver', () => {
+      const observe = vi.fn();
+      const disconnect = vi.fn();
+      class MockResizeObserver {
+        constructor(_cb: () => void) {}
+        observe = observe;
+        disconnect = disconnect;
+      }
+      const originalResizeObserver = globalThis.ResizeObserver;
+      globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
+
+      try {
+        const chart = {
+          isDisposed: () => false,
+          getWidth: () => 360,
+          getHeight: () => 280,
+          getDom: () => ({}) as HTMLElement,
+          setOption: () => {},
+        } as unknown as import('echarts').ECharts;
+
+        const cleanup = resolvePieOptions(sample, {
+          variant: 'doughnut',
+          centerLabels: ['80%', 'CPU'],
+        }).onInit?.(chart);
+
+        // Contract: onInit hands the engine a teardown, not void.
+        expect(typeof cleanup).toBe('function');
+        expect(observe).toHaveBeenCalledTimes(1);
+        expect(disconnect).not.toHaveBeenCalled();
+
+        (cleanup as () => void)();
+        expect(disconnect).toHaveBeenCalledTimes(1);
+      } finally {
+        globalThis.ResizeObserver = originalResizeObserver;
+      }
+    });
+
+    it('each render gets a fresh ResizeObserver carrying the latest theme colors', () => {
+      // The engine disconnects the previous teardown before the next
+      // onInit, so a theme change yields a fresh observer bound to the new
+      // theme's recompute closure — no stale center-label colors.
       const resizeCallbacks: Array<() => void> = [];
       const observe = vi.fn();
       const disconnect = vi.fn();
@@ -684,11 +724,14 @@ describe('pie adapter', () => {
           },
         } as unknown as import('echarts').ECharts;
 
-        resolvePieOptions(sample, {
+        const lightCleanup = resolvePieOptions(sample, {
           theme: 'light',
           variant: 'doughnut',
           centerLabels: ['80%', 'CPU'],
         }).onInit?.(chart);
+
+        // Engine tears down the previous render's effect before re-running.
+        (lightCleanup as () => void)();
 
         resolvePieOptions(sample, {
           theme: 'dark',
@@ -696,7 +739,8 @@ describe('pie adapter', () => {
           centerLabels: ['80%', 'CPU'],
         }).onInit?.(chart);
 
-        resizeCallbacks[0]?.();
+        // Fire the newest (dark) observer's callback.
+        resizeCallbacks[resizeCallbacks.length - 1]?.();
 
         const lastPayload = setOptionCalls[setOptionCalls.length - 1] as Record<string, unknown>;
         const graphic = (lastPayload.graphic as Record<string, unknown>[])[0];

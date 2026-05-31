@@ -65,8 +65,12 @@ export {
 export {
   registerAdapter,
   getAdapter,
+  hasAdapter,
+  listAdapters,
+  unregisterAdapter,
   type ChartAdapter,
   type ChartSetupResult,
+  type ChartTeardown,
 } from './adapters/index.js';
 
 // Types

@@ -2,11 +2,24 @@ import type * as echarts from 'echarts';
 import type { ChartData, ChartOptions } from '../types.js';
 
 /**
+ * Cleanup callback an adapter's `onInit` may return. The engine runs it on
+ * the next re-render (before the next `onInit`) and on `dispose()`, so an
+ * adapter that wires `ResizeObserver` / event listeners / timers in `onInit`
+ * has a deterministic teardown point — no need to stash state on the chart
+ * instance or poll `isDisposed()`.
+ */
+export type ChartTeardown = () => void;
+
+/**
  * Result returned by an adapter's resolve method.
  *
  * `option`    -- full ECharts option ready for setOption().
- * `onInit`    -- optional hook called once after the instance is initialised
- *                and setOption() has been called (e.g. for event listeners).
+ * `onInit`    -- optional hook called after the instance is initialised and
+ *                setOption() has been called (e.g. for event listeners). It
+ *                fires on every render pass (initial + every update / theme /
+ *                resize). May return a {@link ChartTeardown} cleanup; the
+ *                engine invokes the previous pass's cleanup before the next
+ *                `onInit`, and the final cleanup on `dispose()`.
  * `notMerge`  -- forwarded to ECharts `setOption(option, notMerge)`. Defaults
  *                to `true` (full replace). Adapters that depend on cross-call
  *                state transitions (e.g. bar `race` needs ECharts to animate
@@ -16,7 +29,7 @@ import type { ChartData, ChartOptions } from '../types.js';
  */
 export interface ChartSetupResult {
   option: Record<string, unknown>;
-  onInit?: (instance: echarts.ECharts) => void;
+  onInit?: (instance: echarts.ECharts) => void | ChartTeardown;
   notMerge?: boolean;
 }
 
@@ -117,11 +130,31 @@ export interface ChartAdapter {
 const adapterRegistry = new Map<string, ChartAdapter>();
 
 /**
+ * Snapshot of the type strings owned by built-in adapters. Populated once at
+ * the bottom of this module after all built-ins are registered (stays `null`
+ * during built-in registration so those calls never warn). Used solely to
+ * flag the uncommon case of a consumer silently shadowing a built-in type.
+ */
+let builtinTypes: ReadonlySet<string> | null = null;
+
+/**
  * Register a chart adapter for a given type string.
  * Built-in adapters are registered at module load time.
  * Users can call this to add custom chart types.
+ *
+ * Overriding a **built-in** type emits a `console.warn` (the override still
+ * takes effect). This is almost always an accidental type-string collision;
+ * prefer a distinct string for custom charts. Re-registering a custom type is
+ * silent.
  */
 export function registerAdapter(type: string, adapter: ChartAdapter): void {
+  if (builtinTypes?.has(type) && adapterRegistry.get(type) !== adapter) {
+    console.warn(
+      `[icharts] registerAdapter("${type}") overrides a built-in chart type. ` +
+        `If this is intentional you can ignore this; otherwise use a distinct ` +
+        `type string for your custom chart to avoid shadowing the built-in.`,
+    );
+  }
   adapterRegistry.set(type, adapter);
 }
 
@@ -136,6 +169,52 @@ export function getAdapter(type: string): ChartAdapter | undefined {
 }
 
 /**
+ * Whether an adapter is registered for `type` (built-in or custom). Cheap
+ * pre-flight check before `createChart` so callers can branch without a
+ * try/catch around the engine's "Unsupported chart type" throw.
+ */
+export function hasAdapter(type: string): boolean {
+  return adapterRegistry.has(type);
+}
+
+/**
+ * The type strings of every registered adapter (built-in + custom), in
+ * registration order. Useful for diagnostics, building a type picker, or
+ * asserting a custom adapter registered as expected.
+ */
+export function listAdapters(): string[] {
+  return [...adapterRegistry.keys()];
+}
+
+/**
+ * Remove a previously registered adapter. Returns `true` if one was removed,
+ * `false` if no adapter was registered for `type`. Primarily for tests and
+ * hot-reload scenarios; removing a built-in is allowed but leaves that type
+ * unusable until re-registered.
+ */
+export function unregisterAdapter(type: string): boolean {
+  return adapterRegistry.delete(type);
+}
+
+/**
+ * Human-readable, value-free description of a data payload's shape. Used to
+ * build actionable validation errors without echoing the user's (potentially
+ * sensitive / large) data values back into the message.
+ */
+function describeDataShape(data: unknown): string {
+  if (data === null) return 'null';
+  if (data === undefined) return 'undefined';
+  if (Array.isArray(data)) return `an array of length ${data.length}`;
+  if (typeof data === 'object') {
+    const keys = Object.keys(data as object);
+    return keys.length
+      ? `an object with keys [${keys.join(', ')}]`
+      : 'an empty object';
+  }
+  return `a ${typeof data}`;
+}
+
+/**
  * Resolve chart data + options into a ChartSetupResult.
  */
 export function resolveEChartsOption(
@@ -146,12 +225,19 @@ export function resolveEChartsOption(
 ): ChartSetupResult {
   const adapter = adapterRegistry.get(type);
   if (!adapter) {
-    throw new Error(`Unsupported chart type: "${type}"`);
+    const known = listAdapters();
+    throw new Error(
+      `Unsupported chart type: "${type}". ` +
+        (known.length
+          ? `Registered types: ${known.join(', ')}. `
+          : '') +
+        `Register a custom adapter with registerAdapter("${type}", ...) first.`,
+    );
   }
   if (!adapter.validate(data)) {
     throw new Error(
-      `Invalid data for chart type "${type}": ` +
-        JSON.stringify(data).slice(0, 100),
+      `Invalid data for chart type "${type}": received ${describeDataShape(data)}. ` +
+        `See the expected data format in docs/chart-*.md (or the chart's data type).`,
     );
   }
   return adapter.resolve(data, options, ctx);
@@ -335,3 +421,8 @@ registerAdapter(ChartType.WordCloud, {
     ),
   }),
 });
+
+// Freeze the set of built-in type strings now that every built-in is
+// registered. From here on, `registerAdapter` warns when a consumer overrides
+// one of these (see registerAdapter above).
+builtinTypes = new Set(adapterRegistry.keys());

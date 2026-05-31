@@ -124,6 +124,15 @@ export class IChart implements IChartInstance {
    * call `createAsyncTooltipFormatter`).
    */
   private _asyncTooltipDismiss: (() => void) | null = null;
+  /**
+   * Teardown callback returned by the adapter's most recent `onInit`
+   * (see {@link ChartTeardown}). The engine owns its lifecycle so adapters
+   * that wire `ResizeObserver` / listeners / timers in `onInit` get a
+   * deterministic cleanup point: we run it before the next `_apply()`'s
+   * `onInit` and once more on `dispose()`. `null` when the last `onInit`
+   * returned nothing (or no adapter wires one).
+   */
+  private _applyCleanup: (() => void) | null = null;
 
   constructor(
     container: HTMLElement,
@@ -235,6 +244,9 @@ export class IChart implements IChartInstance {
     // only need to drop our local reference — no `off('hideTip', ...)`
     // call here (which would throw post-dispose on some ECharts builds).
     this._asyncTooltipDismiss = null;
+    // Run the adapter's final teardown (e.g. disconnect a ResizeObserver)
+    // before ECharts tears down the instance.
+    this._runApplyCleanup();
     chartRegistry.delete(this);
     this.ecInstance.dispose();
   }
@@ -284,7 +296,26 @@ export class IChart implements IChartInstance {
     this._observeGridRight(option);
     this.ecInstance.setOption(option, notMerge ?? true);
     this._rebindAsyncTooltipDismiss(option);
-    onInit?.(this.ecInstance);
+    // Tear down the previous render's adapter effect before re-running
+    // `onInit` so each pass starts from a clean slate (no stacked
+    // observers / listeners). The adapter may return a fresh teardown.
+    this._runApplyCleanup();
+    const cleanup = onInit?.(this.ecInstance);
+    this._applyCleanup = typeof cleanup === 'function' ? cleanup : null;
+  }
+
+  /** Run and clear the pending adapter teardown, swallowing its errors. */
+  private _runApplyCleanup(): void {
+    if (!this._applyCleanup) return;
+    const cleanup = this._applyCleanup;
+    this._applyCleanup = null;
+    try {
+      cleanup();
+    } catch {
+      // A misbehaving adapter teardown must never break the render /
+      // dispose path. Swallow — the engine has already dropped its
+      // reference, so a throwing cleanup can't wedge subsequent passes.
+    }
   }
 
   /**

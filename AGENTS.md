@@ -116,7 +116,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 
 ### Architecture rules
 
-1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. **Per-type engine behavior lives on the adapter, not in `core.ts`** — declare `mergeData(prev, next)` to fold partial `update()` patches into the prior frame (gauge / liquid-progress carry `max`/`label` forward; the engine only calls it when both frames pass `validate`) and `clearOnThemeChange: true` to make the engine `instance.clear()` before repainting on `setTheme()` (wordcloud's custom-series renderer needs this). `core.ts` consults these via `getAdapter(type)` and hardcodes nothing — never add a `this._type === ChartType.Xxx` branch to the engine; add the capability to the adapter instead. Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls), `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations), and `containerWidth` / `containerHeight` (px reported by `ecInstance.getWidth()/getHeight()` each render — `undefined` when zero/non-finite — used by the gauge `percentage` variant to derive ring thickness and inner font sizes from the rendered viewport; `core.ts` re-applies on `resize()` so container-aware sizing re-flows). See `src/adapters/common/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) and `src/adapters/gauge.ts` (`autoSizePercentage`) for the canonical usage.
+1. **Adapters build options only** — `resolve*Options()` returns `Record<string, unknown>` **or** `ChartSetupResult` (`{ option, onInit?, notMerge? }`). Do not call `echarts.init` inside adapters. Set `notMerge: false` when the adapter needs ECharts to animate transitions across successive `chart.update()` calls (e.g. bar `race`); the default `true` performs a full replace. **Per-type engine behavior lives on the adapter, not in `core.ts`** — declare `mergeData(prev, next)` to fold partial `update()` patches into the prior frame (gauge / liquid-progress carry `max`/`label` forward; the engine only calls it when both frames pass `validate`) and `clearOnThemeChange: true` to make the engine `instance.clear()` before repainting on `setTheme()` (wordcloud's custom-series renderer needs this). `core.ts` consults these via `getAdapter(type)` and hardcodes nothing — never add a `this._type === ChartType.Xxx` branch to the engine; add the capability to the adapter instead. **`onInit` fires on every render pass** (initial + every `update`/`setTheme`/`resize`) and **may return a `ChartTeardown` cleanup** (`() => void`): the engine runs the previous pass's cleanup before the next `onInit` and once more on `dispose()`. Wire `ResizeObserver` / listeners / timers in `onInit` and return their teardown — do **not** stash state on the chart instance or poll `isDisposed()` (see `src/adapters/pie.ts` `attachResizeObserver` for the canonical observer-teardown pattern). Full design rationale + the render-loop timeline live in [docs/LIFECYCLE.md](docs/LIFECYCLE.md). Adapters that need to react to the consumer's update cadence (auto-sizing race animation duration, throttling expensive computations, etc.) accept an optional third `ctx: RenderContext` arg — currently exposes `observedFrameMs` (wall-clock gap between the last two `chart.update()` calls), `maxRaceGridRight` (engine-tracked high-water mark of the largest `grid.right` any prior frame emitted, for monotonic label-headroom calculations), and `containerWidth` / `containerHeight` (px reported by `ecInstance.getWidth()/getHeight()` each render — `undefined` when zero/non-finite — used by the gauge `percentage` variant to derive ring thickness and inner font sizes from the rendered viewport; `core.ts` re-applies on `resize()` so container-aware sizing re-flows). See `src/adapters/common/race-utils.ts` (`resolveRaceFrameDuration`, `resolveRaceLabelHeadroom`) and `src/adapters/gauge.ts` (`autoSizePercentage`) for the canonical usage.
 2. **Reuse shared builders** — `src/adapters/common/index.ts` provides `buildTitle`, `buildLegend`, `buildGrid`, `buildXAxis`, `buildYAxis`, `buildTooltip`, etc. XY charts should use `src/adapters/common/series-utils.ts` for per-series options, mark lines/points, and y-axis index handling. Do **not** call `getCommonDefaults()` unless it is wired into the adapter pipeline (currently unused by built-in adapters).
 3. **Merge user overrides, then apply the resolved palette** — end adapter functions with:
    ```ts
@@ -157,6 +157,7 @@ When changing library code, at minimum run **`npm run typecheck`**, **`npm run l
 - **AGENTS.md** — agent workflow (this file). Keep in sync with structural changes.
 - **docs/COLORS.md** — internal design guide for the color pipeline (resolver layer, assembly layer, theme tokens, per-chart placement rules). Read before adding a new chart type or touching `src/utils.ts` color helpers.
 - **docs/LAYOUT.md** — internal design guide for the title + legend layout pipeline (`buildTitle` / `buildLegend` for appearance, `getTitleReserve` / `getLegendReserve` for per-edge pixel slots, grid vs body-centered consumer patterns). Read when adding a chart that renders a title or legend or extending either API.
+- **docs/LIFECYCLE.md** — internal design guide for the **runtime engine + adapter contract** (`IChart._apply` render loop; `onInit` teardown lifecycle; `mergeData` / `clearOnThemeChange` / `notMerge` capabilities; registry introspection + guardrails; the engine-vs-adapter boundary). Read before touching `src/core.ts`, adding a per-type runtime behavior, or wiring side effects (observers/listeners/timers) in an adapter.
 
 ### Demo site
 
@@ -430,7 +431,14 @@ import type { ChartSetupResult } from './index.js';
 export function resolveXxxOptions(data: XxxData, options: ChartOptions): ChartSetupResult {
  return {
  option: { /* ... */ },
- onInit: (instance) => { /* event listeners */ },
+ onInit: (instance) => {
+ // Fires on every render pass. Wire side effects here and return a
+ // ChartTeardown — the engine runs it before the next onInit and on
+ // dispose(). Return nothing if there's no cleanup.
+ const ro = new ResizeObserver(() => instance.resize());
+ ro.observe(instance.getDom());
+ return () => ro.disconnect();
+ },
  notMerge: false, // optional — set to false when ECharts needs to animate state across successive setOption calls
  };
 }
@@ -451,6 +459,7 @@ Reference implementations:
 | Cross-update transitions (`notMerge: false`) | `src/adapters/bar.ts` and `src/adapters/line.ts` (`race` branches) |
 | Cross-frame data merge (`adapter.mergeData`) | `src/adapters/index.ts` gauge / liquidprogress registrations → `mergeGaugeData` / `mergeLiquidProgressData` (`src/types/gauge.ts`, `src/types/liquid-progress.ts`). Engine wiring: `IChart.update` in `src/core.ts`. |
 | Clear before theme repaint (`adapter.clearOnThemeChange`) | `src/adapters/index.ts` wordcloud registration. Engine wiring: `IChart.setTheme` in `src/core.ts`. |
+| `onInit` teardown (ResizeObserver cleanup) | `src/adapters/pie.ts` `attachResizeObserver` — returns `() => observer.disconnect()`; the engine (`IChart._runApplyCleanup` in `src/core.ts`) runs it before each re-render and on `dispose()`. No symbol-on-instance state, no `isDisposed()` polling. |
 | Variant-specific sub-object (`race.topN` / `race.frameDuration`) | `src/types/bar.ts` (`BarRaceOptions` → `BarChartOptions.race`), `src/types/line.ts` (`LineRaceOptions` → `LineChartOptions.race`) |
 | Streaming axis pinning (race) | `src/adapters/line.ts` auto-pins `xAxis.min` to `categories[0]` for time-axis race; users pin `max` themselves via `xAxis.max`. Without this, axis re-layout each frame compresses the line. |
 | Auto-measured race frame duration | `src/adapters/common/race-utils.ts` (`resolveRaceFrameDuration`) — priority: explicit `race.frameDuration` > `ctx.observedFrameMs` (clamped to `[80, 3000]` ms) > 500 ms fallback. Consumed by bar/line race resolvers so callers don't have to mirror their own `setInterval` value. `core.ts` measures the gap between consecutive `update()` calls via `performance.now()` and threads the value through `RenderContext`. |
@@ -624,6 +633,10 @@ registerAdapter(ChartType.WordCloud, {
   resolve: (data, options, ctx) => ({ option: resolveWordCloudOptions(...) }),
 });
 ```
+
+**Registry surface + guardrails** (full reference: [docs/LIFECYCLE.md §6](docs/LIFECYCLE.md)). Besides `registerAdapter` / `getAdapter`, the module exports `hasAdapter(type)`, `listAdapters()`, and `unregisterAdapter(type)` (all re-exported from `src/index-core.ts`). Two safety behaviors live in this file, not `core.ts`:
+- `registerAdapter` logs a `console.warn` when a consumer overrides a **built-in** type (the override still applies). Built-ins are snapshotted into `builtinTypes` at the bottom of the module after all built-in `registerAdapter` calls — so built-in registration itself never warns, and re-registering a *custom* type is silent (tests re-register custom stubs in `beforeEach` without noise). Don't move this snapshot above the built-in registrations.
+- `resolveEChartsOption` throws **actionable, value-free** errors: unknown type lists the registered types; invalid data reports the payload's *shape* (`an object with keys [...]` / `an array of length N`) via `describeDataShape` — never echo the user's data values into the message (privacy + log-injection). When changing these messages, keep the `Unsupported chart type` / `Invalid data for chart type` prefixes (tests match on them).
 
 ### 5. Public exports (`src/index.ts`)
 

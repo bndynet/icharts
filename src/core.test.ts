@@ -213,6 +213,57 @@ describe('IChart engine — mergeData adapter capability', () => {
   });
 });
 
+describe('IChart engine — onInit teardown lifecycle', () => {
+  it('runs the previous teardown before each re-render, and once on dispose', () => {
+    const cleanup = vi.fn();
+    // onInit returns a fresh teardown each pass; the engine must run the
+    // PRIOR pass's teardown before invoking onInit again, and the final
+    // teardown on dispose() — no stacking, no leaks.
+    registerAdapter('teardown-stub', {
+      validate: () => true,
+      resolve: () => ({ option: { series: [] }, onInit: () => cleanup }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'teardown-stub', stubData);
+    // Constructor render wired teardown #1; nothing cleaned up yet.
+    expect(cleanup).not.toHaveBeenCalled();
+
+    chart.update(stubData); // tears down #1, wires #2
+    expect(cleanup).toHaveBeenCalledTimes(1);
+
+    chart.setTheme('dark'); // tears down #2, wires #3
+    expect(cleanup).toHaveBeenCalledTimes(2);
+
+    chart.dispose(); // tears down #3 (final)
+    expect(cleanup).toHaveBeenCalledTimes(3);
+  });
+
+  it('tolerates an onInit that returns nothing (no teardown to run)', () => {
+    // 'observed-stub' (top-level beforeEach) has an onInit-less resolve.
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    expect(() => {
+      chart.update(stubData);
+      chart.dispose();
+    }).not.toThrow();
+  });
+
+  it('swallows a throwing teardown so render/dispose still proceed', () => {
+    registerAdapter('throwing-teardown-stub', {
+      validate: () => true,
+      resolve: () => ({
+        option: { series: [] },
+        onInit: () => () => {
+          throw new Error('teardown boom');
+        },
+      }),
+    });
+
+    const chart = new IChart(fakeContainer(), 'throwing-teardown-stub', stubData);
+    expect(() => chart.update(stubData)).not.toThrow();
+    expect(() => chart.dispose()).not.toThrow();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // `inShadowDom` threading — the engine samples the container's root once at
 // construction and forwards it on every render. The flag is the contract the

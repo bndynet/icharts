@@ -423,8 +423,11 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `getSeriesColor(name)` | Get the assigned color (with hover/active/disabled states) for a name |
 | `getCurrentTheme()` | Get the active theme object |
 | `getThemeColors()` | Get the active theme's UI color tokens |
-| `registerAdapter(type, adapter)` | Register a custom chart type adapter |
+| `registerAdapter(type, adapter)` | Register a custom chart type adapter (warns when shadowing a built-in type) |
 | `getAdapter(type)` | Look up the registered adapter for a type (or `undefined`) |
+| `hasAdapter(type)` | Whether an adapter is registered for `type` |
+| `listAdapters()` | Type strings of every registered adapter (built-in + custom) |
+| `unregisterAdapter(type)` | Remove a registered adapter; returns whether one existed |
 
 ---
 
@@ -520,7 +523,37 @@ The object returned by `resolve` and the adapter itself support a few optional h
 | `mergeData(prev, next)` | adapter | Fold the next `update()` data into the previous frame instead of replacing it — lets a live chart accept a partial patch (e.g. gauge `update({ value })` carries `max` / `label` forward). The engine only calls it when both frames pass `validate`. |
 | `clearOnThemeChange` | adapter | When `true`, the engine clears the instance before repainting on `setTheme()` — needed by custom-series renderers (e.g. wordcloud) that leave stale marks during diff/merge. |
 
-`getAdapter(type)` returns the registered adapter (or `undefined`) for introspection.
+**`onInit` cleanup.** If `onInit` wires a `ResizeObserver`, event listener, or
+timer, return a teardown function. The engine runs it before the next render's
+`onInit` and once more on `dispose()` — so you never leak observers and never
+have to poll `isDisposed()`:
+
+```ts
+const adapter: ChartAdapter = {
+  validate: (d) => Array.isArray(d),
+  resolve: (data) => ({
+    option: buildOption(data),
+    onInit: (chart) => {
+      const ro = new ResizeObserver(() => chart.resize());
+      ro.observe(chart.getDom());
+      return () => ro.disconnect(); // engine calls this on re-render + dispose
+    },
+  }),
+};
+```
+
+### Registry introspection
+
+`getAdapter(type)` / `hasAdapter(type)` / `listAdapters()` / `unregisterAdapter(type)`
+let you inspect and manage the registry — branch before calling `createChart`,
+build a type picker, or swap an adapter during hot-reload. Re-registering a
+**built-in** type logs a `console.warn` (the override still applies); use a
+distinct type string for custom charts to avoid the warning.
+
+> For the full runtime model — the `_apply` render loop, the `onInit` teardown
+> lifecycle, the engine-vs-adapter boundary, and how to add per-type behavior
+> without touching the engine — see the design guide in
+> [`docs/LIFECYCLE.md`](docs/LIFECYCLE.md).
 
 ---
 
