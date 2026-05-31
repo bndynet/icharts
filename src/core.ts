@@ -9,7 +9,13 @@ import { getConfig } from './config.js';
 import { buildChartEventContext } from './tooltip-context.js';
 import type { ChartEventType, ChartEventHandler } from './types.js';
 import { applyConfiguredFontFamilyToOption } from './adapters/common/font-family.js';
-import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
+import {
+  ensureThemesRegistered,
+  resolveThemeName,
+  beginColorRender,
+  endColorRender,
+  releaseColorOwner,
+} from './themes/index.js';
 import { chartRegistry } from './registry.js';
 import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
 
@@ -264,6 +270,11 @@ export class IChart implements IChartInstance {
     // Run the adapter's final teardown (e.g. disconnect a ResizeObserver)
     // before ECharts tears down the instance.
     this._runApplyCleanup();
+    // Release this chart's consistentColors name lease so any auto-assigned
+    // palette slot it was the last holder of is recycled. This is the primary
+    // cleanup path that makes the registry / sentinel sweeps a fallback rather
+    // than load-bearing — see `releaseColorOwner` / `PaletteRegistry`.
+    releaseColorOwner(this);
     chartRegistry.delete(this);
     this.ecInstance.dispose();
   }
@@ -303,12 +314,28 @@ export class IChart implements IChartInstance {
       containerHeight:
         typeof h === 'number' && Number.isFinite(h) && h > 0 ? h : undefined,
     };
-    const { option, onInit, notMerge } = resolveEChartsOption(
-      this._type,
-      this._data,
-      this._options,
-      fullCtx,
-    );
+    // Bracket the adapter resolve with a color render session so the names it
+    // resolves (via `resolveColors`, when `consistentColors` is on) become a
+    // refcounted lease owned by this chart. `dispose()` releases the lease and
+    // recycles freed palette slots — see `releaseColorOwner` below and
+    // `PaletteRegistry`. The session wraps only the resolve (where colors are
+    // computed); `try/finally` guarantees the session closes even if an
+    // adapter throws, and keeps `onInit` / `setOption` outside the session so
+    // a re-entrant render (e.g. an `onInit` calling `resize()`) can't nest.
+    const renderThemeName = resolveThemeName(this._options.theme);
+    let resolved: ReturnType<typeof resolveEChartsOption>;
+    beginColorRender(this, renderThemeName);
+    try {
+      resolved = resolveEChartsOption(
+        this._type,
+        this._data,
+        this._options,
+        fullCtx,
+      );
+    } finally {
+      endColorRender(this);
+    }
+    const { option, onInit, notMerge } = resolved;
     applyConfiguredFontFamilyToOption(option, getConfig().fontFamily);
     this._observeGridRight(option);
     this.ecInstance.setOption(option, notMerge ?? true);

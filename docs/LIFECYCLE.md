@@ -72,6 +72,8 @@ createChart(el, type, data, options)
   chart.dispose()                  ── DOES NOT call _apply()
         ├── sentinel.remove()
         ├── _runApplyCleanup()             (final adapter teardown)
+        ├── releaseColorOwner(this)        (release consistentColors name lease;
+        │                                   recycle auto slots this chart last held)
         ├── chartRegistry.delete(this)
         └── ecInstance.dispose()
 ```
@@ -81,7 +83,10 @@ createChart(el, type, data, options)
 ```
 1. Sample container dims + flags → RenderContext
      (inShadowDom, containerWidth/Height; undefined when 0 / non-finite)
-2. resolveEChartsOption(type, data, options, ctx)   → { option, onInit?, notMerge? }
+2. beginColorRender(this, theme) … resolveEChartsOption(...) … endColorRender(this)
+     (try/finally — brackets the resolve in a color render session so the names
+      it resolves under `consistentColors` become this chart's refcounted lease)
+     → { option, onInit?, notMerge? }
 3. applyConfiguredFontFamilyToOption(option, fontFamily)
 4. _observeGridRight(option)                         (race grid.right high-water mark)
 5. ecInstance.setOption(option, notMerge ?? true)
@@ -93,6 +98,16 @@ createChart(el, type, data, options)
 ```
 
 Steps 8–10 are the cleanup lifecycle covered in [§4](#4-oninit-teardown-lifecycle).
+
+Step 2's `beginColorRender` / `endColorRender` bracket is the engine half of
+the **consistentColors name lease**: the names an adapter resolves (via
+`resolveColors`) during the session become a refcounted lease owned by this
+chart, and `dispose()`'s `releaseColorOwner(this)` recycles any auto palette
+slot the chart was the last holder of. This is what lets a fully-unmounted page
+restart at `palette[0]` without the disconnect-sentinel sweep — see
+[docs/COLORS.md §4 "Name leases & dispose-release recycling"](COLORS.md). The
+session wraps **only** the resolve (not `onInit` / `setOption`), so a
+re-entrant render triggered from `onInit` can't nest sessions.
 
 Steps 6–7 are **engine-owned, type-agnostic** event wiring: the async-tooltip
 `hideTip` dismiss and the typed `options.events` handlers (`onClick` /

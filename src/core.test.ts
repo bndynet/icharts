@@ -35,7 +35,9 @@ vi.mock('@echarts-x/custom-word-cloud', () => ({
 import { IChart } from './core.js';
 import { registerAdapter, type RenderContext } from './adapters/index.js';
 import { configure, resetConfiguration } from './config.js';
-import type { ChartData } from './types.js';
+import { resolveColors } from './utils.js';
+import { switchTheme, resetColorMap } from './themes/index.js';
+import type { ChartData, ChartOptions } from './types.js';
 import * as echarts from 'echarts';
 
 const observations: Array<RenderContext | undefined> = [];
@@ -705,6 +707,67 @@ describe('IChart engine — configured fontFamily propagation', () => {
     expect(option.series?.[0]?.label?.fontFamily).toBe('Inter, sans-serif');
     expect(option.series?.[0]?.emphasis?.label?.fontFamily).toBe('Inter, sans-serif');
     chart.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// consistentColors name lease — dispose recycles palette slots so the next
+// chart restarts at palette[0] WITHOUT depending on pruneDetachedCharts. This
+// is the P2 "no drift without a sweep" guarantee, exercised end-to-end through
+// the real engine + resolver (not just the PaletteRegistry unit).
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — consistentColors dispose-release recycle', () => {
+  /** Adapter that resolves colors for `data.names` and records the result. */
+  const captured: string[][] = [];
+
+  beforeEach(() => {
+    captured.length = 0;
+    registerAdapter('color-lease-stub', {
+      validate: () => true,
+      resolve: (data, options) => {
+        const names = (data as unknown as { names: string[] }).names ?? [];
+        captured.push(resolveColors(names, options as ChartOptions));
+        return { option: { series: [] } };
+      },
+    });
+    resetConfiguration();
+    switchTheme('light');
+    resetColorMap();
+    configure({ consistentColors: true });
+  });
+
+  function chartWith(names: string[]): IChart {
+    return new IChart(
+      fakeContainer(),
+      'color-lease-stub',
+      { names } as unknown as ChartData,
+    );
+  }
+
+  it('recycles a disposed chart\u2019s slots so the next chart restarts at palette[0] (no prune call)', () => {
+    const a = chartWith(['lease-X', 'lease-Y']);
+    expect(captured[0]).toEqual(['#3b82f6', '#10b981']); // palette[0], [1]
+
+    a.dispose(); // releases lease-X / lease-Y; slots recycled
+
+    // No pruneDetachedCharts(), no switchTheme() — just a fresh chart.
+    const b = chartWith(['lease-P', 'lease-Q']);
+    expect(captured[1]).toEqual(['#3b82f6', '#10b981']); // restarts, no drift
+    b.dispose();
+  });
+
+  it('keeps accumulating across charts that are still alive (live charts retain their colors)', () => {
+    const a = chartWith(['live-A', 'live-B']);
+    expect(captured[0]).toEqual(['#3b82f6', '#10b981']);
+
+    // a is NOT disposed — its names are still leased, so b continues the
+    // palette exactly like the pre-refactor behavior.
+    const b = chartWith(['live-C', 'live-D']);
+    expect(captured[1]).toEqual(['#f59e0b', '#ef4444']); // palette[2], [3]
+
+    a.dispose();
+    b.dispose();
   });
 });
 
