@@ -10,6 +10,7 @@ export * from './xy.js';
 export * from './line.js';
 export * from './bar.js';
 export * from './area.js';
+export * from './map.js';
 export * from './pie.js';
 export * from './gauge.js';
 export * from './liquid-progress.js';

@@ -13,6 +13,9 @@ export { IChart } from './core.js';
 // Imperative API
 export { createChart } from './api.js';
 
+// Map resource registration for `type: 'map'`.
+export { registerMap, type MapGeoJsonSource, type MapSourceObject } from './map-registry.js';
+
 // Server-side rendering — produces a complete `<svg>...</svg>` string
 // from `(type, data, options)` without touching `window` / `document`
 // / `customElements` / `<canvas>`. Pair with `sharp` or
@@ -90,6 +93,8 @@ export {
   type LineData,
   type BarData,
   type AreaData,
+  type MapDataItem,
+  type MapData,
   type PieData,
   type PieDataItem,
   type GaugeData,
@@ -120,6 +125,8 @@ export {
   type LineChartOptions,
   type BarChartOptions,
   type AreaChartOptions,
+  type MapVisualMapOptions,
+  type MapChartOptions,
   type PieChartOptions,
   type GaugeChartOptions,
   type LiquidProgressChartOptions,
@@ -170,6 +177,7 @@ export {
   isTreemapData,
   isWordCloudData,
   isLiquidProgressData,
+  isMapData,
   mergeLiquidProgressData,
 } from './types.js';
 

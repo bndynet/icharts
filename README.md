@@ -246,6 +246,7 @@ The SSR-safe entry deliberately does NOT auto-register the
 | Line   | `line`   | `default`, `spark`, `race` |
 | Bar    | `bar`    | `default`, `horizontal`, `spark`, `race` |
 | Area   | `area`   | `default`, `spark` |
+| Map    | `map`    | `default` |
 | Pie    | `pie`    | `default`, `doughnut`, `half-doughnut`, `nightingale` |
 | Gauge  | `gauge`  | `default`, `percentage` |
 | Liquid Progress | `liquidprogress` | `default` |
@@ -257,6 +258,28 @@ The SSR-safe entry deliberately does NOT auto-register the
 | Treemap | `treemap` | `default` |
 | Word Cloud | `wordcloud` | `default`, `diamond`, `poster` |
 
+### Map resources (`type: 'map'`)
+
+`map` charts require a pre-registered map resource. Register your GeoJSON (or SVG map) once with `registerMap`, then reference it via `options.mapName`:
+
+```ts
+import { registerMap, createChart } from '@bndynet/icharts';
+
+// `chinaGeoJson` can come from your own local file or a remote fetch.
+registerMap('china', chinaGeoJson);
+
+createChart(el, 'map', [
+  { name: '北京市', value: 92 },
+  { name: '上海市', value: 88 },
+  { name: '广东省', value: 97 },
+  { name: '浙江省', value: 85 },
+], {
+  title: '中国区域评分',
+  mapName: 'china',
+  visualMap: { min: 60, max: 100 },
+});
+```
+
 ---
 
 ## Data Formats
@@ -266,6 +289,7 @@ Each chart type expects a specific data shape. Full schemas, field notes, and ch
 | Chart | Data type | Reference |
 |-------|-----------|-----------|
 | Line / Bar / Area | `XYData` (`LineData` / `BarData` / `AreaData`) | [docs/chart-xy.md](docs/chart-xy.md) |
+| Map | `MapData` | [docs/chart-map.md](docs/chart-map.md) |
 | Pie | `PieData` | [docs/chart-pie.md](docs/chart-pie.md) |
 | Word Cloud | `WordCloudData` | [docs/chart-wordcloud.md](docs/chart-wordcloud.md) |
 | Gauge | `GaugeData` | [docs/chart-gauge.md](docs/chart-gauge.md) |
@@ -292,6 +316,7 @@ All options fields are optional. Each chart type extends the base `ChartOptions`
 | `line` | `LineChartOptions` | `XYChartOptions` | [docs/chart-xy.md](docs/chart-xy.md) |
 | `bar` | `BarChartOptions` | `XYChartOptions` | [docs/chart-xy.md](docs/chart-xy.md) |
 | `area` | `AreaChartOptions` | `XYChartOptions` | [docs/chart-xy.md](docs/chart-xy.md) |
+| `map` | `MapChartOptions` | `ChartOptions` | [docs/chart-map.md](docs/chart-map.md) |
 | `pie` | `PieChartOptions` | `ChartOptions` | [docs/chart-pie.md](docs/chart-pie.md) |
 | `gauge` | `GaugeChartOptions` | `ChartOptions` | [docs/chart-gauge.md](docs/chart-gauge.md) |
 | `liquidprogress` | `LiquidProgressChartOptions` | `ChartOptions` | [docs/chart-liquidprogress.md](docs/chart-liquidprogress.md) |

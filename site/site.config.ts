@@ -26,6 +26,11 @@ export default defineConfig({
           page: () => import('./views/charts/PieCharts.vue'),
         },
         {
+          label: 'Map',
+          icon: 'map',
+          page: () => import('./views/charts/MapCharts.vue'),
+        },
+        {
           label: 'Radar',
           icon: 'radar',
           page: () => import('./views/charts/RadarCharts.vue'),

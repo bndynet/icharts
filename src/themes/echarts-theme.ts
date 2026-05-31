@@ -63,7 +63,7 @@ function paletteLabelHalo(colors: ChartThemeColors) {
  * Note on label colors: adapters intentionally do NOT set `series.label.color`
  * / `series.endLabel.color` / `series.edgeLabel.color`. ECharts deep-merges
  * the series-type defaults below (`bar.label`, `line.label`, `line.endLabel`,
- * `pie.label`, `radar.axisName`, `graph.label`, `graph.edgeLabel`,
+ * `pie.label`, `map.label`, `radar.axisName`, `graph.label`, `graph.edgeLabel`,
  * `sankey.label`, `chord.label`, `tree.label`, `custom.label`, …) into each series so themes
  * drive the look.
  * This keeps adapters theme-agnostic (they never read the active palette
@@ -102,6 +102,13 @@ export function buildEChartsTheme(
     },
 
     legend: {
+      textStyle: { color: colors.textPrimary },
+    },
+
+    visualMap: {
+      // Map value legend text should follow the same primary text token as
+      // title/legend/labels; otherwise it falls back to ECharts defaults
+      // (near-black), which is unreadable on dark themes.
       textStyle: { color: colors.textPrimary },
     },
 
@@ -158,6 +165,29 @@ export function buildEChartsTheme(
       // dedicated knob; `?? colors.surface` keeps every pre-existing
       // user-registered theme behaviourally identical.
       itemStyle: { borderWidth: 1, borderColor: colors.itemDivider ?? colors.surface },
+    },
+
+    map: {
+      // Region labels on choropleth maps.
+      label: {
+        color: colors.textPrimary,
+        fontSize: DEFAULT_LABEL_FONT_SIZE,
+        ...paletteLabelHalo(colors),
+      },
+      emphasis: {
+        label: {
+          color: colors.textPrimary,
+          ...paletteLabelHalo(colors),
+        },
+      },
+      // Base region fill + border for map series. visualMap overwrites fill
+      // for regions with values, while regions without values still use this
+      // tokenized fallback. Border stays tokenized in all cases.
+      itemStyle: {
+        areaColor: colors.surface,
+        borderColor: colors.axisLine,
+        borderWidth: 1,
+      },
     },
 
     gauge: {

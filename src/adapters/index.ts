@@ -250,6 +250,7 @@ export function resolveEChartsOption(
 import {
   ChartType,
   isXYData,
+  isMapData,
   isPieData,
   isGaugeData,
   mergeGaugeData,
@@ -267,6 +268,7 @@ import type {
   LineData,
   BarData,
   AreaData,
+  MapData,
   PieData,
   GaugeData,
   LiquidProgressData,
@@ -280,6 +282,7 @@ import type {
   LineChartOptions,
   BarChartOptions,
   AreaChartOptions,
+  MapChartOptions,
   PieChartOptions,
   GaugeChartOptions,
   LiquidProgressChartOptions,
@@ -293,6 +296,7 @@ import type {
 } from '../types.js';
 import { resolveLineOptions, resolveAreaOptions } from './line.js';
 import { resolveBarOptions } from './bar.js';
+import { resolveMapOptions } from './map.js';
 import { resolvePieOptions } from './pie.js';
 import { resolveGaugeOptions } from './gauge.js';
 import { resolveLiquidProgressOptions } from './liquid-progress.js';
@@ -325,6 +329,13 @@ registerAdapter(ChartType.Bar, {
   validate: isXYData,
   resolve: (data, options, ctx) =>
     resolveBarOptions(data as BarData, options as BarChartOptions, ctx),
+});
+
+registerAdapter(ChartType.Map, {
+  validate: isMapData,
+  resolve: (data, options, ctx) => ({
+    option: resolveMapOptions(data as MapData, options as MapChartOptions, ctx),
+  }),
 });
 
 registerAdapter(ChartType.Pie, {

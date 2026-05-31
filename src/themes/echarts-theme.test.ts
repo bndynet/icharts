@@ -57,6 +57,40 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.pie.label.color).toBe(COLORS.textPrimary);
   });
 
+  it('map.label.color follows textPrimary (map region labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.map.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('map.label has a `surface`-colored text halo for readability on filled regions', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.map.label.textBorderColor).toBe(COLORS.surface);
+    expect(theme.map.label.textBorderWidth).toBe(2);
+  });
+
+  it('map.emphasis.label keeps the same halo on hover', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.map.emphasis.label.color).toBe(COLORS.textPrimary);
+    expect(theme.map.emphasis.label.textBorderColor).toBe(COLORS.surface);
+    expect(theme.map.emphasis.label.textBorderWidth).toBe(2);
+  });
+
+  it('map.itemStyle.areaColor follows surface (region fallback fill)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.map.itemStyle.areaColor).toBe(COLORS.surface);
+  });
+
+  it('map.itemStyle.borderColor follows axisLine (region borders)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.map.itemStyle.borderColor).toBe(COLORS.axisLine);
+    expect(theme.map.itemStyle.borderWidth).toBe(1);
+  });
+
+  it('visualMap.textStyle.color follows textPrimary (map value legend text)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.visualMap.textStyle.color).toBe(COLORS.textPrimary);
+  });
+
   it('graph.label.color follows textPrimary (network node labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.graph.label.color).toBe(COLORS.textPrimary);
@@ -175,6 +209,10 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.bar.label.color).toBe('#aaaaaa');
     expect(a.line.label.color).toBe('#aaaaaa');
     expect(a.line.endLabel.color).toBe('#aaaaaa');
+    expect(a.visualMap.textStyle.color).toBe('#aaaaaa');
+    expect(a.map.label.color).toBe('#aaaaaa');
+    expect(a.map.itemStyle.areaColor).toBe(COLORS.surface);
+    expect(a.map.itemStyle.borderColor).toBe(COLORS.axisLine);
     expect(a.radar.axisName.color).toBe('#aaaaaa');
     expect(a.graph.label.color).toBe('#aaaaaa');
     expect(a.graph.edgeLabel.color).toBe('#aaaaaa');
@@ -189,6 +227,10 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
     expect(b.line.endLabel.color).toBe('#bbbbbb');
+    expect(b.visualMap.textStyle.color).toBe('#bbbbbb');
+    expect(b.map.label.color).toBe('#bbbbbb');
+    expect(b.map.itemStyle.areaColor).toBe(COLORS.surface);
+    expect(b.map.itemStyle.borderColor).toBe(COLORS.axisLine);
     expect(b.radar.axisName.color).toBe('#bbbbbb');
     expect(b.graph.label.color).toBe('#bbbbbb');
     expect(b.graph.edgeLabel.color).toBe('#bbbbbb');
@@ -246,6 +288,11 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.pie.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
   });
 
+  it('map.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.map.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
+  });
+
   it('graph.label.fontSize falls back to DEFAULT_LABEL_FONT_SIZE (network node labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.graph.label.fontSize).toBe(DEFAULT_LABEL_FONT_SIZE);
@@ -293,6 +340,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
       theme.line.label.fontSize,
       theme.line.endLabel.fontSize,
       theme.pie.label.fontSize,
+      theme.map.label.fontSize,
       theme.graph.label.fontSize,
       theme.graph.edgeLabel.fontSize,
       theme.sankey.label.fontSize,

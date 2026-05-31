@@ -4,6 +4,7 @@ import type { XYData, XYChartOptions } from './xy.js';
 import type { LineVariant, LineData, LineChartOptions } from './line.js';
 import type { BarVariant, BarData, BarChartOptions } from './bar.js';
 import type { AreaVariant, AreaData, AreaChartOptions } from './area.js';
+import type { MapData, MapChartOptions } from './map.js';
 import type { PieVariant, PieData, PieChartOptions } from './pie.js';
 import type { GaugeVariant, GaugeData, GaugeChartOptions } from './gauge.js';
 import type {
@@ -44,6 +45,7 @@ export type ChartVariant =
 
 export type ChartData =
   | XYData
+  | MapData
   | PieData
   | GaugeData
   | LiquidProgressData
@@ -70,6 +72,7 @@ export type AnyChartOptions =
   | LineChartOptions
   | BarChartOptions
   | AreaChartOptions
+  | MapChartOptions
   | PieChartOptions
   | GaugeChartOptions
   | LiquidProgressChartOptions
@@ -108,6 +111,7 @@ export interface ChartTypeRegistry {
   line: { data: LineData; options: LineChartOptions };
   bar: { data: BarData; options: BarChartOptions };
   area: { data: AreaData; options: AreaChartOptions };
+  map: { data: MapData; options: MapChartOptions };
   pie: { data: PieData; options: PieChartOptions };
   gauge: { data: GaugeData; options: GaugeChartOptions };
   liquidprogress: { data: LiquidProgressData; options: LiquidProgressChartOptions };

@@ -12,6 +12,7 @@ export enum ChartType {
   Line = 'line',
   Bar = 'bar',
   Area = 'area',
+  Map = 'map',
   Pie = 'pie',
   Gauge = 'gauge',
   LiquidProgress = 'liquidprogress',
