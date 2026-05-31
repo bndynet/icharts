@@ -85,13 +85,24 @@ createChart(el, type, data, options)
 3. applyConfiguredFontFamilyToOption(option, fontFamily)
 4. _observeGridRight(option)                         (race grid.right high-water mark)
 5. ecInstance.setOption(option, notMerge ?? true)
-6. _rebindAsyncTooltipDismiss(option)
-7. _runApplyCleanup()        ← tear down the PREVIOUS pass's onInit effect
-8. cleanup = onInit?.(instance)
-9. _applyCleanup = (typeof cleanup === 'function') ? cleanup : null
+6. _rebindAsyncTooltipDismiss(option)   (off prev `hideTip` listener → on new)
+7. _rebindEvents()                       (off prev options.events wrappers → on new)
+8. _runApplyCleanup()        ← tear down the PREVIOUS pass's onInit effect
+9. cleanup = onInit?.(instance)
+10. _applyCleanup = (typeof cleanup === 'function') ? cleanup : null
 ```
 
-Steps 7–9 are the cleanup lifecycle covered in [§4](#4-oninit-teardown-lifecycle).
+Steps 8–10 are the cleanup lifecycle covered in [§4](#4-oninit-teardown-lifecycle).
+
+Steps 6–7 are **engine-owned, type-agnostic** event wiring: the async-tooltip
+`hideTip` dismiss and the typed `options.events` handlers (`onClick` /
+`onDoubleClick` / `onMouseOver` / `onMouseOut`). Both follow the same
+detach-then-attach discipline — the previous pass's listeners are removed
+before the new ones bind, so re-renders never stack listeners. Event `params`
+are normalized into a `ChartEventContext` (reusing the tooltip item/edge
+shapes) via `buildChartEventContext`. **Adapters never wire interaction
+events** — they belong to the engine so every chart type gets them uniformly;
+an adapter that needs a bespoke listener uses its `onInit` teardown instead.
 
 ---
 

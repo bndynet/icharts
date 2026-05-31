@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   pieParamsToTooltipContext,
   sankeyChordParamsToTooltipContext,
+  buildChartEventContext,
 } from './tooltip-context.js';
 
 describe('pieParamsToTooltipContext', () => {
@@ -144,5 +145,91 @@ describe('sankeyChordParamsToTooltipContext (item branch)', () => {
     );
     if (ctx.kind !== 'item') throw new Error('unexpected kind');
     expect(ctx.marker).toBe('<svg/>');
+  });
+});
+
+describe('buildChartEventContext', () => {
+  it('normalizes a series data-item click into an item context', () => {
+    const ctx = buildChartEventContext('click', {
+      componentType: 'series',
+      seriesType: 'pie',
+      seriesIndex: 0,
+      dataIndex: 2,
+      name: 'North',
+      value: 40,
+      percent: 25,
+      marker: '<span></span>',
+      color: '#5470c6',
+    });
+    expect(ctx.type).toBe('click');
+    expect(ctx.componentType).toBe('series');
+    expect(ctx.seriesType).toBe('pie');
+    expect(ctx.seriesIndex).toBe(0);
+    expect(ctx.data).toEqual({
+      kind: 'item',
+      dataIndex: 2,
+      name: 'North',
+      value: 40,
+      percent: 25,
+      marker: '<span></span>',
+      color: '#5470c6',
+    });
+  });
+
+  it('normalizes an edge (link) hit into an edge context', () => {
+    const ctx = buildChartEventContext('click', {
+      componentType: 'series',
+      seriesType: 'sankey',
+      dataType: 'edge',
+      dataIndex: 3,
+      data: { source: 'A', target: 'B', value: 7 },
+      color: 'gradient',
+    });
+    expect(ctx.data).toEqual({
+      kind: 'edge',
+      dataIndex: 3,
+      source: 'A',
+      target: 'B',
+      value: 7,
+    });
+  });
+
+  it('unpacks a tuple value (scatter / word-cloud) to its trailing magnitude', () => {
+    const ctx = buildChartEventContext('mouseover', {
+      componentType: 'series',
+      seriesType: 'wordCloud',
+      name: 'hello',
+      value: ['hello', 128],
+      dataIndex: 0,
+    });
+    if (ctx.data?.kind !== 'item') throw new Error('expected item');
+    expect(ctx.data.value).toBe(128);
+  });
+
+  it('drops the literal "gradient" color (not a usable hex)', () => {
+    const ctx = buildChartEventContext('click', {
+      componentType: 'series',
+      name: 'X',
+      value: 1,
+      color: 'gradient',
+    });
+    if (ctx.data?.kind !== 'item') throw new Error('expected item');
+    expect(ctx.data.color).toBeUndefined();
+  });
+
+  it('leaves data undefined for non-series hits (legend / title / empty canvas)', () => {
+    const ctx = buildChartEventContext('click', {
+      componentType: 'title',
+    });
+    expect(ctx.data).toBeUndefined();
+    expect(ctx.componentType).toBe('title');
+    expect(ctx.raw).toEqual({ componentType: 'title' });
+  });
+
+  it('tolerates null / undefined params', () => {
+    const ctx = buildChartEventContext('mouseout', undefined);
+    expect(ctx.type).toBe('mouseout');
+    expect(ctx.data).toBeUndefined();
+    expect(ctx.raw).toBeUndefined();
   });
 });

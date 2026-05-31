@@ -324,6 +324,74 @@ export type TooltipContext =
   | TooltipContextItem
   | TooltipContextEdge;
 
+// ---------------------------------------------------------------------------
+// Chart interaction events — typed onClick / hover handlers (ChartOptions.events)
+// ---------------------------------------------------------------------------
+
+/** Mouse interaction kinds forwarded to {@link ChartEventHandlers}. */
+export type ChartEventType = 'click' | 'dblclick' | 'mouseover' | 'mouseout';
+
+/**
+ * Normalized payload passed to every {@link ChartEventHandlers} callback.
+ *
+ * The interaction layer mirrors the tooltip layer: `data` reuses the same
+ * `TooltipContextItem` / `TooltipContextEdge` normalization, so a click on a
+ * pie slice, a sankey node, or a sankey link surfaces the same shape your
+ * `tooltip.customHtml` already receives. Axis-trigger has no click equivalent
+ * in ECharts (clicks always land on a single data item), so `data` is never
+ * the `'axis'` kind.
+ *
+ * `data` is `undefined` when the interaction didn't hit a data item — e.g. a
+ * click on empty canvas, the legend, or a title. Use `componentType` /
+ * `seriesType` to disambiguate, and `raw` for anything the normalized shape
+ * doesn't cover.
+ */
+export interface ChartEventContext {
+  /** Which handler fired this context. */
+  type: ChartEventType;
+  /**
+   * Normalized data context, reusing the tooltip item/edge shapes. `undefined`
+   * when the hit wasn't on a series data item (empty canvas, legend, title, …).
+   */
+  data?: TooltipContextItem | TooltipContextEdge;
+  /** ECharts `params.componentType` — e.g. `'series'`, `'markPoint'`, `'title'`. */
+  componentType?: string;
+  /** ECharts `params.seriesType` — e.g. `'line'`, `'pie'`, `'sankey'`. */
+  seriesType?: string;
+  /** ECharts `params.seriesIndex`, when the hit was on a series. */
+  seriesIndex?: number;
+  /**
+   * Raw ECharts event params — the escape hatch for fields the normalized
+   * shape doesn't expose. Shape varies by `componentType`; treat as unknown
+   * and narrow as needed.
+   */
+  raw: unknown;
+}
+
+/** A single chart interaction handler. */
+export type ChartEventHandler = (ctx: ChartEventContext) => void;
+
+/**
+ * Typed mouse-event handlers, set via `ChartOptions.events`. Each maps to the
+ * ECharts event of the same intent and receives a normalized
+ * {@link ChartEventContext}. The engine binds/unbinds these on the underlying
+ * instance across every render (and clears them on `dispose()`), so handlers
+ * stay current with `update({ events })` without stacking listeners.
+ *
+ * For events not covered here (e.g. `legendselectchanged`, `datazoom`), reach
+ * for `getEChartsInstance().on(...)` directly.
+ */
+export interface ChartEventHandlers {
+  /** Fired on a single click. Maps to ECharts `'click'`. */
+  onClick?: ChartEventHandler;
+  /** Fired on a double click. Maps to ECharts `'dblclick'`. */
+  onDoubleClick?: ChartEventHandler;
+  /** Fired when the pointer enters an element. Maps to ECharts `'mouseover'`. */
+  onMouseOver?: ChartEventHandler;
+  /** Fired when the pointer leaves an element. Maps to ECharts `'mouseout'`. */
+  onMouseOut?: ChartEventHandler;
+}
+
 /**
  * Options for `createAsyncTooltipFormatter` — chart-agnostic async tooltip
  * built on ECharts’ `(params, ticket, callback)` protocol.

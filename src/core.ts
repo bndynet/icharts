@@ -6,6 +6,8 @@ import {
   type RenderContext,
 } from './adapters/index.js';
 import { getConfig } from './config.js';
+import { buildChartEventContext } from './tooltip-context.js';
+import type { ChartEventType, ChartEventHandler } from './types.js';
 import { applyConfiguredFontFamilyToOption } from './adapters/common/font-family.js';
 import { ensureThemesRegistered, resolveThemeName } from './themes/index.js';
 import { chartRegistry } from './registry.js';
@@ -133,6 +135,17 @@ export class IChart implements IChartInstance {
    * returned nothing (or no adapter wires one).
    */
   private _applyCleanup: (() => void) | null = null;
+  /**
+   * ECharts event wrappers currently bound for `options.events` handlers.
+   * Re-derived on every `_apply()` (handlers can change via `update`), so we
+   * detach the previous wrappers before attaching new ones to avoid stacking
+   * listeners. Each entry pairs the ECharts event name with the wrapper we
+   * registered so we can `off()` exactly what we `on()`-ed.
+   */
+  private _boundEvents: Array<{
+    event: ChartEventType;
+    handler: (params: unknown) => void;
+  }> = [];
 
   constructor(
     container: HTMLElement,
@@ -244,6 +257,10 @@ export class IChart implements IChartInstance {
     // only need to drop our local reference — no `off('hideTip', ...)`
     // call here (which would throw post-dispose on some ECharts builds).
     this._asyncTooltipDismiss = null;
+    // ECharts' dispose() clears its own listeners; just drop our references
+    // to the event wrappers so they (and the options closure they hold) can
+    // be collected.
+    this._boundEvents = [];
     // Run the adapter's final teardown (e.g. disconnect a ResizeObserver)
     // before ECharts tears down the instance.
     this._runApplyCleanup();
@@ -296,12 +313,58 @@ export class IChart implements IChartInstance {
     this._observeGridRight(option);
     this.ecInstance.setOption(option, notMerge ?? true);
     this._rebindAsyncTooltipDismiss(option);
+    this._rebindEvents();
     // Tear down the previous render's adapter effect before re-running
     // `onInit` so each pass starts from a clean slate (no stacked
     // observers / listeners). The adapter may return a fresh teardown.
     this._runApplyCleanup();
     const cleanup = onInit?.(this.ecInstance);
     this._applyCleanup = typeof cleanup === 'function' ? cleanup : null;
+  }
+
+  /**
+   * Bind `options.events` handlers to the underlying ECharts instance,
+   * normalizing each raw `params` into a {@link ChartEventContext} via
+   * {@link buildChartEventContext}. Mirrors `_rebindAsyncTooltipDismiss`:
+   * re-derived on every `_apply()` (handlers can change via `update`), so we
+   * detach the previous wrappers first and never stack listeners. A throwing
+   * user handler is swallowed so one bad callback can't break ECharts'
+   * internal event dispatch.
+   */
+  private _rebindEvents(): void {
+    const ec = this.ecInstance as unknown as {
+      on?: (event: string, handler: (...args: unknown[]) => void) => void;
+      off?: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
+    if (this._boundEvents.length && typeof ec.off === 'function') {
+      for (const { event, handler } of this._boundEvents) {
+        ec.off(event, handler);
+      }
+    }
+    this._boundEvents = [];
+
+    const events = this._options.events;
+    if (!events || typeof ec.on !== 'function') return;
+
+    const mapping: Array<[ChartEventType, ChartEventHandler | undefined]> = [
+      ['click', events.onClick],
+      ['dblclick', events.onDoubleClick],
+      ['mouseover', events.onMouseOver],
+      ['mouseout', events.onMouseOut],
+    ];
+
+    for (const [event, fn] of mapping) {
+      if (typeof fn !== 'function') continue;
+      const wrapper = (params: unknown): void => {
+        try {
+          fn(buildChartEventContext(event, params));
+        } catch {
+          // A user event handler must never break ECharts' event dispatch.
+        }
+      };
+      ec.on(event, wrapper);
+      this._boundEvents.push({ event, handler: wrapper });
+    }
   }
 
   /** Run and clear the pending adapter teardown, swallowing its errors. */

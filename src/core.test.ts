@@ -213,6 +213,92 @@ describe('IChart engine — mergeData adapter capability', () => {
   });
 });
 
+describe('IChart engine — events (onClick / onMouseOver)', () => {
+  type MockEC = {
+    on: ReturnType<typeof vi.fn>;
+    off: ReturnType<typeof vi.fn>;
+  };
+  const eventStub = {
+    validate: () => true,
+    resolve: () => ({ option: { series: [] } }),
+  };
+
+  it('binds options.events handlers and passes a normalized context', () => {
+    registerAdapter('event-stub', eventStub);
+    const onClick = vi.fn();
+    const chart = new IChart(fakeContainer(), 'event-stub', stubData, {
+      events: { onClick },
+    });
+    const ec = chart.getEChartsInstance() as unknown as MockEC;
+
+    const clickReg = ec.on.mock.calls.find((c) => c[0] === 'click');
+    expect(clickReg).toBeDefined();
+
+    // Fire the registered wrapper with a raw ECharts click param.
+    (clickReg![1] as (p: unknown) => void)({
+      componentType: 'series',
+      seriesType: 'pie',
+      name: 'North',
+      value: 40,
+      dataIndex: 1,
+      color: '#5470c6',
+    });
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    const ctx = onClick.mock.calls[0][0];
+    expect(ctx.type).toBe('click');
+    expect(ctx.data).toEqual({
+      kind: 'item',
+      dataIndex: 1,
+      name: 'North',
+      value: 40,
+      percent: undefined,
+      marker: undefined,
+      color: '#5470c6',
+    });
+    chart.dispose();
+  });
+
+  it('does not bind any handler when options.events is absent', () => {
+    registerAdapter('event-stub', eventStub);
+    const chart = new IChart(fakeContainer(), 'event-stub', stubData);
+    const ec = chart.getEChartsInstance() as unknown as MockEC;
+    expect(ec.on.mock.calls.some((c) => c[0] === 'click')).toBe(false);
+    chart.dispose();
+  });
+
+  it('rebinds (off then on) on re-render so handlers never stack', () => {
+    registerAdapter('event-stub', eventStub);
+    const chart = new IChart(fakeContainer(), 'event-stub', stubData, {
+      events: { onClick: vi.fn() },
+    });
+    const ec = chart.getEChartsInstance() as unknown as MockEC;
+    expect(ec.on.mock.calls.filter((c) => c[0] === 'click')).toHaveLength(1);
+
+    chart.update(stubData);
+    // Previous wrapper detached, new wrapper attached.
+    expect(ec.off.mock.calls.filter((c) => c[0] === 'click')).toHaveLength(1);
+    expect(ec.on.mock.calls.filter((c) => c[0] === 'click')).toHaveLength(2);
+    chart.dispose();
+  });
+
+  it('swallows a throwing handler so ECharts dispatch is not broken', () => {
+    registerAdapter('event-stub', eventStub);
+    const chart = new IChart(fakeContainer(), 'event-stub', stubData, {
+      events: {
+        onMouseOver: () => {
+          throw new Error('handler boom');
+        },
+      },
+    });
+    const ec = chart.getEChartsInstance() as unknown as MockEC;
+    const reg = ec.on.mock.calls.find((c) => c[0] === 'mouseover');
+    expect(reg).toBeDefined();
+    expect(() => (reg![1] as (p: unknown) => void)({ componentType: 'series', name: 'x' })).not.toThrow();
+    chart.dispose();
+  });
+});
+
 describe('IChart engine — onInit teardown lifecycle', () => {
   it('runs the previous teardown before each re-render, and once on dispose', () => {
     const cleanup = vi.fn();

@@ -1,4 +1,8 @@
-import type { TitleOptions, TooltipOptions } from './shared.js';
+import type {
+  TitleOptions,
+  TooltipOptions,
+  ChartEventHandlers,
+} from './shared.js';
 
 // ---------------------------------------------------------------------------
 // Chart type enum
@@ -68,6 +72,15 @@ export interface ChartOptions {
   labelFontSize?: number;
 
   tooltip?: TooltipOptions;
+
+  /**
+   * Typed mouse-interaction handlers (`onClick` / `onDoubleClick` /
+   * `onMouseOver` / `onMouseOut`). Each receives a normalized
+   * {@link ChartEventHandlers} `ChartEventContext` — the same item/edge shape
+   * the tooltip hooks get — instead of raw ECharts `params`. The engine binds
+   * them on the live instance and keeps them in sync across `update()`.
+   */
+  events?: ChartEventHandlers;
 
   /** Raw ECharts options merged last — escape hatch for advanced users */
   echarts?: Record<string, unknown>;

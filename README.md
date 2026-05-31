@@ -445,6 +445,55 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 
 ---
 
+## Events
+
+Listen for clicks and hovers with typed `options.events` handlers — no need to
+reach into the raw ECharts instance. Each handler receives a normalized
+`ChartEventContext` whose `data` reuses the **same item/edge shape** that
+`tooltip.customHtml` gets:
+
+```ts
+createChart(el, 'pie', data, {
+  events: {
+    onClick: (ctx) => {
+      // ctx.type === 'click'
+      if (ctx.data?.kind === 'item') {
+        console.log('clicked slice', ctx.data.name, ctx.data.value, ctx.data.color);
+      }
+    },
+    onMouseOver: (ctx) => {
+      /* ctx.data?.kind: 'item' (slice / node / word) | 'edge' (link) | undefined */
+    },
+  },
+});
+```
+
+`ChartEventContext`:
+
+```ts
+interface ChartEventContext {
+  type: 'click' | 'dblclick' | 'mouseover' | 'mouseout';
+  data?: TooltipContextItem | TooltipContextEdge; // narrow with data.kind
+  componentType?: string; // 'series' | 'markPoint' | 'title' | …
+  seriesType?: string;    // 'line' | 'pie' | 'sankey' | …
+  seriesIndex?: number;
+  raw: unknown;           // raw ECharts params — escape hatch
+}
+```
+
+- A click on a pie slice / sankey node / word-cloud word → `data.kind === 'item'`;
+  on a sankey / chord / network link → `data.kind === 'edge'`. There is no
+  `'axis'` event kind (ECharts clicks always hit a single data item).
+- `data` is `undefined` when the hit wasn't on a series item (legend, title,
+  empty canvas) — fall back to `componentType` / `raw`.
+- Handlers stay in sync across `update({ events })` (no stacked listeners) and
+  are detached on `dispose()`. A throwing handler is swallowed so it can't
+  break ECharts' event dispatch.
+- For events not covered (`legendselectchanged`, `datazoom`, …) use
+  `getEChartsInstance().on(...)` directly.
+
+---
+
 ## Type-safe by chart type
 
 `createChart` infers `data` and `options` from the `type` argument, so a
