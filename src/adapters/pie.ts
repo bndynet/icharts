@@ -17,6 +17,7 @@ import {
   buildTitle,
   buildLegend,
   buildAsyncTooltipFormatter,
+  buildEmphasisBlur,
   compileRichText,
   getLabelFontSize,
   getLegendReserve,
@@ -550,6 +551,11 @@ function buildPieSeries(
   }
 
   applySliceStyle(series, options, variant);
+
+  // Slices are data items in one series → focus 'self' fades the other slices
+  // when one is hovered / highlighted (opt-in).
+  Object.assign(series, buildEmphasisBlur(options.emphasis, 'self'));
+
   return [series];
 }
 

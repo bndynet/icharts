@@ -155,6 +155,8 @@ export {
   type ChartEventType,
   type ChartEventHandler,
   type ChartEventHandlers,
+  type ChartHighlightTarget,
+  type EmphasisOptions,
   type CreateAsyncTooltipFormatterOptions,
   type BarRaceOptions,
   type LineRaceOptions,

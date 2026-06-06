@@ -2,6 +2,7 @@ import type {
   TitleOptions,
   TooltipOptions,
   ChartEventHandlers,
+  EmphasisOptions,
 } from './shared.js';
 
 // ---------------------------------------------------------------------------
@@ -73,6 +74,16 @@ export interface ChartOptions {
   labelFontSize?: number;
 
   tooltip?: TooltipOptions;
+
+  /**
+   * Emphasis (hover / highlight) behavior. Set `emphasis.blurOthers` to fade
+   * non-highlighted items so the focused one stands out — applies to real
+   * hover and to programmatic {@link import('./instance.js').IChartInstance.highlight}
+   * calls alike. Off by default. Honored by line / area / bar / pie / radar;
+   * graph charts (sankey / chord / network) already blur via their own
+   * adjacency focus.
+   */
+  emphasis?: EmphasisOptions;
 
   /**
    * Typed mouse-interaction handlers (`onClick` / `onDoubleClick` /

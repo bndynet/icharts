@@ -9,3 +9,4 @@ export * from './rich-text.js';
 export * from './shared.js';
 export * from './font-family.js';
 export * from './icon-symbol.js';
+export * from './emphasis.js';

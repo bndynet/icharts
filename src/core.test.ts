@@ -24,6 +24,7 @@ vi.mock('echarts', () => ({
     resize: vi.fn(),
     on: vi.fn(),
     off: vi.fn(),
+    dispatchAction: vi.fn(),
   })),
   registerTheme: vi.fn(),
 }));
@@ -786,5 +787,60 @@ describe('IChart engine — configured global theme fallback', () => {
     const [, themeName] = lastCall;
     expect(themeName).toBe('core-config-theme');
     chart.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// highlight() / unhighlight() — thin wrappers over ECharts dispatchAction
+// used for cross-chart hover linkage. We assert payload normalization (string
+// shorthand → { name }, object pass-through, empty unhighlight = clear all)
+// and the post-dispose no-op guard.
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — highlight / unhighlight', () => {
+  function dispatchMock(chart: IChart): ReturnType<typeof vi.fn> {
+    return (
+      chart.getEChartsInstance() as unknown as {
+        dispatchAction: ReturnType<typeof vi.fn>;
+      }
+    ).dispatchAction;
+  }
+
+  it('highlight(string) dispatches a highlight action with { name }', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    chart.highlight('Premium');
+    expect(dispatchMock(chart)).toHaveBeenCalledWith({
+      type: 'highlight',
+      name: 'Premium',
+    });
+    chart.dispose();
+  });
+
+  it('highlight(object) passes the selector fields through unchanged', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    chart.highlight({ seriesIndex: 0, dataIndex: 2 });
+    expect(dispatchMock(chart)).toHaveBeenCalledWith({
+      type: 'highlight',
+      seriesIndex: 0,
+      dataIndex: 2,
+    });
+    chart.dispose();
+  });
+
+  it('unhighlight() with no target dispatches a bare downplay (clear all)', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    chart.unhighlight();
+    expect(dispatchMock(chart)).toHaveBeenCalledWith({ type: 'downplay' });
+    chart.dispose();
+  });
+
+  it('is a no-op after dispose (never throws, never dispatches)', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    const dispatch = dispatchMock(chart);
+    chart.dispose();
+    dispatch.mockClear();
+    expect(() => chart.highlight('Premium')).not.toThrow();
+    expect(() => chart.unhighlight()).not.toThrow();
+    expect(dispatch).not.toHaveBeenCalled();
   });
 });

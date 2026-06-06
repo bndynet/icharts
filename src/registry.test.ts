@@ -41,6 +41,8 @@ function makeFakeChart(opts: {
     resize: () => {},
     dispose: disposeSpy,
     getEChartsInstance: () => ec as unknown as ReturnType<IChartInstance['getEChartsInstance']>,
+    highlight: () => {},
+    unhighlight: () => {},
   };
 
   return { instance, disposeSpy };
@@ -91,6 +93,8 @@ describe('pruneDetachedCharts', () => {
           isDisposed: () => false,
           getDom: () => undefined,
         }) as unknown as ReturnType<IChartInstance['getEChartsInstance']>,
+      highlight: () => {},
+      unhighlight: () => {},
     };
     chartRegistry.add(headless);
 

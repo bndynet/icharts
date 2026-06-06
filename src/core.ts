@@ -7,7 +7,11 @@ import {
 } from './adapters/index.js';
 import { getConfig } from './config.js';
 import { buildChartEventContext } from './tooltip-context.js';
-import type { ChartEventType, ChartEventHandler } from './types.js';
+import type {
+  ChartEventType,
+  ChartEventHandler,
+  ChartHighlightTarget,
+} from './types.js';
 import { applyConfiguredFontFamilyToOption } from './adapters/common/font-family.js';
 import {
   ensureThemesRegistered,
@@ -283,6 +287,22 @@ export class IChart implements IChartInstance {
     return this.ecInstance;
   }
 
+  highlight(target: ChartHighlightTarget): void {
+    if (this._disposed) return;
+    this.ecInstance.dispatchAction({
+      type: 'highlight',
+      ...normalizeHighlightTarget(target),
+    });
+  }
+
+  unhighlight(target?: ChartHighlightTarget): void {
+    if (this._disposed) return;
+    this.ecInstance.dispatchAction({
+      type: 'downplay',
+      ...normalizeHighlightTarget(target),
+    });
+  }
+
   /** Change the chart type (used by the web component when the `type` property changes). */
   setType(type: string): void {
     this._type = type;
@@ -480,4 +500,18 @@ function extractAsyncTooltipDismiss(option: unknown): (() => void) | null {
     }
   }
   return null;
+}
+
+/**
+ * Normalize a {@link ChartHighlightTarget} into the selector fields ECharts'
+ * `highlight` / `downplay` action payloads accept. A bare string becomes
+ * `{ name }`; `undefined` becomes `{}` (no selector = act on the whole
+ * chart); an object is passed through unchanged.
+ */
+function normalizeHighlightTarget(
+  target?: ChartHighlightTarget,
+): Record<string, unknown> {
+  if (target === undefined) return {};
+  if (typeof target === 'string') return { name: target };
+  return { ...target };
 }

@@ -23,6 +23,7 @@ import type {
   WordCloudData,
   WordCloudChartOptions,
 } from './word-cloud.js';
+import type { ChartHighlightTarget } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // Aggregate unions
@@ -162,4 +163,33 @@ export interface IChartInstance<T extends string = string> {
   resize(): void;
   dispose(): void;
   getEChartsInstance(): echarts.ECharts;
+  /**
+   * Programmatically put data into the highlight (emphasis) state — the same
+   * visual state ECharts applies on hover. A bare string is shorthand for
+   * `{ name }` (highlights every same-named item across all series), which is
+   * the common case for cross-chart hover linkage:
+   *
+   * ```ts
+   * createChart(elA, 'pie', dataA, {
+   *   events: {
+   *     onMouseOver: (ctx) => { if (ctx.data?.kind === 'item') chartB.highlight(ctx.data.name); },
+   *     onMouseOut:  () => chartB.unhighlight(),
+   *   },
+   * });
+   * ```
+   *
+   * Wraps ECharts' `dispatchAction({ type: 'highlight' })`. The highlight
+   * persists until {@link IChartInstance.unhighlight} (or a real hover-out)
+   * clears it, so always pair `highlight` on enter with `unhighlight` on
+   * leave. No-op after `dispose()`.
+   */
+  highlight(target: ChartHighlightTarget): void;
+  /**
+   * Clear a highlight set by {@link IChartInstance.highlight} (or by hover),
+   * returning the data to its normal state. Call with no argument to clear
+   * every highlight on the chart. Wraps ECharts' `dispatchAction` with the
+   * `downplay` action (the counterpart to `highlight`). No-op after
+   * `dispose()`.
+   */
+  unhighlight(target?: ChartHighlightTarget): void;
 }

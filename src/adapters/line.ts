@@ -9,6 +9,7 @@ import {
   buildYAxis,
   buildTooltip,
   buildSparkTooltip,
+  buildEmphasisBlur,
   getLabelFontSize,
   isTimeCategories,
 } from './common/index.js';
@@ -333,6 +334,10 @@ function buildLineSeries(
 
     applyMarkLines(series, so);
     applyMarkPoints(series, so);
+
+    // Each line/area series is its own legend entry → focus 'series' fades the
+    // other series when this one is hovered / highlighted (opt-in).
+    Object.assign(series, buildEmphasisBlur(options.emphasis, 'series'));
 
     return series;
   });

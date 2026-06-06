@@ -10,6 +10,7 @@ import {
   buildXAxis,
   buildTooltip,
   buildSparkTooltip,
+  buildEmphasisBlur,
   getLabelFontSize,
   isTimeCategories,
 } from './common/index.js';
@@ -337,6 +338,13 @@ function buildBarSeries(
     if (enableColorByCategory) {
       series.colorBy = 'data';
     }
+
+    // Multi-series bars link by series; a colorByCategory chart is a single
+    // series whose bars are the comparable items, so fade siblings via 'self'.
+    Object.assign(
+      series,
+      buildEmphasisBlur(options.emphasis, enableColorByCategory ? 'self' : 'series'),
+    );
 
     return series;
   });

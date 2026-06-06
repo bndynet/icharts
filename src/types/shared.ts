@@ -393,6 +393,57 @@ export interface ChartEventHandlers {
 }
 
 /**
+ * Target for the imperative `IChartInstance.highlight()` / `unhighlight()`
+ * methods. A bare string is shorthand for `{ name }` — it highlights every
+ * data item with that name across all series, which is the common case for
+ * cross-chart hover linkage (`other.highlight(ctx.data?.name)`). The object
+ * form is forwarded as-is to ECharts' `highlight` / `downplay` action payload
+ * for finer targeting (a single point via `seriesIndex` + `dataIndex`, an
+ * entire series via `seriesName`, …).
+ */
+export type ChartHighlightTarget =
+  | string
+  | {
+      /** Highlight/downplay every data item with this name across all series. */
+      name?: string;
+      /** Restrict to a series by name. */
+      seriesName?: string;
+      /** Restrict to a series by index. */
+      seriesIndex?: number;
+      /** Restrict to a single data item by index (pair with a series selector). */
+      dataIndex?: number;
+    };
+
+/**
+ * Emphasis (hover / programmatic-highlight) behavior shared by every chart
+ * type that renders multiple comparable items.
+ *
+ * By default ECharts only *emphasizes* the hovered / highlighted item, which
+ * is easy to miss on a busy multi-series chart. Turning {@link blurOthers} on
+ * additionally **fades every other item** so the focused one clearly stands
+ * out — this applies both to real mouse hover and to programmatic
+ * {@link import('./instance.js').IChartInstance.highlight} calls (the
+ * mechanism is the same emphasis state, so cross-chart hover linkage gets the
+ * fade for free).
+ *
+ * Off by default to preserve the plain emphasis-only hover behavior; opt in
+ * per chart. The adapter picks the correct ECharts `focus` mode for its
+ * series shape, so you don't have to.
+ */
+export interface EmphasisOptions {
+  /**
+   * Fade the non-highlighted items when one item is hovered or highlighted.
+   * Default `false`.
+   */
+  blurOthers?: boolean;
+  /**
+   * Opacity (0–1) applied to the faded items when {@link blurOthers} is on.
+   * Lower = stronger fade. Default `0.12`.
+   */
+  blurOpacity?: number;
+}
+
+/**
  * Options for `createAsyncTooltipFormatter` — chart-agnostic async tooltip
  * built on ECharts’ `(params, ticket, callback)` protocol.
  */

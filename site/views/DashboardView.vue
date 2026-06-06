@@ -55,7 +55,12 @@
         <span class="dash-pin-swatch" :style="{ background: PIN_COLOR_MAP.Trial }" />
         <code class="dash-code">{{ PIN_COLOR_MAP.Trial }}</code>.
         Switch the theme above to watch other colors update while Trial stays
-        fixed.
+        fixed.         Hover any tier &mdash; on the chart body or its legend &mdash; in the
+        line, area, bar, doughnut, radar, chord, nightingale, half-doughnut,
+        sankey, or network charts to see it highlighted across all of them at once
+        &mdash; powered by the instance
+        <code class="dash-code">highlight()</code> /
+        <code class="dash-code">unhighlight()</code> methods.
       </template>
     </el-alert>
 
@@ -285,6 +290,8 @@ import {
   registerTheme,
   getCurrentTheme,
   type IChartInstance,
+  type ChartEventHandlers,
+  type ChartEventContext,
 } from '@bndynet/icharts';
 import { useTheme } from '@bndynet/vue-site';
 import {
@@ -547,6 +554,89 @@ function track(c: IChartInstance): IChartInstance {
   return c;
 }
 
+// ── Cross-chart hover linkage ──────────────────────────────────────────────
+// Every chart in this dashboard is fed from the same five-tier dataset and
+// (via consistentColors) keeps each tier on the same color. We lean into that:
+// hovering a tier in ANY linked chart highlights everything belonging to that
+// tier across ALL of them, using the instance `highlight()` / `unhighlight()`
+// methods.
+//
+// Two keying schemes share one tier-name vocabulary:
+//   - Most charts (line/area/bar/pie/radar/chord) are keyed by item NAME — the
+//     hovered item's name IS the tier, and `highlight(name)` matches it across
+//     series.
+//   - The network charts are keyed by node CATEGORY — their nodes are named per
+//     cohort segment ("Strategic", "Organic Search", …), and the tier lives on
+//     `node.category`. So they translate hover↔tier via the node category and
+//     highlight every node in a tier by its data indices.
+//
+// Each linked chart registers a `highlightTier(tier)` closure; a hover
+// broadcasts its tier to all of them, and mouse-out clears every highlight.
+const linked: { chart: IChartInstance; highlightTier: (tier: string) => void }[] = [];
+
+function broadcastTier(tier?: string): void {
+  if (!tier) return;
+  for (const l of linked) l.highlightTier(tier);
+}
+function clearTierHighlight(): void {
+  for (const l of linked) l.chart.unhighlight();
+}
+
+// Legend hovers don't land on a data item, so `ctx.data` is undefined — the
+// label arrives on the raw ECharts params as `value` (see the events docs:
+// "fall back to componentType / raw"). For every chart here the legend label
+// IS the tier (series/slice name, or the network category), so hovering a
+// legend entry can drive the same linkage as hovering the data.
+function legendTier(ctx: ChartEventContext): string | undefined {
+  if (ctx.componentType !== 'legend') return undefined;
+  const value = (ctx.raw as { value?: unknown } | undefined)?.value;
+  return typeof value === 'string' ? value : undefined;
+}
+
+// Name-keyed charts: hovered item name = tier; highlight by that name. Legend
+// entries map to the same tier name.
+const tierHoverLink: ChartEventHandlers = {
+  onMouseOver: (ctx) =>
+    broadcastTier(ctx.data?.kind === 'item' ? ctx.data.name : legendTier(ctx)),
+  onMouseOut: clearTierHighlight,
+};
+function linkAndTrack(c: IChartInstance): IChartInstance {
+  linked.push({ chart: c, highlightTier: (tier) => c.highlight(tier) });
+  return track(c);
+}
+
+// Network charts: map each tier to the data indices of its nodes (both network
+// charts share the same node order), so a tier broadcast highlights every node
+// in that category, and a node hover resolves back to its tier by index.
+const networkTierIndices = new Map<string, number[]>();
+tierMovementNetwork.nodes.forEach((n, i) => {
+  const arr = networkTierIndices.get(n.category) ?? [];
+  arr.push(i);
+  networkTierIndices.set(n.category, arr);
+});
+const networkHoverLink: ChartEventHandlers = {
+  onMouseOver: (ctx) => {
+    if (ctx.data?.kind === 'item') {
+      broadcastTier(tierMovementNetwork.nodes[ctx.data.dataIndex]?.category);
+      return;
+    }
+    // The network legend lists the categories, which already ARE tier names.
+    broadcastTier(legendTier(ctx));
+  },
+  onMouseOut: clearTierHighlight,
+};
+function linkNetworkAndTrack(c: IChartInstance): IChartInstance {
+  linked.push({
+    chart: c,
+    highlightTier: (tier) => {
+      const idx = networkTierIndices.get(tier);
+      if (!idx) return;
+      for (const di of idx) c.highlight({ seriesIndex: 0, dataIndex: di });
+    },
+  });
+  return track(c);
+}
+
 let resizeHandler: (() => void) | null = null;
 
 onMounted(() => {
@@ -591,32 +681,40 @@ onMounted(() => {
   });
 
   // ── Main charts (data from `./dashboard-data.ts`) ─────────────────────
-  track(createChart(trendEl.value!, 'line', buildMonthlyTrend(), {
+  linkAndTrack(createChart(trendEl.value!, 'line', buildMonthlyTrend(), {
     colorMap: PIN_COLOR_MAP,
     series: { '*': { smooth: true, lineWidth: 2.5, showPoints: false } },
     legend: { position: 'bottom' },
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
   const shareElData = buildAnnualShare();
   const shareElTotal = shareElData.reduce((sum, item) => sum + item.value, 0);
-  track(createChart(shareEl.value!, 'pie', shareElData, {
+  linkAndTrack(createChart(shareEl.value!, 'pie', shareElData, {
     colorMap: PIN_COLOR_MAP,
     variant: 'doughnut',
     legend: { show: true, position: 'right' },
     centerLabels: [formatNumber(shareElTotal, { compact: true }), 'Total'],
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
-  track(createChart(cumulativeEl.value!, 'area', buildMonthlyTrend(), {
+  linkAndTrack(createChart(cumulativeEl.value!, 'area', buildMonthlyTrend(), {
     colorMap: PIN_COLOR_MAP,
     stacked: true,
     series: { '*': { smooth: true } },
     legend: { position: 'bottom' },
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
-  track(createChart(quarterlyEl.value!, 'bar', buildQuarterly(), {
+  linkAndTrack(createChart(quarterlyEl.value!, 'bar', buildQuarterly(), {
     colorMap: PIN_COLOR_MAP,
     stacked: true,
     legend: { position: 'bottom' },
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
   // Horizontal bar with one series + `colorByCategory: true` colors each
@@ -644,17 +742,20 @@ onMounted(() => {
     legend: { position: 'bottom' },
   }));
 
-  track(createChart(radarEl.value!, 'radar', radarFeatureUsage, {
+  linkAndTrack(createChart(radarEl.value!, 'radar', radarFeatureUsage, {
     colorMap: PIN_COLOR_MAP,
     filled: true,
     legend: { position: 'bottom' },
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
   // ── Sankey: traffic source → trial signup → outcome tier ──────────────
   // Tier nodes use consistentColors; Trial is pinned via PIN_COLOR_MAP.
   // paintGraphNodes inside the sankey adapter.
-  track(createChart(sankeyEl.value!, 'sankey', acquisitionSankey, {
+  linkAndTrack(createChart(sankeyEl.value!, 'sankey', acquisitionSankey, {
     colorMap: PIN_COLOR_MAP,
+    events: tierHoverLink,
   }));
 
   // ── Two stacked percentage gauges in a single card ────────────────────
@@ -666,43 +767,50 @@ onMounted(() => {
   // ── Chord: inter-tier movement (upgrades, downgrades, cross-tier) ─────
   // Same node names as the line/bar/pie charts, so consistentColors keeps
   // every tier on the same color — Trial stays pinned via PIN_COLOR_MAP.
-  track(createChart(chordEl.value!, 'chord', tierMovement, {
+  linkAndTrack(createChart(chordEl.value!, 'chord', tierMovement, {
     colorMap: PIN_COLOR_MAP,
     tooltip: { formatValue: (v) => `${v} customers` },
+    events: tierHoverLink,
   }));
 
   // ── Network: cohort segments per tier (`category`), two layouts ───────
   const networkTooltip = { formatValue: (v: number) => `${v} customers` };
-  track(createChart(networkForceEl.value!, 'network', tierMovementNetwork, {
+  linkNetworkAndTrack(createChart(networkForceEl.value!, 'network', tierMovementNetwork, {
     colorMap: PIN_COLOR_MAP,
     legend: { position: 'bottom' },
     tooltip: networkTooltip,
+    events: networkHoverLink,
   }));
-  track(createChart(networkCircularEl.value!, 'network', tierMovementNetwork, {
+  linkNetworkAndTrack(createChart(networkCircularEl.value!, 'network', tierMovementNetwork, {
     colorMap: PIN_COLOR_MAP,
     variant: 'circular',
     legend: { position: 'right' },
     tooltip: networkTooltip,
+    events: networkHoverLink,
   }));
 
   // ── Pie · nightingale variant — Q4 revenue mix per tier ───────────────
-  track(createChart(nightingaleEl.value!, 'pie', buildQ4Mix(), {
+  linkAndTrack(createChart(nightingaleEl.value!, 'pie', buildQ4Mix(), {
     colorMap: PIN_COLOR_MAP,
     variant: 'nightingale',
     legend: { show: true, position: 'bottom' },
     sliceBorderRadius: 12,
     sliceGap: 2,
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
   // ── Pie · half-doughnut variant — trial signup outcomes ───────────────
   // Mirrors the sankey's second stage so the story stays consistent.
   const halfDoughnutTotal = trialOutcomes.reduce((sum, item) => sum + item.value, 0);
-  track(createChart(halfDoughnutEl.value!, 'pie', [...trialOutcomes], {
+  linkAndTrack(createChart(halfDoughnutEl.value!, 'pie', [...trialOutcomes], {
     colorMap: PIN_COLOR_MAP,
     variant: 'half-doughnut',
     legend: { show: true, position: 'bottom' },
     centerLabels: [`${halfDoughnutTotal.toLocaleString()}`],
     centerLabelOffset: [0, -16],
+    emphasis: { blurOthers: true },
+    events: tierHoverLink,
   }));
 
   // ── Word cloud: emphasis by cohort segment volume ─────────────────────
@@ -786,6 +894,7 @@ onUnmounted(() => {
 
   for (const c of charts) c.dispose();
   charts.length = 0;
+  linked.length = 0;
 
   // Restore the global icharts state so charts on other pages don't inherit
   // the dashboard's consistentColors flag or active theme.

@@ -5,6 +5,7 @@ import {
   type EdgeReserves,
   buildTitle,
   buildLegend,
+  buildEmphasisBlur,
   getLegendReserve,
   getTitleReserve,
   resolveAppendToBody,
@@ -183,6 +184,9 @@ function buildRadarSeries(
       symbolSize: 4,
       lineStyle: { width: 2 },
       ...(filled ? { areaStyle: { opacity: 0.2 } } : {}),
+      // Each radar polygon is a data item in one series → focus 'self' fades
+      // the other polygons when one is hovered / highlighted (opt-in).
+      ...buildEmphasisBlur(options.emphasis, 'self'),
       data: data.series.map((s) => ({ name: s.name, value: s.values })),
     },
   ];
