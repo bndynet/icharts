@@ -1,0 +1,62 @@
+import{d as v,o as g,a as f,c as y,b as t,w as n,e as b,f as o,F as k,r as l}from"./index-B6IDcwPx.js";import{c as r}from"./api-6F-8kEI9.js";import{S as x,D as s,a as C}from"./DemoCard-ClnI8xzw.js";import"./_plugin-vue_export-helper-DlAUqK2U.js";const H=v({__name:"TreemapCharts",setup(D){const i=l(),m=l(),c=l(),d=l(),u=[{name:"src",children:[{name:"components",value:18},{name:"adapters",children:[{name:"line",value:8},{name:"bar",value:7},{name:"pie",value:9},{name:"gauge",value:4},{name:"tree",value:14}]},{name:"themes",value:12},{name:"types",value:10}]},{name:"site",children:[{name:"views",value:24},{name:"components",value:9}]},{name:"docs",value:8},{name:"tests",value:15}],p=[{name:"/Applications",children:[{name:"Xcode.app",value:12400},{name:"Safari.app",value:1200},{name:"Finder.app",value:200}]},{name:"/Users",children:[{name:"Documents",value:4800},{name:"Downloads",value:3100},{name:"Photos",value:9300},{name:"Music",value:2400}]},{name:"/Library",children:[{name:"Caches",value:1900},{name:"Logs",value:320}]},{name:"/System",value:8700}],h=[{name:"Engineering",value:60,color:"#0ea5e9"},{name:"Product",value:25},{name:"Operations",value:15}];return g(()=>{r(i.value.chartEl,"treemap",u,{title:"Repo Size by Folder"}),r(m.value.chartEl,"treemap",p,{title:"Disk Usage",leafDepth:2}),r(c.value.chartEl,"treemap",h,{title:"Headcount",colorMap:{Product:"#10b981",Operations:"#f59e0b"}}),r(d.value.chartEl,"treemap",p,{title:"Disk Usage",tooltip:{formatValue:a=>`${a.toLocaleString()} MB`,customHtml:async a=>a.kind!=="item"?"":`<div style="display:flex;align-items:center;gap:8px">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${a.color??"#888"}"></span>
+          <strong>${a.name}</strong> — ${a.value.toLocaleString()} MB
+        </div>`}})}),(a,e)=>(f(),y(k,null,[t(x,null,{default:n(()=>[...e[0]||(e[0]=[b("Treemap",-1)])]),_:1}),t(C,null,{default:n(()=>[t(s,{ref_key:"defaultCard",ref:i,title:"Default — disk usage",tag:'type="treemap"',"card-style":"grid-column: 1 / -1;","box-style":"height: 520px;"},{code:n(()=>[...e[1]||(e[1]=[o("pre",{class:"code-block"},`// Hierarchical data: each node has a name + value (required on leaves;
+// internal nodes may omit it — ECharts sums children automatically).
+// Click any node to drill into its sub-tree, then use the breadcrumb
+// at the bottom to navigate back.
+createChart(el, 'treemap', [
+  {
+    name: 'src',
+    children: [
+      { name: 'components', value: 18 },
+      { name: 'adapters',   value: 42 },
+      { name: 'themes',     value: 12 },
+    ],
+  },
+  {
+    name: 'site',
+    children: [
+      { name: 'views',      value: 24 },
+      { name: 'components', value: 9  },
+    ],
+  },
+  { name: 'docs',  value: 8 },
+  { name: 'tests', value: 15 },
+], {
+  title: 'Repo Size by Folder',
+});`,-1)])]),_:1},512),t(s,{ref_key:"leafDepthCard",ref:m,title:"Initial collapse (leafDepth)",tag:"leafDepth=2","box-style":"height: 460px;"},{code:n(()=>[...e[2]||(e[2]=[o("pre",{class:"code-block"},`// leafDepth: 2 → only the first two levels render. Drill into a
+// node to expose deeper levels. Useful for very deep hierarchies.
+createChart(el, 'treemap', diskData, {
+  title: 'Disk Usage',
+  leafDepth: 2,
+});`,-1)])]),_:1},512),t(s,{ref_key:"customColorsCard",ref:c,title:"Per-node color + colorMap",tag:"node.color + options.colorMap","box-style":"height: 460px;"},{code:n(()=>[...e[3]||(e[3]=[o("pre",{class:"code-block"},`// Per-node \`color\` pins the rectangle (and its descendants inherit
+// ECharts' tinting from that color). \`colorMap\` keyed by root-level
+// node name works the same way every other chart in the lib does.
+createChart(el, 'treemap', [
+  { name: 'Engineering', value: 60, color: '#0ea5e9' },
+  { name: 'Product',     value: 25 },
+  { name: 'Operations',  value: 15 },
+], {
+  title: 'Headcount',
+  colorMap: {
+    Product:    '#10b981',
+    Operations: '#f59e0b',
+  },
+});`,-1)])]),_:1},512),t(s,{ref_key:"customTooltipCard",ref:d,title:"Custom tooltip — tooltip.customHtml",tag:"customHtml + formatValue","card-style":"grid-column: 1 / -1;","box-style":"height: 460px;"},{code:n(()=>[...e[4]||(e[4]=[o("pre",{class:"code-block"},`// The default sync row is replaced by \`customHtml\`. The \`ctx.kind ===
+// 'item'\` payload carries \`name\`, \`value\`, and the painted \`color\`,
+// so callbacks can render rich HTML without re-implementing tooltip
+// positioning / debounce.
+createChart(el, 'treemap', diskData, {
+  title: 'Disk Usage',
+  tooltip: {
+    formatValue: (v) => \`\${v.toLocaleString()} MB\`,
+    customHtml: async (ctx) => {
+      if (ctx.kind !== 'item') return '';
+      return \`<div style="display:flex;align-items:center;gap:8px">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:\${ctx.color}"></span>
+        <strong>\${ctx.name}</strong> — \${(ctx.value as number).toLocaleString()} MB
+      </div>\`;
+    },
+  },
+});`,-1)])]),_:1},512)]),_:1})],64))}});export{H as default};
