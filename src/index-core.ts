@@ -118,6 +118,8 @@ export {
   type TreeNodeIconSpec,
   type TreemapData,
   type TreemapDataItem,
+  type HeatmapData,
+  type HeatmapCell,
   type WordCloudData,
   type WordCloudDataItem,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
@@ -126,6 +128,7 @@ export {
   type BarChartOptions,
   type AreaChartOptions,
   type MapVisualMapOptions,
+  type HeatmapVisualMapOptions,
   type MapChartOptions,
   type PieChartOptions,
   type GaugeChartOptions,
@@ -136,6 +139,7 @@ export {
   type NetworkChartOptions,
   type TreeChartOptions,
   type TreemapChartOptions,
+  type HeatmapChartOptions,
   type WordCloudChartOptions,
   // Shared option building blocks
   type SeriesOptions,
@@ -177,6 +181,7 @@ export {
   isNetworkData,
   isTreeData,
   isTreemapData,
+  isHeatmapData,
   isWordCloudData,
   isLiquidProgressData,
   isMapData,

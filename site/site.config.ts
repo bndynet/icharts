@@ -71,6 +71,11 @@ export default defineConfig({
           page: () => import('./views/charts/TreemapCharts.vue'),
         },
         {
+          label: 'Heatmap',
+          icon: 'grid-3x3',
+          page: () => import('./views/charts/HeatmapCharts.vue'),
+        },
+        {
           label: 'Word Cloud',
           icon: 'cloud',
           page: () => import('./views/charts/WordCloudCharts.vue'),

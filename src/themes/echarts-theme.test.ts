@@ -193,6 +193,28 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     );
   });
 
+  it('heatmap.label.color follows textPrimary (cell value labels when showCellLabel)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.heatmap.label.color).toBe(COLORS.textPrimary);
+  });
+
+  it('heatmap.label has a `surface`-colored text halo (so cell labels stay readable on palette-colored cells)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.heatmap.label.textBorderColor).toBe(COLORS.surface);
+    expect(theme.heatmap.label.textBorderWidth).toBe(2);
+  });
+
+  it('heatmap.itemStyle.borderColor follows itemDivider when defined', () => {
+    const colors: ChartThemeColors = { ...COLORS, itemDivider: '#abcdef' };
+    const theme = buildEChartsTheme(colors, PALETTE);
+    expect(theme.heatmap.itemStyle.borderColor).toBe('#abcdef');
+  });
+
+  it('heatmap.itemStyle.borderColor falls back to surface when itemDivider is omitted', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.heatmap.itemStyle.borderColor).toBe(COLORS.surface);
+  });
+
   it('custom.label.color follows textPrimary (wordcloud + liquidprogress labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.custom.label.color).toBe(COLORS.textPrimary);
@@ -223,6 +245,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.treemap.upperLabel.color).toBe('#aaaaaa');
     expect(a.treemap.breadcrumb.itemStyle.textStyle.color).toBe('#aaaaaa');
     expect(a.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe('#aaaaaa');
+    expect(a.heatmap.label.color).toBe('#aaaaaa');
     expect(a.custom.label.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
@@ -241,6 +264,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(b.treemap.upperLabel.color).toBe('#bbbbbb');
     expect(b.treemap.breadcrumb.itemStyle.textStyle.color).toBe('#bbbbbb');
     expect(b.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe('#bbbbbb');
+    expect(b.heatmap.label.color).toBe('#bbbbbb');
     expect(b.custom.label.color).toBe('#bbbbbb');
   });
 

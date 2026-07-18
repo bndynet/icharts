@@ -18,6 +18,7 @@ import type { RadarVariant, RadarData, RadarChartOptions } from './radar.js';
 import type { NetworkVariant, NetworkData, NetworkChartOptions } from './network.js';
 import type { TreeData, TreeChartOptions } from './tree.js';
 import type { TreemapData, TreemapChartOptions } from './treemap.js';
+import type { HeatmapData, HeatmapChartOptions } from './heatmap.js';
 import type {
   WordCloudVariant,
   WordCloudData,
@@ -56,6 +57,7 @@ export type ChartData =
   | NetworkData
   | TreeData
   | TreemapData
+  | HeatmapData
   | WordCloudData;
 
 /**
@@ -83,6 +85,7 @@ export type AnyChartOptions =
   | NetworkChartOptions
   | TreeChartOptions
   | TreemapChartOptions
+  | HeatmapChartOptions
   | WordCloudChartOptions;
 
 // ---------------------------------------------------------------------------
@@ -122,6 +125,7 @@ export interface ChartTypeRegistry {
   network: { data: NetworkData; options: NetworkChartOptions };
   tree: { data: TreeData; options: TreeChartOptions };
   treemap: { data: TreemapData; options: TreemapChartOptions };
+  heatmap: { data: HeatmapData; options: HeatmapChartOptions };
   wordcloud: { data: WordCloudData; options: WordCloudChartOptions };
 }
 

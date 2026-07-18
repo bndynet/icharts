@@ -66,6 +66,20 @@ export function buildQ4Mix() {
   return tiers.map((t) => ({ name: t, value: quarterSum(monthly[t])[3]! }));
 }
 
+/**
+ * Revenue intensity grid — one cell per (tier × month), colored by the
+ * tier's monthly revenue via the heatmap's visualMap.
+ */
+export function buildRevenueHeatmap() {
+  return {
+    xCategories: [...months],
+    yCategories: [...tiers],
+    data: tiers.flatMap((t, yi) =>
+      months.map((_, xi) => ({ x: xi, y: yi, value: monthly[t][xi]! })),
+    ),
+  };
+}
+
 // ── KPI cards ──────────────────────────────────────────────────────────────
 
 const totalARR = tiers.reduce((s, t) => s + yearTotal(monthly[t]), 0);

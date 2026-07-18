@@ -242,6 +242,19 @@
       </el-card>
     </div>
 
+    <!-- ── Section: revenue heatmap · full width ──────────────────────── -->
+    <div class="dash-row dash-row-full">
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-head">
+            <span>Monthly revenue heatmap · tier × month</span>
+            <el-tag type="info" size="small" effect="plain">heatmap</el-tag>
+          </div>
+        </template>
+        <div ref="heatmapEl" class="chart-box-lg"></div>
+      </el-card>
+    </div>
+
     <!-- ── Section: revenue mix · three circular views ────────────────── -->
     <div class="dash-row dash-row-three">
       <el-card shadow="hover">
@@ -313,6 +326,7 @@ import {
   buildAnnualShare,
   buildQ4Ranking,
   buildQ4Mix,
+  buildRevenueHeatmap,
   type DashboardKpi,
 } from './dashboard-data.js';
 
@@ -542,6 +556,7 @@ const networkForceEl     = ref<HTMLElement>();
 const networkCircularEl  = ref<HTMLElement>();
 const radarEl            = ref<HTMLElement>();
 const mixedEl        = ref<HTMLElement>();
+const heatmapEl      = ref<HTMLElement>();
 const nightingaleEl  = ref<HTMLElement>();
 const halfDoughnutEl = ref<HTMLElement>();
 const wordCloudEl    = ref<HTMLElement>();
@@ -741,6 +756,11 @@ onMounted(() => {
     },
     legend: { position: 'bottom' },
   }));
+
+  // ── Heatmap: revenue intensity per tier × month ──────────────────────
+  // Cells are (tier × month) intersections, not tier-keyed items, so this
+  // card is standalone — it doesn't join the cross-chart hover linkage.
+  track(createChart(heatmapEl.value!, 'heatmap', buildRevenueHeatmap(), {}));
 
   linkAndTrack(createChart(radarEl.value!, 'radar', radarFeatureUsage, {
     colorMap: PIN_COLOR_MAP,

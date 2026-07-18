@@ -350,6 +350,24 @@ export function buildEChartsTheme(
         },
       },
     },
+    heatmap: {
+      // Cell value labels (when `showCellLabel` is on) render ON TOP of
+      // the palette-colored cells, so — like treemap / sankey — they need
+      // the shared "outlined label" halo to stay legible on any mid-tone
+      // fill. The adapter emits only structural `label` fields (show /
+      // position / formatter / fontSize); the color lives here so a
+      // `setTheme()` repaints the grid.
+      label: {
+        color:    colors.textPrimary,
+        fontSize: DEFAULT_LABEL_FONT_SIZE,
+        ...paletteLabelHalo(colors),
+      },
+      // 1 px stroke between adjacent cells. Same `itemDivider` token as
+      // pie / treemap (with `surface` fallback) so one knob drives the
+      // cell-divider look. The adapter emits only `borderWidth`; the
+      // border color lives here so `setTheme()` repaints the grid.
+      itemStyle: { borderColor: colors.itemDivider ?? colors.surface },
+    },
     custom: {
       // Wordcloud and liquidprogress are implemented via ECharts custom
       // series (`renderItem: 'wordCloud'` / `'liquidFill'`). Keep

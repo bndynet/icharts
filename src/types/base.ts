@@ -23,6 +23,7 @@ export enum ChartType {
   Network = 'network',
   Tree = 'tree',
   Treemap = 'treemap',
+  Heatmap = 'heatmap',
   WordCloud = 'wordcloud',
 }
 
