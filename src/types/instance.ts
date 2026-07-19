@@ -20,6 +20,10 @@ import type { TreeData, TreeChartOptions } from './tree.js';
 import type { TreemapData, TreemapChartOptions } from './treemap.js';
 import type { HeatmapData, HeatmapChartOptions } from './heatmap.js';
 import type {
+  CalendarHeatmapData,
+  CalendarHeatmapChartOptions,
+} from './calendar-heatmap.js';
+import type {
   WordCloudVariant,
   WordCloudData,
   WordCloudChartOptions,
@@ -58,6 +62,7 @@ export type ChartData =
   | TreeData
   | TreemapData
   | HeatmapData
+  | CalendarHeatmapData
   | WordCloudData;
 
 /**
@@ -86,6 +91,7 @@ export type AnyChartOptions =
   | TreeChartOptions
   | TreemapChartOptions
   | HeatmapChartOptions
+  | CalendarHeatmapChartOptions
   | WordCloudChartOptions;
 
 // ---------------------------------------------------------------------------
@@ -126,6 +132,7 @@ export interface ChartTypeRegistry {
   tree: { data: TreeData; options: TreeChartOptions };
   treemap: { data: TreemapData; options: TreemapChartOptions };
   heatmap: { data: HeatmapData; options: HeatmapChartOptions };
+  calendarheatmap: { data: CalendarHeatmapData; options: CalendarHeatmapChartOptions };
   wordcloud: { data: WordCloudData; options: WordCloudChartOptions };
 }
 

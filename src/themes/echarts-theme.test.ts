@@ -215,6 +215,42 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(theme.heatmap.itemStyle.borderColor).toBe(COLORS.surface);
   });
 
+  it('calendar.dayLabel.color follows textSecondary (weekday labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.calendar.dayLabel.color).toBe(COLORS.textSecondary);
+  });
+
+  it('calendar.monthLabel.color follows textSecondary (month labels)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.calendar.monthLabel.color).toBe(COLORS.textSecondary);
+  });
+
+  it('calendar.yearLabel.color follows textPrimary (year label)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.calendar.yearLabel.color).toBe(COLORS.textPrimary);
+  });
+
+  it('calendar.itemStyle.color follows surface (missing-day cell fill)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.calendar.itemStyle.color).toBe(COLORS.surface);
+  });
+
+  it('calendar.itemStyle.borderColor follows itemDivider when defined', () => {
+    const colors: ChartThemeColors = { ...COLORS, itemDivider: '#abcdef' };
+    const theme = buildEChartsTheme(colors, PALETTE);
+    expect(theme.calendar.itemStyle.borderColor).toBe('#abcdef');
+  });
+
+  it('calendar.itemStyle.borderColor falls back to surface when itemDivider is omitted', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.calendar.itemStyle.borderColor).toBe(COLORS.surface);
+  });
+
+  it('calendar.splitLine.lineStyle.color follows gridLine (month separators)', () => {
+    const theme = buildEChartsTheme(COLORS, PALETTE);
+    expect(theme.calendar.splitLine.lineStyle.color).toBe(COLORS.gridLine);
+  });
+
   it('custom.label.color follows textPrimary (wordcloud + liquidprogress labels)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.custom.label.color).toBe(COLORS.textPrimary);
@@ -246,6 +282,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(a.treemap.breadcrumb.itemStyle.textStyle.color).toBe('#aaaaaa');
     expect(a.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe('#aaaaaa');
     expect(a.heatmap.label.color).toBe('#aaaaaa');
+    expect(a.calendar.yearLabel.color).toBe('#aaaaaa');
     expect(a.custom.label.color).toBe('#aaaaaa');
     expect(b.bar.label.color).toBe('#bbbbbb');
     expect(b.line.label.color).toBe('#bbbbbb');
@@ -265,6 +302,7 @@ describe('buildEChartsTheme — data-label colors are themed', () => {
     expect(b.treemap.breadcrumb.itemStyle.textStyle.color).toBe('#bbbbbb');
     expect(b.treemap.breadcrumb.emphasis.itemStyle.textStyle.color).toBe('#bbbbbb');
     expect(b.heatmap.label.color).toBe('#bbbbbb');
+    expect(b.calendar.yearLabel.color).toBe('#bbbbbb');
     expect(b.custom.label.color).toBe('#bbbbbb');
   });
 

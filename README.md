@@ -257,6 +257,7 @@ The SSR-safe entry deliberately does NOT auto-register the
 | Tree   | `tree`   | `default` (use `direction` for layout orientation) |
 | Treemap | `treemap` | `default` |
 | Heatmap | `heatmap` | `default` |
+| Calendar Heatmap | `calendarheatmap` | `default` |
 | Word Cloud | `wordcloud` | `default`, `diamond`, `poster` |
 
 ### Map resources (`type: 'map'`)
@@ -302,6 +303,7 @@ Each chart type expects a specific data shape. Full schemas, field notes, and ch
 | Tree | `TreeData` | [docs/chart-tree.md](docs/chart-tree.md) |
 | Treemap | `TreemapData` | [docs/chart-treemap.md](docs/chart-treemap.md) |
 | Heatmap | `HeatmapData` | [docs/chart-heatmap.md](docs/chart-heatmap.md) |
+| Calendar Heatmap | `CalendarHeatmapData` | [docs/chart-calendar-heatmap.md](docs/chart-calendar-heatmap.md) |
 
 **Shared options** (theme, title, colors, tooltip, …): [docs/chart-options-common.md](docs/chart-options-common.md).
 
@@ -329,6 +331,7 @@ All options fields are optional. Each chart type extends the base `ChartOptions`
 | `tree` | `TreeChartOptions` | `ChartOptions` | [docs/chart-tree.md](docs/chart-tree.md) |
 | `treemap` | `TreemapChartOptions` | `ChartOptions` | [docs/chart-treemap.md](docs/chart-treemap.md) |
 | `heatmap` | `HeatmapChartOptions` | `ChartOptions` | [docs/chart-heatmap.md](docs/chart-heatmap.md) |
+| `calendarheatmap` | `CalendarHeatmapChartOptions` | `ChartOptions` | [docs/chart-calendar-heatmap.md](docs/chart-calendar-heatmap.md) |
 | `wordcloud` | `WordCloudChartOptions` | `ChartOptions` | [docs/chart-wordcloud.md](docs/chart-wordcloud.md) |
 
 `createChart` accepts `AnyChartOptions` — a chart-specific literal type-checks without importing the subtype. For stricter validation, import the matching `XxxChartOptions` and annotate explicitly.

@@ -5,8 +5,7 @@ import type {
   TooltipContextItem,
 } from '../types.js';
 import type { RenderContext } from './index.js';
-import { deepMerge, resolveColors, hexToRgb } from '../utils.js';
-import { getThemeColors } from '../themes/index.js';
+import { deepMerge, resolveColors } from '../utils.js';
 import {
   buildTitle,
   buildGrid,
@@ -15,8 +14,7 @@ import {
   resolveAppendToBody,
   resolveTooltipPosition,
   applyAxisLabel,
-  parseRgbTuple,
-  blendRgb,
+  buildVisualMap,
 } from './common/index.js';
 
 /** Extra grid inset (px) reserved for the vertical visualMap bar + labels. */
@@ -43,113 +41,6 @@ function resolveCategoryIndex(
     }
   }
   return categories.indexOf(value);
-}
-
-/**
- * Build a heatmap visualMap from data + options. Mirrors the map adapter's
- * ramp builder: base color via `resolveColors`, low stop blended over the
- * theme `surface` at 20%, high stop the base color itself. Returns
- * `undefined` when the consumer disabled it (or there are no numeric values
- * and no explicit config), in which case the series falls back to a single
- * palette color.
- */
-function resolveHeatmapVisualMap(
-  data: HeatmapData,
-  options: HeatmapChartOptions,
-  baseColor: string,
-): Record<string, unknown> | undefined {
-  const cfg = options.visualMap;
-  if (cfg?.show === false) return undefined;
-
-  const numericValues = data.data
-    .map((c) => c.value)
-    .filter((v): v is number => Number.isFinite(v));
-  if (!cfg && numericValues.length === 0) return undefined;
-
-  const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
-  const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
-
-  const surface = getThemeColors()?.surface ?? '#ffffff';
-  const baseRgb = parseRgbTuple(baseColor);
-  const surfaceRgb = parseRgbTuple(surface);
-  const lowColor =
-    baseRgb && surfaceRgb
-      ? (() => {
-          const [r, g, b] = blendRgb(baseRgb, surfaceRgb, 0.2);
-          return `rgb(${r}, ${g}, ${b})`;
-        })()
-      : `rgba(${hexToRgb(baseColor)}, 0.2)`;
-  const highColor = baseRgb
-    ? `rgb(${baseRgb[0]}, ${baseRgb[1]}, ${baseRgb[2]})`
-    : baseColor;
-  const inRangeColors = cfg?.inRangeColors ?? [lowColor, highColor];
-
-  const resolvedMin = cfg?.min ?? minValue;
-  const resolvedMax = cfg?.max ?? maxValue;
-  const orient = cfg?.orient ?? 'vertical';
-
-  const out: Record<string, unknown> = {
-    show: cfg?.show ?? true,
-    min: resolvedMin,
-    max: resolvedMax,
-    orient,
-    textStyle: { fontSize: 10 },
-  };
-
-  if (orient === 'horizontal') {
-    out.left = cfg?.left ?? 'center';
-    out.bottom = cfg?.bottom ?? 8;
-    // ECharts renders a horizontal visualMap by rotating the bar group 90°,
-    // so `itemWidth` is the bar THICKNESS (screen height) and `itemHeight`
-    // is the bar LENGTH (screen width) — the opposite of the vertical case.
-    out.itemWidth = 12;
-    out.itemHeight = cfg?.width ?? 120;
-  } else {
-    out.left = cfg?.left ?? 'right';
-    out.bottom = cfg?.bottom ?? 12;
-    out.itemWidth = cfg?.width ?? 10;
-    out.itemHeight = 90;
-  }
-  if (cfg?.right !== undefined) {
-    delete out.left;
-    out.right = cfg.right;
-  }
-  if (cfg?.top !== undefined) {
-    delete out.bottom;
-    out.top = cfg.top;
-  }
-
-  if (!cfg?.pieces) {
-    out.inRange = { color: inRangeColors };
-  }
-  if (cfg?.formatter !== undefined) out.formatter = cfg.formatter;
-  if (cfg?.precision !== undefined) out.precision = cfg.precision;
-  if (cfg?.pieces !== undefined) out.pieces = cfg.pieces;
-
-  // Surface scale labels at both ends of the gradient bar (ECharts does not
-  // always show them reliably without an explicit `text`). User-supplied
-  // `cfg.text` wins; `pieces` mode uses its own labels.
-  if (!cfg?.pieces) {
-    if (cfg?.text !== undefined) {
-      out.text = cfg.text;
-    } else if (orient === 'vertical') {
-      // End labels render cleanly on the vertical bar (max at top, min at
-      // bottom). On the horizontal bar ECharts' 90°-rotated label layout
-      // pushes one label far past the bar end, so we omit them there — the
-      // gradient bar reads clearly on its own and the tooltip shows values.
-      const precision = cfg?.precision;
-      const formatEnd = (n: number): string => {
-        if (precision !== undefined) return n.toFixed(precision);
-        return Number.isInteger(n) ? String(n) : n.toFixed(1);
-      };
-      // ECharts convention: `text[0]` is the HIGH value and `text[1]` the
-      // LOW value — for vertical that renders max at the top / min at the
-      // bottom (matching the map adapter).
-      out.text = [formatEnd(resolvedMax), formatEnd(resolvedMin)];
-    }
-  }
-
-  return out;
 }
 
 /**
@@ -271,7 +162,12 @@ export function resolveHeatmapOptions(
     return [xi, yi, cell.value] as [number, number, number];
   });
 
-  const visualMap = resolveHeatmapVisualMap(data, options, baseColor);
+  const visualMap = buildVisualMap(
+    data.data.map((c) => c.value),
+    options.visualMap,
+    baseColor,
+    'vertical',
+  );
 
   const tooltip: Record<string, unknown> = {
     trigger: 'item',

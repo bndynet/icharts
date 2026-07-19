@@ -5,6 +5,7 @@ export * from './layout.js';
 export * from './stacked-text.js';
 export * from './axis.js';
 export * from './color-ramp.js';
+export * from './visual-map.js';
 export * from './tooltip.js';
 export * from './rich-text.js';
 export * from './shared.js';

@@ -24,6 +24,7 @@ export enum ChartType {
   Tree = 'tree',
   Treemap = 'treemap',
   Heatmap = 'heatmap',
+  CalendarHeatmap = 'calendarheatmap',
   WordCloud = 'wordcloud',
 }
 

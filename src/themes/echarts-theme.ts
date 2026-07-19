@@ -368,6 +368,23 @@ export function buildEChartsTheme(
       // border color lives here so `setTheme()` repaints the grid.
       itemStyle: { borderColor: colors.itemDivider ?? colors.surface },
     },
+    calendar: {
+      // Weekday / month / year labels render on the canvas (like axis
+      // labels), so they follow the same tokens as every other chart text.
+      // The adapter (`calendar-heatmap.ts`) emits only structural fields.
+      dayLabel:   { color: colors.textSecondary },
+      monthLabel: { color: colors.textSecondary },
+      yearLabel:  { color: colors.textPrimary },
+      // Missing-day cell fill + the grid divider stroke. `itemDivider`
+      // keeps the day-cell gap consistent with pie / treemap / heatmap;
+      // the `surface` fill keeps empty days subtle on both light and dark.
+      itemStyle: {
+        color:       colors.surface,
+        borderColor: colors.itemDivider ?? colors.surface,
+      },
+      // Month/quarter separators reuse the structural grid-line token.
+      splitLine: { lineStyle: { color: colors.gridLine } },
+    },
     custom: {
       // Wordcloud and liquidprogress are implemented via ECharts custom
       // series (`renderItem: 'wordCloud'` / `'liquidFill'`). Keep

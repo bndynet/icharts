@@ -76,6 +76,11 @@ export default defineConfig({
           page: () => import('./views/charts/HeatmapCharts.vue'),
         },
         {
+          label: 'Calendar Heatmap',
+          icon: 'calendar',
+          page: () => import('./views/charts/CalendarHeatmapCharts.vue'),
+        },
+        {
           label: 'Word Cloud',
           icon: 'cloud',
           page: () => import('./views/charts/WordCloudCharts.vue'),

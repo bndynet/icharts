@@ -120,6 +120,8 @@ export {
   type TreemapDataItem,
   type HeatmapData,
   type HeatmapCell,
+  type CalendarHeatmapData,
+  type CalendarHeatmapCell,
   type WordCloudData,
   type WordCloudDataItem,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
@@ -140,6 +142,7 @@ export {
   type TreeChartOptions,
   type TreemapChartOptions,
   type HeatmapChartOptions,
+  type CalendarHeatmapChartOptions,
   type WordCloudChartOptions,
   // Shared option building blocks
   type SeriesOptions,
@@ -182,6 +185,7 @@ export {
   isTreeData,
   isTreemapData,
   isHeatmapData,
+  isCalendarHeatmapData,
   isWordCloudData,
   isLiquidProgressData,
   isMapData,
