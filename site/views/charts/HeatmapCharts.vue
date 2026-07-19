@@ -35,6 +35,7 @@ createChart(el, 'heatmap', {
       ref="labelsCard"
       title="Cell labels + horizontal scale"
       tag="showCellLabel + visualMap.orient"
+      card-style="grid-column: 1 / -1;"
       box-style="height: 440px;"
     >
       <template #code>
