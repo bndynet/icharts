@@ -167,6 +167,17 @@ export interface AxisOptions {
   show?: boolean;
   name?: string;
   /**
+   * Rotation angle (degrees) applied to every tick label on this axis.
+   *
+   * Long category names overlap horizontally on dense category axes; set
+   * e.g. `rotate: 45` (or `-45`) to angle the labels and keep them readable.
+   * The grid already renders with `containLabel: true`, so ECharts reserves
+   * space for the rotated labels automatically. Purely structural — label
+   * color stays theme-owned. Maps to ECharts `axisLabel.rotate` and composes
+   * with `formatLabel` / `dateFormat`.
+   */
+  rotate?: number;
+  /**
    * Customize the text rendered for each axis tick label.
    *
    * Receives the **tick value** (category name for `type: 'category'`, raw

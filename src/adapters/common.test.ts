@@ -641,6 +641,64 @@ describe('applyAxisLabel + axis formatLabel rich-text', () => {
   });
 });
 
+describe('AxisOptions.rotate — axisLabel.rotate passthrough', () => {
+  it('wires rotate onto a category x-axis label block', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1', 'Q2', 'Q3'], series: [] },
+      { xAxis: { rotate: 45 } },
+      false,
+    )[0];
+    expect((axis.axisLabel as Record<string, unknown>).rotate).toBe(45);
+  });
+
+  it('wires rotate onto a value y-axis label block', () => {
+    const axis = buildYAxis({ yAxis: { rotate: -45 } }, 1)[0];
+    expect((axis.axisLabel as Record<string, unknown>).rotate).toBe(-45);
+  });
+
+  it('composes rotate with formatLabel instead of clobbering the formatter', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1', 'Q2'], series: [] },
+      { xAxis: { rotate: 30, formatLabel: (v) => `★ ${v}` } },
+      false,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+    expect(axisLabel.rotate).toBe(30);
+    expect(f('Q1', 0)).toBe('★ Q1');
+  });
+
+  it('composes rotate with time-axis dateFormat', () => {
+    const axis = buildXAxis(
+      { categories: [], series: [] },
+      { xAxis: { rotate: 60, dateFormat: 'YYYY' } },
+      true,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    expect(axisLabel.rotate).toBe(60);
+    expect(typeof axisLabel.formatter).toBe('function');
+  });
+
+  it('omits axisLabel when rotate is unset (unchanged behavior)', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1'], series: [] },
+      {},
+      false,
+    )[0];
+    expect(axis.axisLabel).toBeUndefined();
+  });
+
+  it('applyAxisLabel: rotate reaches hand-authored bar-race-style yAxis literals', () => {
+    const axis: Record<string, unknown> = {
+      type: 'category',
+      data: ['China', 'India', 'USA'],
+      inverse: true,
+    };
+    applyAxisLabel(axis, { rotate: -30 }, false, ['China', 'India', 'USA'], 'yaxis_race');
+    expect((axis.axisLabel as Record<string, unknown>).rotate).toBe(-30);
+  });
+});
+
 describe('buildLegend + buildGrid: title vs top-legend stacking', () => {
   // Regression for "legend at `position: 'top'` overlaps the title": the
   // title widget anchors at `top: chartPadding` and used to share that

@@ -50,6 +50,15 @@
       </template>
     </DemoCard>
 
+    <DemoCard ref="rotatedLabelCard" title="Rotated Axis Labels" tag="xAxis.rotate">
+      <template #code>
+        <pre v-pre class="code-block">createChart(el, 'bar', {
+  categories: ['North America', 'South America', 'Europe', 'Africa', 'Asia', 'Oceania'],
+  series: [{ name: 'Revenue', data: [920, 410, 720, 230, 840, 160] }],
+}, { title: 'Revenue by Continent', xAxis: { rotate: 45 } });</pre>
+      </template>
+    </DemoCard>
+
   </DemoGrid>
 </template>
 
@@ -66,6 +75,7 @@ const barCard = ref<CardRef>();
 const stackedBarCard = ref<CardRef>();
 const hbarCard = ref<CardRef>();
 const colorByCategoryCard = ref<CardRef>();
+const rotatedLabelCard = ref<CardRef>();
 
 const barData = {
   categories: ['Q1', 'Q2', 'Q3', 'Q4'],
@@ -103,6 +113,15 @@ onMounted(() => {
         Edge: '#0078D7',
       },
     },
+  );
+  createChart(
+    rotatedLabelCard.value!.chartEl!,
+    'bar',
+    {
+      categories: ['North America', 'South America', 'Europe', 'Africa', 'Asia', 'Oceania'],
+      series: [{ name: 'Revenue', data: [920, 410, 720, 230, 840, 160] }],
+    },
+    { title: 'Revenue by Continent', xAxis: { rotate: 45 } },
   );
 });
 </script>

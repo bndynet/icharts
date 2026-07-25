@@ -152,6 +152,11 @@ export function applyAxisLabel(
 ): void {
   const existing = (axis.axisLabel as Record<string, unknown> | undefined) ?? {};
 
+  // Collect the formatter config that the formatLabel / dateFormat branches
+  // produce, so structural label knobs (rotate) can be merged in one place at
+  // the end instead of being duplicated across early-returning branches.
+  let formatterConfig: Record<string, unknown> | undefined;
+
   if (userAxis.formatLabel) {
     const fn = userAxis.formatLabel;
     if (categoryValues !== undefined) {
@@ -169,8 +174,7 @@ export function applyAxisLabel(
       });
       const richBlock =
         Object.keys(rich).length > 0 ? { rich } : undefined;
-      axis.axisLabel = {
-        ...existing,
+      formatterConfig = {
         formatter: (value: string | number, idx: number): string => {
           const i = valueIndex.get(String(value));
           if (i !== undefined) return compiled[i].text;
@@ -178,23 +182,29 @@ export function applyAxisLabel(
         },
         ...(richBlock ?? {}),
       };
-      return;
+    } else {
+      formatterConfig = {
+        formatter: (value: string | number, idx: number): string =>
+          safeFormatAxisLabel(fn, value, idx, `${keyPrefix}_v`).plainText,
+      };
     }
-    axis.axisLabel = {
-      ...existing,
-      formatter: (value: string | number, idx: number): string =>
-        safeFormatAxisLabel(fn, value, idx, `${keyPrefix}_v`).plainText,
-    };
-    return;
-  }
-
-  if (isTimeAxis && userAxis.dateFormat) {
+  } else if (isTimeAxis && userAxis.dateFormat) {
     const fmt = userAxis.dateFormat;
-    axis.axisLabel = {
-      ...existing,
+    formatterConfig = {
       formatter: (value: number): string =>
         formatDateByPattern(new Date(value), fmt),
     };
+  }
+
+  // Structural label knobs (rotate today; future labelInterval / hideOverlap
+  // belong here too). They must survive even when no formatter branch ran — a
+  // plain category axis with `rotate: 45` still needs its own `axisLabel`
+  // block. Merged after the formatter so the two never clobber each other.
+  const structural: Record<string, unknown> = {};
+  if (userAxis.rotate !== undefined) structural.rotate = userAxis.rotate;
+
+  if (formatterConfig !== undefined || Object.keys(structural).length > 0) {
+    axis.axisLabel = { ...existing, ...formatterConfig, ...structural };
   }
 }
 
