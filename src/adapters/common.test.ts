@@ -699,6 +699,44 @@ describe('AxisOptions.rotate — axisLabel.rotate passthrough', () => {
   });
 });
 
+describe('AxisOptions.labelInterval — axisLabel.interval passthrough', () => {
+  it('wires labelInterval onto the axisLabel block (0 is preserved)', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1', 'Q2', 'Q3'], series: [] },
+      { xAxis: { labelInterval: 0 } },
+      false,
+    )[0];
+    expect((axis.axisLabel as Record<string, unknown>).interval).toBe(0);
+  });
+
+  it('passes through a numeric interval', () => {
+    const axis = buildXAxis(
+      { categories: Array.from({ length: 10 }, (_, i) => `C${i}`), series: [] },
+      { xAxis: { labelInterval: 2 } },
+      false,
+    )[0];
+    expect((axis.axisLabel as Record<string, unknown>).interval).toBe(2);
+  });
+
+  it("passes through 'auto'", () => {
+    const axis = buildYAxis({ yAxis: { labelInterval: 'auto' } }, 1)[0];
+    expect((axis.axisLabel as Record<string, unknown>).interval).toBe('auto');
+  });
+
+  it('composes with rotate + formatLabel', () => {
+    const axis = buildXAxis(
+      { categories: ['Q1', 'Q2'], series: [] },
+      { xAxis: { rotate: 45, labelInterval: 0, formatLabel: (v) => `★ ${v}` } },
+      false,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+    expect(axisLabel.rotate).toBe(45);
+    expect(axisLabel.interval).toBe(0);
+    expect(f('Q1', 0)).toBe('★ Q1');
+  });
+});
+
 describe('buildLegend + buildGrid: title vs top-legend stacking', () => {
   // Regression for "legend at `position: 'top'` overlaps the title": the
   // title widget anchors at `top: chartPadding` and used to share that

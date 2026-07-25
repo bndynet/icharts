@@ -178,6 +178,17 @@ export interface AxisOptions {
    */
   rotate?: number;
   /**
+   * Display interval for tick labels — maps to ECharts `axisLabel.interval`.
+   *
+   * - `'auto'` (default): hide labels that would overlap each other.
+   * - `0`: force every tick label to render (dense category axes).
+   * - `number`: show one label every `N + 1` ticks (ECharts semantics).
+   *
+   * Category-axis only, like ECharts' own `interval`. Purely structural —
+   * composes with `formatLabel` / `dateFormat` / `rotate`.
+   */
+  labelInterval?: number | 'auto';
+  /**
    * Customize the text rendered for each axis tick label.
    *
    * Receives the **tick value** (category name for `type: 'category'`, raw

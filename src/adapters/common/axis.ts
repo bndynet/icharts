@@ -196,12 +196,13 @@ export function applyAxisLabel(
     };
   }
 
-  // Structural label knobs (rotate today; future labelInterval / hideOverlap
-  // belong here too). They must survive even when no formatter branch ran — a
-  // plain category axis with `rotate: 45` still needs its own `axisLabel`
+  // Structural label knobs (rotate / labelInterval; future hideOverlap
+  // belongs here too). They must survive even when no formatter branch ran —
+  // a plain category axis with `rotate: 45` still needs its own `axisLabel`
   // block. Merged after the formatter so the two never clobber each other.
   const structural: Record<string, unknown> = {};
   if (userAxis.rotate !== undefined) structural.rotate = userAxis.rotate;
+  if (userAxis.labelInterval !== undefined) structural.interval = userAxis.labelInterval;
 
   if (formatterConfig !== undefined || Object.keys(structural).length > 0) {
     axis.axisLabel = { ...existing, ...formatterConfig, ...structural };

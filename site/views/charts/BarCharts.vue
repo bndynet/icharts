@@ -59,6 +59,18 @@
       </template>
     </DemoCard>
 
+    <DemoCard ref="labelIntervalCard" title="Show Every Label" tag="xAxis.labelInterval">
+      <template #code>
+        <pre v-pre class="code-block">createChart(el, 'bar', {
+  categories: ['00:00','01:00', ... '23:00'],
+  series: [{ name: 'Requests', data: [120, 90, ...] }],
+}, {
+  title: 'Hourly Requests',
+  xAxis: { labelInterval: 0, rotate: 45 },
+});</pre>
+      </template>
+    </DemoCard>
+
   </DemoGrid>
 </template>
 
@@ -76,6 +88,7 @@ const stackedBarCard = ref<CardRef>();
 const hbarCard = ref<CardRef>();
 const colorByCategoryCard = ref<CardRef>();
 const rotatedLabelCard = ref<CardRef>();
+const labelIntervalCard = ref<CardRef>();
 
 const barData = {
   categories: ['Q1', 'Q2', 'Q3', 'Q4'],
@@ -88,6 +101,16 @@ const barData = {
 const hbarData = {
   categories: ['Chrome', 'Firefox', 'Safari', 'Edge', 'Opera'],
   series: [{ name: 'Share %', data: [65, 15, 12, 5, 3] }],
+};
+
+const hourlyData = {
+  categories: Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`),
+  series: [
+    {
+      name: 'Requests',
+      data: [120, 90, 60, 45, 30, 25, 40, 70, 110, 150, 180, 200, 190, 170, 160, 175, 210, 230, 220, 190, 150, 130, 140, 135],
+    },
+  ],
 };
 
 // Auto-disposed on unmount via the sentinel installed inside each chart's
@@ -122,6 +145,12 @@ onMounted(() => {
       series: [{ name: 'Revenue', data: [920, 410, 720, 230, 840, 160] }],
     },
     { title: 'Revenue by Continent', xAxis: { rotate: 45 } },
+  );
+  createChart(
+    labelIntervalCard.value!.chartEl!,
+    'bar',
+    hourlyData,
+    { title: 'Hourly Requests', xAxis: { labelInterval: 0, rotate: 45 } },
   );
 });
 </script>
