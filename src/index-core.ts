@@ -216,3 +216,10 @@ export {
   resetColorMap,
   type ChartThemeConfig,
 } from './themes/index.js';
+
+// Auto-sync theme from a DOM element attribute (e.g. `<html data-theme="dark">`).
+// Browser-only: degrades to a no-op in SSR / non-DOM environments.
+export {
+  syncThemeWithElementAttribute,
+  type SyncThemeWithElementAttributeOptions,
+} from './auto-theme.js';
