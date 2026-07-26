@@ -160,7 +160,21 @@ export interface GridOptions {
   left?: number;
 }
 
+export type AxisType = 'category' | 'time' | 'value';
+
 export interface AxisOptions {
+  /**
+   * Axis coordinate type. When set on an XY x-axis this takes precedence over
+   * time-category auto-detection. The heatmap adapter continues to use
+   * category axes regardless of this shared field.
+   */
+  type?: AxisType;
+  /**
+   * Whether an automatically calculated value/time axis should include zero.
+   * Omit to preserve the underlying ECharts default. Ignored by category
+   * axes; explicit min/max bounds take precedence.
+   */
+  includeZero?: boolean;
   /**
    * Whether to render this axis. Default: true.
    */
@@ -256,6 +270,12 @@ export interface SeriesOptions {
   showLabel?: boolean;
   labelPosition?: 'inside' | 'outside' | 'center';
   showPoints?: boolean;
+  /** Number of data items rendered in each progressive series chunk. */
+  progressive?: number | false;
+  /** Minimum series size before progressive rendering is considered. */
+  progressiveThreshold?: number;
+  /** ECharts progressive chunking mode. */
+  progressiveChunkMode?: 'mod';
   yAxisIndex?: number;
   markLines?: ('average' | 'max' | 'min')[];
   markPoints?: ('max' | 'min')[];
@@ -284,6 +304,11 @@ export interface TooltipContextAxis {
   series: Array<{
     name: string;
     value: number | string;
+    /**
+     * Original ECharts value. For a value-axis XY point this is `[x, y]`;
+     * for category/time data it is normally the y scalar.
+     */
+    rawValue?: number | string | [string | number, string | number];
     marker?: string;
     /**
      * Resolved hex/rgb color of this series at the current axis position —

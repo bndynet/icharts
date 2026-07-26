@@ -45,6 +45,37 @@ describe('bar adapter', () => {
       expect(result.notMerge).toBeUndefined();
     });
 
+    it('supports an explicit numeric x-axis with paired bar data', () => {
+      const data: XYData = {
+        categories: [0, 1, 2],
+        series: [{ name: 'Signal', data: [2, 4, 3] }],
+      };
+      const { option } = resolveBarOptions(data, {
+        xAxis: { type: 'value', includeZero: false },
+      });
+      const axis = (option.xAxis as Record<string, unknown>[])[0];
+      const series = (option.series as Record<string, unknown>[])[0];
+      const bars = series.data as Array<{ value: [number, number] }>;
+      expect(axis.type).toBe('value');
+      expect(axis.boundaryGap).toBe(false);
+      expect(axis.scale).toBe(true);
+      expect(bars.map((bar) => bar.value)).toEqual([[0, 2], [1, 4], [2, 3]]);
+    });
+
+    it('auto-applies performance defaults for a large numeric x-axis payload', () => {
+      const pointCount = 100_001;
+      const data: XYData = {
+        categories: Array.from({ length: pointCount }, (_, i) => i),
+        series: [{ name: 'Signal', data: Array.from({ length: pointCount }, (_, i) => i) }],
+      };
+      const { option } = resolveBarOptions(data, { xAxis: { type: 'value' } });
+      const series = (option.series as Record<string, unknown>[])[0];
+
+      expect(option.animation).toBe(false);
+      expect(series.progressive).toBe(20_000);
+      expect(series.progressiveThreshold).toBe(100_000);
+    });
+
     it('threads legend.formatLabel into the resolved legend', () => {
       const data: XYData = {
         categories: ['Q1', 'Q2'],

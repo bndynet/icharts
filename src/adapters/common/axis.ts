@@ -1,4 +1,4 @@
-import type { AxisOptions, XYChartOptions, XYData } from '../../types.js';
+import type { AxisOptions, AxisType, XYChartOptions, XYData } from '../../types.js';
 import { formatDateByPattern, DATE_STRING_RE } from './date-utils.js';
 import {
   type CompiledRichText,
@@ -13,10 +13,14 @@ export function buildXAxis(
   isTimeAxis: boolean,
 ): Record<string, unknown>[] {
   const userAxis: AxisOptions = options.xAxis ?? {};
+  const axisType: AxisType =
+    userAxis.type ?? (isTimeAxis ? 'time' : 'category');
+  const isTime = axisType === 'time';
+  const isCategory = axisType === 'category';
 
   const axis: Record<string, unknown> = {
-    type: isTimeAxis ? 'time' : 'category',
-    boundaryGap: !isTimeAxis,
+    type: axisType,
+    boundaryGap: isCategory,
     splitLine: { show: false },
     splitArea: { show: false },
   };
@@ -24,9 +28,12 @@ export function buildXAxis(
     axis.show = userAxis.show;
   }
 
-  if (!isTimeAxis) {
+  if (isCategory) {
     axis.data = data.categories;
   }
+
+  const scale = resolveAxisScale(axisType, userAxis);
+  if (scale !== undefined) axis.scale = scale;
 
   if (isAxisBound(userAxis.min)) axis.min = userAxis.min;
   if (isAxisBound(userAxis.max)) axis.max = userAxis.max;
@@ -40,12 +47,12 @@ export function buildXAxis(
   applyAxisLabel(
     axis,
     userAxis,
-    isTimeAxis,
-    isTimeAxis ? undefined : data.categories,
+    isTime,
+    isCategory ? data.categories : undefined,
     'xaxis',
   );
 
-  if (isTimeAxis) {
+  if (isTime) {
     const cursorFmt = userAxis.cursorFormat ?? userAxis.dateFormat;
     if (cursorFmt) {
       const fmt = cursorFmt;
@@ -81,8 +88,14 @@ export function buildYAxis(
   const isCategory = categoryValues !== undefined;
 
   for (let i = 0; i < count; i++) {
+    const axisType: AxisType =
+      isCategory && i === 0
+        ? 'category'
+        : i === 0 && userAxis.type
+          ? userAxis.type
+          : 'value';
     const axis: Record<string, unknown> = {
-      type: isCategory && i === 0 ? 'category' : 'value',
+      type: axisType,
       splitArea: { show: false },
       nameLocation: 'center',
       nameGap: 60,
@@ -90,12 +103,16 @@ export function buildYAxis(
     if (i === 0 && isCategory) {
       axis.data = categoryValues;
     }
+    if (i === 0) {
+      const scale = resolveAxisScale(axisType, userAxis);
+      if (scale !== undefined) axis.scale = scale;
+    }
     if (i === 0 && userAxis.show !== undefined) {
       axis.show = userAxis.show;
     }
 
-    if (i === 0 && !isCategory && isAxisBound(userAxis.min)) axis.min = userAxis.min;
-    if (i === 0 && !isCategory && isAxisBound(userAxis.max)) axis.max = userAxis.max;
+    if (i === 0 && axisType !== 'category' && isAxisBound(userAxis.min)) axis.min = userAxis.min;
+    if (i === 0 && axisType !== 'category' && isAxisBound(userAxis.max)) axis.max = userAxis.max;
 
     if (i === 0 && userAxis.name) {
       axis.name = userAxis.name;
@@ -105,8 +122,8 @@ export function buildYAxis(
       applyAxisLabel(
         axis,
         userAxis,
-        false,
-        isCategory ? categoryValues : undefined,
+        axisType === 'time',
+        axisType === 'category' ? categoryValues : undefined,
         'yaxis',
       );
     }
@@ -119,6 +136,12 @@ export function buildYAxis(
   }
 
   return axes;
+}
+
+/** Map the user-facing zero-baseline option to ECharts' inverse `scale` flag. */
+function resolveAxisScale(axisType: AxisType, userAxis: AxisOptions): boolean | undefined {
+  if (axisType === 'category' || userAxis.includeZero === undefined) return undefined;
+  return !userAxis.includeZero;
 }
 
 /**
@@ -228,4 +251,15 @@ export function isTimeCategories(categories: (string | number)[]): boolean {
     return false;
   });
   return everyValid && hasRealTimestamp;
+}
+
+/** Resolve the XY x-axis type while preserving the legacy auto-detection path. */
+export function resolveXAxisType(
+  data: XYData,
+  options: XYChartOptions,
+): AxisType {
+  const explicit = options.xAxis?.type;
+  if (explicit) return explicit;
+  if (options.xAxis?.dateFormat !== undefined) return 'time';
+  return isTimeCategories(data.categories) ? 'time' : 'category';
 }

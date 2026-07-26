@@ -1,4 +1,10 @@
-import type { LineData, AreaData, LineChartOptions, AreaChartOptions } from '../types.js';
+import type {
+  AxisType,
+  LineData,
+  AreaData,
+  LineChartOptions,
+  AreaChartOptions,
+} from '../types.js';
 import type { ChartSetupResult, RenderContext } from './index.js';
 import { buildSparkAreaGradient, deepMerge, resolveColors } from '../utils.js';
 import {
@@ -11,10 +17,19 @@ import {
   buildSparkTooltip,
   buildEmphasisBlur,
   getLabelFontSize,
-  isTimeCategories,
+  applyXYInteractionOptions,
+  applyXYPerformanceDefaults,
+  getAutoSeriesProgressive,
+  resolveXAxisType,
 } from './common/index.js';
 import { resolveRaceFrameDuration, resolveRaceLabelHeadroom } from './common/race-utils.js';
-import { getSeriesOpts, getYAxisCount, applyMarkLines, applyMarkPoints } from './common/series-utils.js';
+import {
+  getSeriesOpts,
+  getYAxisCount,
+  applyMarkLines,
+  applyMarkPoints,
+  applySeriesProgressiveOptions,
+} from './common/series-utils.js';
 
 export function resolveLineOptions(
   data: LineData,
@@ -27,12 +42,8 @@ export function resolveLineOptions(
     return resolveLineRaceOptions(data, options, ctx);
   }
 
-  // `dateFormat` is a strong opt-in: if the user is asking for date
-  // formatting, they want a time axis even when the heuristic would miss
-  // (e.g. category arrays that include the epoch `0`).
-  const isTime =
-    options.xAxis?.dateFormat !== undefined ||
-    isTimeCategories(data.categories);
+  const xAxisType = resolveXAxisType(data, options);
+  const isTime = xAxisType === 'time';
   const seriesNames = data.series.map((s) => s.name);
   const isSpark = variant === 'spark';
 
@@ -47,7 +58,12 @@ export function resolveLineOptions(
       ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
       : buildGrid(options, { names: seriesNames }),
     xAxis: isSpark
-      ? [{ show: false, type: isTime ? 'time' : 'category', data: isTime ? undefined : data.categories, boundaryGap: false }]
+      ? [{
+        show: false,
+        type: xAxisType,
+        data: xAxisType === 'category' ? data.categories : undefined,
+        boundaryGap: xAxisType === 'category',
+      }]
       : buildXAxis(data, options, isTime),
     yAxis: isSpark
       ? [{ show: false, type: 'value' }]
@@ -55,8 +71,11 @@ export function resolveLineOptions(
     tooltip: isSpark
       ? buildSparkTooltip(options, ctx)
       : buildTooltip(options, 'axis', 'cross', isTime, ctx),
-    series: buildLineSeries(data, options, isTime, false),
+    series: buildLineSeries(data, options, xAxisType, false),
   };
+
+  applyXYInteractionOptions(eOption, options);
+  applyXYPerformanceDefaults(eOption, data, xAxisType, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   merged.color = resolveColors(seriesNames, options);
@@ -121,9 +140,8 @@ function resolveLineRaceOptions(
   // explicit signal prevents the axis from flipping mid-stream when the
   // category array briefly fails the digit-length heuristic (e.g. crosses
   // the epoch `0`).
-  const isTime =
-    options.xAxis?.dateFormat !== undefined ||
-    isTimeCategories(data.categories);
+  const xAxisType = resolveXAxisType(data, options);
+  const isTime = xAxisType === 'time';
   const seriesNames = data.series.map((s) => s.name);
   const yAxisCount = getYAxisCount(data, options);
 
@@ -155,7 +173,7 @@ function resolveLineRaceOptions(
   //
   // We check the BUILT axis (not raw user options) so this also kicks in
   // when the user passed a bogus value (e.g. NaN) that buildXAxis stripped.
-  if (isTime && data.categories.length > 0) {
+  if (xAxisType !== 'category' && data.categories.length > 0) {
     const first = xAxis[0] as Record<string, unknown>;
     if (first.min === undefined) {
       first.min = data.categories[0];
@@ -163,7 +181,7 @@ function resolveLineRaceOptions(
   }
 
   const labelFontSize = getLabelFontSize(options);
-  const series = buildLineSeries(data, options, isTime, false);
+  const series = buildLineSeries(data, options, xAxisType, false);
   for (const s of series) {
     s.showSymbol = false;
     if (showValueLabel) {
@@ -200,6 +218,9 @@ function resolveLineRaceOptions(
     animationEasingUpdate: 'linear',
   };
 
+  applyXYInteractionOptions(eOption, options);
+  applyXYPerformanceDefaults(eOption, data, xAxisType, options);
+
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   merged.color = resolveColors(seriesNames, options);
   return { option: merged, notMerge: false };
@@ -210,9 +231,8 @@ export function resolveAreaOptions(
   options: AreaChartOptions,
   ctx?: RenderContext,
 ): Record<string, unknown> {
-  const isTime =
-    options.xAxis?.dateFormat !== undefined ||
-    isTimeCategories(data.categories);
+  const xAxisType = resolveXAxisType(data, options);
+  const isTime = xAxisType === 'time';
   const seriesNames = data.series.map((s) => s.name);
   const variant = options.variant ?? 'default';
   const isSpark = variant === 'spark';
@@ -228,7 +248,12 @@ export function resolveAreaOptions(
       ? { top: 0, right: 0, bottom: 0, left: 0, containLabel: false }
       : buildGrid(options, { names: seriesNames }),
     xAxis: isSpark
-      ? [{ show: false, type: isTime ? 'time' : 'category', data: isTime ? undefined : data.categories, boundaryGap: false }]
+      ? [{
+        show: false,
+        type: xAxisType,
+        data: xAxisType === 'category' ? data.categories : undefined,
+        boundaryGap: xAxisType === 'category',
+      }]
       : buildXAxis(data, options, isTime),
     yAxis: isSpark
       ? [{ show: false, type: 'value' }]
@@ -236,8 +261,10 @@ export function resolveAreaOptions(
     tooltip: isSpark
       ? buildSparkTooltip(options, ctx)
       : buildTooltip(options, 'axis', 'cross', isTime, ctx),
-    series: buildLineSeries(data, options, isTime, true),
+    series: buildLineSeries(data, options, xAxisType, true),
   };
+
+  applyXYInteractionOptions(eOption, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   const colors = resolveColors(seriesNames, options);
@@ -272,7 +299,7 @@ function applySparkAreaGradient(
 function buildLineSeries(
   data: LineData,
   options: LineChartOptions | AreaChartOptions,
-  isTime: boolean,
+  xAxisType: AxisType,
   isArea: boolean,
 ): Record<string, unknown>[] {
   const isSpark = options.variant === 'spark';
@@ -285,14 +312,20 @@ function buildLineSeries(
     const series: Record<string, unknown> = {
       name: s.name,
       type: seriesType,
-      data: isTime
+      data: xAxisType !== 'category'
         ? s.data.map((v, i) => [data.categories[i], v])
         : s.data,
     };
 
     if (seriesType === 'line') {
-      if (isTime) {
+      if (xAxisType === 'time') {
         series.symbol = 'none';
+      }
+      // Numeric waveforms are commonly much denser than category charts.
+      // Keep the legacy category default intact, while making the explicit
+      // value-axis path safe unless the caller opts back in with showPoints.
+      if (xAxisType === 'value' && so.showPoints === undefined) {
+        series.showSymbol = false;
       }
       if (isSpark) {
         series.symbolSize = 0;
@@ -312,6 +345,8 @@ function buildLineSeries(
     if (seriesType === 'line') {
       if (so.smooth !== undefined) series.smooth = so.smooth;
       if (so.showPoints !== undefined) series.showSymbol = so.showPoints;
+
+      applySeriesProgressiveOptions(series, so, getAutoSeriesProgressive(s.data.length, xAxisType));
 
       if (so.lineWidth !== undefined) {
         series.lineStyle = { width: so.lineWidth };

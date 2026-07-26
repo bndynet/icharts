@@ -12,9 +12,17 @@ import {
   buildSparkTooltip,
   buildEmphasisBlur,
   getLabelFontSize,
-  isTimeCategories,
+  applyXYInteractionOptions,
+  applyXYPerformanceDefaults,
+  getAutoSeriesProgressive,
+  resolveXAxisType,
 } from './common/index.js';
-import { getSeriesOpts, applyMarkLines, applyMarkPoints } from './common/series-utils.js';
+import {
+  getSeriesOpts,
+  applyMarkLines,
+  applyMarkPoints,
+  applySeriesProgressiveOptions,
+} from './common/series-utils.js';
 
 export function resolveBarOptions(
   data: BarData,
@@ -27,7 +35,8 @@ export function resolveBarOptions(
     return resolveBarRaceOptions(data, options, ctx);
   }
 
-  const isTime = isTimeCategories(data.categories);
+  const xAxisType = resolveXAxisType(data, options);
+  const isTime = xAxisType === 'time';
   const seriesNames = data.series.map((s) => s.name);
   const isSpark = variant === 'spark';
   const isHorizontal = variant === 'horizontal';
@@ -92,8 +101,8 @@ export function resolveBarOptions(
     eOption.yAxis = [categoryAxis];
     eOption.xAxis = [valueAxis];
   } else {
-    if (isTime) {
-      eOption.xAxis = buildXAxis(data, options, true);
+    if (xAxisType !== 'category') {
+      eOption.xAxis = buildXAxis(data, options, isTime);
     } else {
       // Vertical category x-axis: same RichText-aware wiring as buildXAxis,
       // applied directly to the literal so the rest of the literal's defaults
@@ -110,8 +119,20 @@ export function resolveBarOptions(
     eOption.yAxis = [valueAxis];
   }
 
-  const series = buildBarSeries(data, options, isTime, isHorizontal, enableColorByCategory);
+  const series = buildBarSeries(
+    data,
+    options,
+    xAxisType,
+    isHorizontal,
+    enableColorByCategory,
+  );
   eOption.series = series;
+
+  applyXYInteractionOptions(eOption, options);
+  // Horizontal bars use a categorical y-axis and keep their existing
+  // behavior; automatic numeric-series performance defaults are for the
+  // explicit continuous x-axis path only.
+  applyXYPerformanceDefaults(eOption, data, isHorizontal ? 'category' : xAxisType, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   // Palette source switches based on colorByCategory: when enabled, derive
@@ -211,6 +232,8 @@ function resolveBarRaceOptions(
     itemStyle: { borderRadius: [0, 4, 4, 0] },
   };
 
+  applySeriesProgressiveOptions(raceSeries, getSeriesOpts(seriesName, options));
+
   applyBarOptionsSizing(raceSeries, options);
 
   if (enableColorByCategory) {
@@ -265,6 +288,8 @@ function resolveBarRaceOptions(
     animationEasingUpdate: 'linear',
   };
 
+  applyXYInteractionOptions(eOption, options);
+
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   merged.color = enableColorByCategory
     ? resolveColors(data.categories.map(String), options)
@@ -292,7 +317,7 @@ function formatRaceBarLabel(v: number | null | undefined): string {
 function buildBarSeries(
   data: BarData,
   options: BarChartOptions,
-  isTime: boolean,
+  xAxisType: 'category' | 'time' | 'value',
   isHorizontal: boolean,
   enableColorByCategory: boolean,
 ): Record<string, unknown>[] {
@@ -307,7 +332,7 @@ function buildBarSeries(
     const series: Record<string, unknown> = {
       name: s.name,
       type: 'bar',
-      data: isTime
+      data: !isHorizontal && xAxisType !== 'category'
         ? s.data.map((v, i) => [data.categories[i], v])
         : seriesData,
     };
@@ -321,6 +346,12 @@ function buildBarSeries(
     }
 
     if (so.yAxisIndex !== undefined) series.yAxisIndex = so.yAxisIndex;
+
+    applySeriesProgressiveOptions(
+      series,
+      so,
+      getAutoSeriesProgressive(isHorizontal ? 0 : s.data.length, xAxisType),
+    );
 
     if (so.showLabel) {
       series.label = {

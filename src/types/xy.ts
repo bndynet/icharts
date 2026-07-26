@@ -22,6 +22,79 @@ export interface XYData {
   series: XYDataSeries[];
 }
 
+/** Typed subset of ECharts dataZoom options used by XY charts. */
+export interface DataZoomOptions {
+  type?: 'inside' | 'slider';
+  xAxisIndex?: number | number[];
+  yAxisIndex?: number | number[];
+  filterMode?: 'filter' | 'weakFilter' | 'empty' | 'none';
+  start?: number;
+  end?: number;
+  startValue?: number | string | Date;
+  endValue?: number | string | Date;
+  minSpan?: number;
+  maxSpan?: number;
+  minValueSpan?: number;
+  maxValueSpan?: number;
+  throttle?: number | null;
+  realtime?: boolean;
+  left?: number | string;
+  right?: number | string;
+  top?: number | string;
+  bottom?: number | string;
+  width?: number | string;
+  height?: number | string;
+  [key: string]: unknown;
+}
+
+/**
+ * XY zoom configuration. `true` enables the standard inside + X slider + Y
+ * slider controls; use an object/array for fine-grained control.
+ */
+export type DataZoomConfig = boolean | DataZoomOptions | DataZoomOptions[];
+
+export interface ToolboxDataZoomOptions {
+  show?: boolean;
+  type?: ('zoom' | 'back')[];
+  /** Localized tooltip labels for the zoom and zoom-back buttons. */
+  title?: ToolboxDataZoomTitle;
+  filterMode?: 'filter' | 'weakFilter' | 'empty' | 'none';
+  xAxisIndex?: number | number[];
+  yAxisIndex?: number | number[];
+  [key: string]: unknown;
+}
+
+/** ECharts toolbox dataZoom button labels. */
+export interface ToolboxDataZoomTitle {
+  zoom?: string;
+  back?: string;
+}
+
+export interface ToolboxRestoreOptions {
+  show?: boolean;
+  title?: string;
+  icon?: string;
+  [key: string]: unknown;
+}
+
+export interface ToolboxFeatureOptions {
+  dataZoom?: ToolboxDataZoomOptions;
+  restore?: ToolboxRestoreOptions;
+  [key: string]: unknown;
+}
+
+/** Typed subset of ECharts toolbox options useful for XY interactions. */
+export interface ToolboxOptions {
+  show?: boolean;
+  orient?: 'horizontal' | 'vertical';
+  left?: number | string;
+  right?: number | string;
+  top?: number | string;
+  bottom?: number | string;
+  feature?: ToolboxFeatureOptions;
+  [key: string]: unknown;
+}
+
 /** Structural type guard for {@link XYData}. */
 export function isXYData(data: ChartData): data is XYData {
   return (
@@ -49,6 +122,11 @@ export function isXYData(data: ChartData): data is XYData {
  */
 export interface XYChartOptions extends ChartOptions {
   stacked?: boolean;
+  /**
+   * Global ECharts animation switch for XY charts. When omitted, dense
+   * explicit value-axis payloads automatically default to `false`.
+   */
+  animation?: boolean;
   xAxis?: AxisOptions;
   yAxis?: AxisOptions;
   /** Per-series overrides keyed by series name (or `'*'` for all). */
@@ -56,4 +134,8 @@ export interface XYChartOptions extends ChartOptions {
 
   legend?: LegendOptions;
   grid?: GridOptions;
+  /** Opt-in zoom controls, or `true` for the standard XY zoom setup. */
+  dataZoom?: DataZoomConfig;
+  /** Opt-in ECharts toolbox features for XY charts. */
+  toolbox?: ToolboxOptions;
 }

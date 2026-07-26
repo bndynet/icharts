@@ -50,6 +50,129 @@ describe('line adapter', () => {
       expect(option.animationEasingUpdate).toBeUndefined();
     });
 
+    it('uses numeric x values as [x, y] points without changing category defaults', () => {
+      const data: XYData = {
+        categories: [0, 0.000001, 0.000002],
+        series: [{ name: 'Vout', data: [0, 3.2, 3.3] }],
+      };
+      const result = resolveLineOptions(data, {
+        xAxis: { type: 'value', includeZero: false },
+        animation: false,
+        series: {
+          '*': {
+            showPoints: false,
+            progressive: 20_000,
+            progressiveThreshold: 100_000,
+          },
+        },
+        dataZoom: [
+          { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
+          { type: 'slider', xAxisIndex: 0 },
+          { type: 'slider', yAxisIndex: 0 },
+        ],
+        toolbox: {
+          feature: {
+            dataZoom: {
+              yAxisIndex: 0,
+              title: { zoom: '区域缩放', back: '退出缩放' },
+            },
+            restore: { title: '还原' },
+          },
+        },
+      });
+      const option = result.option;
+      const axis = (option.xAxis as Record<string, unknown>[])[0];
+      const series = (option.series as Record<string, unknown>[])[0];
+
+      expect(axis.type).toBe('value');
+      expect(axis.boundaryGap).toBe(false);
+      expect(axis.scale).toBe(true);
+      expect(series.data).toEqual([
+        [0, 0],
+        [0.000001, 3.2],
+        [0.000002, 3.3],
+      ]);
+      expect(series.showSymbol).toBe(false);
+      expect(series.progressive).toBe(20_000);
+      expect(series.progressiveThreshold).toBe(100_000);
+      expect(option.animation).toBe(false);
+      expect(option.dataZoom).toHaveLength(3);
+      expect(option.toolbox).toEqual({
+        feature: {
+          dataZoom: {
+            yAxisIndex: 0,
+            title: { zoom: '区域缩放', back: '退出缩放' },
+          },
+          restore: { title: '还原' },
+        },
+      });
+    });
+
+    it('expands dataZoom true to the standard waveform controls', () => {
+      const { option } = resolveLineOptions(
+        {
+          categories: [0, 1, 2],
+          series: [{ name: 'Vout', data: [0, 1, 0] }],
+        },
+        { xAxis: { type: 'value' }, dataZoom: true },
+      );
+
+      expect(option.dataZoom).toEqual([
+        { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
+        { type: 'slider', xAxisIndex: 0, filterMode: 'filter' },
+        { type: 'slider', yAxisIndex: 0, filterMode: 'filter' },
+      ]);
+    });
+
+    it('keeps the legacy category axis and raw y-array path by default', () => {
+      const { option } = resolveLineOptions(defaultFrame, {});
+      const axis = (option.xAxis as Record<string, unknown>[])[0];
+      const series = (option.series as Record<string, unknown>[])[0];
+      expect(axis.type).toBe('category');
+      expect(axis.boundaryGap).toBe(true);
+      expect(series.data).toEqual(defaultFrame.series[0].data);
+      expect(series.showSymbol).toBeUndefined();
+    });
+
+    it('auto-applies performance defaults for a large value-axis series', () => {
+      const pointCount = 100_001;
+      const data: XYData = {
+        categories: Array.from({ length: pointCount }, (_, i) => i),
+        series: [{ name: 'Vout', data: Array.from({ length: pointCount }, (_, i) => i) }],
+      };
+      const { option } = resolveLineOptions(data, { xAxis: { type: 'value' } });
+      const series = (option.series as Record<string, unknown>[])[0];
+
+      expect(option.animation).toBe(false);
+      expect(series.showSymbol).toBe(false);
+      expect(series.progressive).toBe(20_000);
+      expect(series.progressiveThreshold).toBe(100_000);
+    });
+
+    it('lets explicit performance options override automatic value-axis defaults', () => {
+      const pointCount = 100_001;
+      const data: XYData = {
+        categories: Array.from({ length: pointCount }, (_, i) => i),
+        series: [{ name: 'Vout', data: Array.from({ length: pointCount }, (_, i) => i) }],
+      };
+      const { option } = resolveLineOptions(data, {
+        xAxis: { type: 'value' },
+        animation: true,
+        series: {
+          '*': {
+            showPoints: true,
+            progressive: false,
+          },
+        },
+      });
+      const series = (option.series as Record<string, unknown>[])[0];
+
+      expect(option.animation).toBe(true);
+      expect(series.showSymbol).toBe(true);
+      expect(series.progressive).toBe(false);
+      expect(series.progressiveThreshold).toBeUndefined();
+    });
+
     it('threads legend.formatLabel into the resolved legend', () => {
       // Append the last value next to each series name — closure captures
       // the data shape so the formatter stays a pure (name) => string fn.

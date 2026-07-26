@@ -1,4 +1,5 @@
 import type { XYData, XYChartOptions, SeriesOptions } from '../../types.js';
+import type { AutoSeriesProgressiveOptions } from './performance.js';
 
 export function getSeriesOpts(name: string, options: XYChartOptions): SeriesOptions {
   const wildcard = options.series?.['*'] ?? {};
@@ -17,6 +18,26 @@ export function getYAxisCount(data: XYData, options: XYChartOptions): number {
     }
   }
   return count;
+}
+
+export function applySeriesProgressiveOptions(
+  series: Record<string, unknown>,
+  so: SeriesOptions,
+  auto: AutoSeriesProgressiveOptions = {},
+): void {
+  if (so.progressive !== undefined) {
+    series.progressive = so.progressive;
+  } else if (auto.progressive !== undefined) {
+    series.progressive = auto.progressive;
+  }
+  if (so.progressiveThreshold !== undefined) {
+    series.progressiveThreshold = so.progressiveThreshold;
+  } else if (so.progressive === undefined && auto.progressiveThreshold !== undefined) {
+    series.progressiveThreshold = auto.progressiveThreshold;
+  }
+  if (so.progressiveChunkMode !== undefined) {
+    series.progressiveChunkMode = so.progressiveChunkMode;
+  }
 }
 
 export function applyMarkLines(series: Record<string, unknown>, so: SeriesOptions): void {

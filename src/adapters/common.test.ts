@@ -6,6 +6,7 @@ import {
   applyAxisLabel,
   buildAsyncTooltipFormatter,
   buildAxisTooltipContext,
+  buildGrid,
   buildLegend,
   buildXAxis,
   buildYAxis,
@@ -16,6 +17,7 @@ import {
   getLegendReserve,
   getTitleReserve,
   resolveAppendToBody,
+  resolveDataZoomOptions,
   resolveTooltipPosition,
 } from './common/index.js';
 import { resolveLineOptions, resolveAreaOptions } from './line.js';
@@ -448,6 +450,51 @@ describe('compileRichText', () => {
 // ---------------------------------------------------------------------------
 
 describe('applyAxisLabel + axis formatLabel rich-text', () => {
+  it('supports an explicit numeric value axis and keeps formatLabel dynamic', () => {
+    const formatter = vi.fn((v: string | number) => `t=${v}`);
+    const axis = buildXAxis(
+      { categories: [0, 0.000001, 0.000002], series: [] },
+      {
+        xAxis: { type: 'value', includeZero: false, formatLabel: formatter },
+      },
+      false,
+    )[0];
+    const axisLabel = axis.axisLabel as Record<string, unknown>;
+    const f = axisLabel.formatter as (v: string | number, i: number) => string;
+
+    expect(axis.type).toBe('value');
+    expect(axis.boundaryGap).toBe(false);
+    expect(axis.data).toBeUndefined();
+    expect(axis.scale).toBe(true);
+    expect(f(0.000001, 3)).toBe('t=0.000001');
+    expect(formatter).toHaveBeenCalledWith(0.000001, 3);
+    expect(axisLabel.rich).toBeUndefined();
+  });
+
+  it('maps includeZero true to ECharts scale false', () => {
+    const xAxis = buildXAxis(
+      { categories: [1, 2, 3], series: [] },
+      { xAxis: { type: 'value', includeZero: true } },
+      false,
+    )[0];
+    const yAxis = buildYAxis({ yAxis: { includeZero: true } })[0];
+
+    expect(xAxis.scale).toBe(false);
+    expect(yAxis.scale).toBe(false);
+  });
+
+  it('does not emit a scale override when includeZero is omitted', () => {
+    const xAxis = buildXAxis(
+      { categories: [1, 2, 3], series: [] },
+      { xAxis: { type: 'value' } },
+      false,
+    )[0];
+    const yAxis = buildYAxis({})[0];
+
+    expect(xAxis.scale).toBeUndefined();
+    expect(yAxis.scale).toBeUndefined();
+  });
+
   it('plain string formatLabel: wires user function into axisLabel.formatter', () => {
     const axis = buildXAxis(
       { categories: ['Q1', 'Q2', 'Q3'], series: [] },
@@ -914,6 +961,44 @@ describe('buildGrid + side-edge legend width (XY charts)', () => {
     // reserve must match — proving we measured the stripped string, not
     // the literal source.
     expect(rich.right).toBe(plain.right);
+  });
+});
+
+describe('buildGrid + dataZoom slider reserves', () => {
+  it('expands dataZoom true to the standard inside/X-slider/Y-slider setup', () => {
+    expect(resolveDataZoomOptions(true)).toEqual([
+      { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
+      { type: 'slider', xAxisIndex: 0, filterMode: 'filter' },
+      { type: 'slider', yAxisIndex: 0, filterMode: 'filter' },
+    ]);
+    expect(resolveDataZoomOptions(false)).toBeUndefined();
+  });
+
+  it('keeps the legacy grid unchanged when dataZoom is absent', () => {
+    expect(buildGrid({ legend: { show: false } })).toMatchObject({
+      top: 12,
+      right: 12,
+      bottom: 12,
+      left: 12,
+    });
+  });
+
+  it('reserves bottom and right space for opt-in XY sliders', () => {
+    const grid = buildGrid({
+      legend: { show: false },
+      dataZoom: [
+        { type: 'slider', xAxisIndex: 0 },
+        { type: 'slider', yAxisIndex: 0 },
+      ],
+    });
+    expect(grid.bottom).toBe(60);
+    expect(grid.right).toBe(52);
+  });
+
+  it('reserves bottom and right space for the standard dataZoom shorthand', () => {
+    const grid = buildGrid({ legend: { show: false }, dataZoom: true });
+    expect(grid.bottom).toBe(60);
+    expect(grid.right).toBe(52);
   });
 });
 
@@ -1866,6 +1951,24 @@ async function flushTooltipMicrotasks(): Promise<void> {
 }
 
 describe('buildAxisTooltipContext', () => {
+  it('preserves the original [x, y] value for numeric-axis tooltips', () => {
+    const ctx = buildAxisTooltipContext(
+      [{
+        axisValue: 0.000001,
+        axisValueLabel: '1 µs',
+        dataIndex: 1,
+        seriesName: 'Vout',
+        value: [0.000001, 0.0031415],
+      }],
+      {},
+      false,
+    );
+    expect(ctx.rawAxisValue).toBe(0.000001);
+    expect(ctx.axisValueLabel).toBe('0.000001');
+    expect(ctx.series[0].value).toBe(0.0031415);
+    expect(ctx.series[0].rawValue).toEqual([0.000001, 0.0031415]);
+  });
+
   it('propagates resolved series colors from ECharts params into each series entry', () => {
     const params = [
       {

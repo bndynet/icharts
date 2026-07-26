@@ -2,6 +2,38 @@
   <SectionDivider>Line &amp; Area Charts</SectionDivider>
   <DemoGrid>
 
+    <DemoCard
+      ref="waveformCard"
+      title="Numeric Waveform — 357k Samples"
+      tag="value axis + auto performance + X/Y zoom"
+      :card-style="{ gridColumn: '1 / -1' }"
+      :box-style="{ height: '420px' }"
+    >
+      <template #code>
+        <pre v-pre class="code-block">createChart(el, 'line', {
+  categories: timeArray,             // numeric seconds: x coordinates
+  series: [{ name: 'Vout', data: values }],
+}, {
+  xAxis: {
+    type: 'value',
+    includeZero: false,
+    formatLabel: (v) => `${Number(v) * 1e6} µs`,
+  },
+  series: { '*': {
+    lineWidth: 1.2,
+  }},
+  dataZoom: true,
+  toolbox: { feature: {
+    dataZoom: {
+      yAxisIndex: 0,
+      title: { zoom: '区域缩放', back: '退出缩放' },
+    },
+    restore: { title: '还原' },
+  }},
+});</pre>
+      </template>
+    </DemoCard>
+
     <DemoCard ref="lineCard" title="Line Chart" tag='type="line"'>
       <template #code>
         <pre v-pre class="code-block">createChart(el, 'line', {
@@ -95,6 +127,7 @@ import { xyData } from './sharedData';
 type CardRef = InstanceType<typeof DemoCard>;
 
 const lineCard = ref<CardRef>();
+const waveformCard = ref<CardRef>();
 const areaCard = ref<CardRef>();
 const stackedAreaCard = ref<CardRef>();
 const markCard = ref<CardRef>();
@@ -136,11 +169,75 @@ const timeTsData = {
   series: [{ name: 'Visits', data: [120, 145, 98, 167, 203, 180, 221] }],
 };
 
+const WAVEFORM_POINT_COUNT = 357_000;
+const WAVEFORM_SAMPLE_PERIOD = 1e-9;
+
+function formatWaveTime(value: number): string {
+  const microseconds = value * 1e6;
+  if (Math.abs(microseconds) >= 1) return `${microseconds.toFixed(2)} µs`;
+  return `${(value * 1e9).toFixed(2)} ns`;
+}
+
+function buildWaveformData() {
+  const categories = Array.from(
+    { length: WAVEFORM_POINT_COUNT },
+    (_, i) => i * WAVEFORM_SAMPLE_PERIOD,
+  );
+  const values = categories.map((time) => {
+    const carrier = 0.45 * Math.sin(2 * Math.PI * 18_000 * time);
+    const ripple = 0.015 * Math.sin(2 * Math.PI * 420_000 * time);
+    const step = time >= 0.00022 ? 0.35 : 0;
+    return 3.0 + carrier + ripple + step;
+  });
+  return {
+    categories,
+    series: [{ name: 'Vout', data: values }],
+  };
+}
+
 // No manual cleanup needed — `IChart` installs a hidden sentinel custom
 // element in each container; the browser's `disconnectedCallback` fires the
 // moment Vue tears this view's DOM down, which auto-disposes every chart
 // and removes its global-registry entry. See `src/disconnect-sentinel.ts`.
 onMounted(() => {
+  const waveformData = buildWaveformData();
+  createChart(waveformCard.value!.chartEl!, 'line', waveformData, {
+    title: 'Vout — 357,000 lossless samples',
+    legend: { show: false },
+    xAxis: {
+      type: 'value',
+      includeZero: false,
+      formatLabel: (value) => formatWaveTime(Number(value)),
+    },
+    yAxis: {
+      includeZero: false,
+      formatLabel: (value) => `${Number(value).toFixed(2)} V`,
+    },
+    series: {
+      '*': {
+        lineWidth: 1.2,
+      },
+    },
+    dataZoom: true,
+    toolbox: {
+      feature: {
+        dataZoom: {
+          yAxisIndex: 0,
+          title: { zoom: '区域缩放', back: '退出缩放' },
+        },
+        restore: { title: '还原' },
+      },
+    },
+    tooltip: {
+      customHtml: async (ctx) => {
+        if (ctx.kind !== 'axis') return '';
+        const point = ctx.series[0]?.rawValue;
+        if (!Array.isArray(point)) return `${ctx.axisValueLabel}`;
+        return `<b>t = ${formatWaveTime(Number(point[0]))}</b><br/>` +
+          `Vout = ${Number(point[1]).toFixed(6)} V`;
+      },
+    },
+  });
   createChart(lineCard.value!.chartEl!, 'line', xyData, { title: 'Monthly Financials' });
   createChart(areaCard.value!.chartEl!, 'area', weekData, { title: 'Weekly Visits' });
   createChart(stackedAreaCard.value!.chartEl!, 'area', trafficData, {

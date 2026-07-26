@@ -31,7 +31,7 @@ export function formatAxisTooltipSyncHtml(
     const ts = typeof rawTs === 'number' ? rawTs : Date.parse(String(rawTs));
     header = !isNaN(ts) ? formatDateByPattern(new Date(ts), tooltip.dateFormat) : String(rawTs ?? '');
   } else {
-    header = String(firstItem.axisValue ?? '');
+    header = String(rawTs ?? '');
   }
 
   const rows = items
@@ -69,7 +69,7 @@ export function buildAxisTooltipContext(
       ? formatDateByPattern(new Date(ts), tooltip.dateFormat)
       : String(rawTs ?? '');
   } else {
-    axisValueLabel = String(first.axisValue ?? '');
+    axisValueLabel = String(rawTs ?? '');
   }
 
   const series = items.map((p: unknown) => {
@@ -79,10 +79,12 @@ export function buildAxisTooltipContext(
       value?: unknown;
       color?: string;
     };
+    const rawValue = normalizeTooltipRawValue(item.value);
     const val = Array.isArray(item.value) ? (item.value as [unknown, unknown])[1] : item.value;
     return {
       name: item.seriesName ?? '',
       value: val as number | string,
+      rawValue,
       marker: item.marker,
       color: typeof item.color === 'string' ? item.color : undefined,
     };
@@ -92,9 +94,25 @@ export function buildAxisTooltipContext(
     kind: 'axis',
     axisValueLabel,
     dataIndex: first.dataIndex ?? 0,
-    rawAxisValue: first.axisValue,
+    rawAxisValue:
+      typeof rawTs === 'number' || typeof rawTs === 'string' ? rawTs : undefined,
     series,
   };
+}
+
+function normalizeTooltipRawValue(
+  value: unknown,
+): number | string | [string | number, string | number] | undefined {
+  if (typeof value === 'number' || typeof value === 'string') return value;
+  if (
+    Array.isArray(value) &&
+    value.length >= 2 &&
+    (typeof value[0] === 'number' || typeof value[0] === 'string') &&
+    (typeof value[1] === 'number' || typeof value[1] === 'string')
+  ) {
+    return [value[0], value[1]];
+  }
+  return undefined;
 }
 
 interface TooltipPositionSize {
