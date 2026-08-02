@@ -128,7 +128,7 @@ export function resolveBarOptions(
   );
   eOption.series = series;
 
-  applyXYInteractionOptions(eOption, options);
+  applyXYInteractionOptions(eOption, options, legendVisible);
   // Horizontal bars use a categorical y-axis and keep their existing
   // behavior; automatic numeric-series performance defaults are for the
   // explicit continuous x-axis path only.
@@ -288,7 +288,11 @@ function resolveBarRaceOptions(
     animationEasingUpdate: 'linear',
   };
 
-  applyXYInteractionOptions(eOption, options);
+  applyXYInteractionOptions(
+    eOption,
+    options,
+    !enableColorByCategory && (options.legend?.show ?? true),
+  );
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   merged.color = enableColorByCategory

@@ -119,7 +119,7 @@ describe('line adapter', () => {
 
       expect(option.dataZoom).toEqual([
         { type: 'inside', xAxisIndex: 0, filterMode: 'filter' },
-        { type: 'slider', xAxisIndex: 0, filterMode: 'filter' },
+        { type: 'slider', xAxisIndex: 0, filterMode: 'filter', bottom: 12 },
         { type: 'slider', yAxisIndex: 0, filterMode: 'filter' },
       ]);
     });

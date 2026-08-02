@@ -74,7 +74,7 @@ export function resolveLineOptions(
     series: buildLineSeries(data, options, xAxisType, false),
   };
 
-  applyXYInteractionOptions(eOption, options);
+  applyXYInteractionOptions(eOption, options, !isSpark && (options.legend?.show ?? true));
   applyXYPerformanceDefaults(eOption, data, xAxisType, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
@@ -218,7 +218,7 @@ function resolveLineRaceOptions(
     animationEasingUpdate: 'linear',
   };
 
-  applyXYInteractionOptions(eOption, options);
+  applyXYInteractionOptions(eOption, options, options.legend?.show ?? true);
   applyXYPerformanceDefaults(eOption, data, xAxisType, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
@@ -264,7 +264,7 @@ export function resolveAreaOptions(
     series: buildLineSeries(data, options, xAxisType, true),
   };
 
-  applyXYInteractionOptions(eOption, options);
+  applyXYInteractionOptions(eOption, options, !isSpark && (options.legend?.show ?? true));
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
   const colors = resolveColors(seriesNames, options);

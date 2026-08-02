@@ -3,15 +3,16 @@ import { deepMerge } from '../../utils.js';
 import { getLegendReserve } from './legend.js';
 import { EMPTY_EDGES, getChartPadding, type EdgeReserves } from './shared.js';
 import { getTitleReserve } from './title.js';
-import { resolveDataZoomOptions } from './interaction.js';
+import {
+  DATA_ZOOM_SLIDER_RESERVE,
+  DATA_ZOOM_X_AXIS_GAP,
+  resolveDataZoomOptions,
+} from './interaction.js';
 
 export interface BuildGridOverrides {
   legendShow?: boolean;
   names?: ReadonlyArray<string>;
 }
-
-const DATA_ZOOM_SLIDER_RESERVE = 40;
-const DATA_ZOOM_X_AXIS_GAP = 8;
 
 function getDataZoomGridAdjustment(
   options: XYChartOptions,

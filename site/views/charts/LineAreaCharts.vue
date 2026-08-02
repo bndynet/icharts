@@ -4,16 +4,21 @@
 
     <DemoCard
       ref="waveformCard"
-      title="Numeric Waveform — 357k Samples"
-      tag="value axis + auto performance + X/Y zoom"
+      title="Numeric Waveform — 357k Samples / 3 Channels"
+      tag="3 lines + legend + auto performance + X/Y zoom"
       :card-style="{ gridColumn: '1 / -1' }"
       :box-style="{ height: '420px' }"
     >
       <template #code>
         <pre v-pre class="code-block">createChart(el, 'line', {
   categories: timeArray,             // numeric seconds: x coordinates
-  series: [{ name: 'Vout', data: values }],
+  series: [
+    { name: 'Vin', data: vinValues },
+    { name: 'Vout', data: voutValues },
+    { name: 'Vref', data: vrefValues },
+  ],
 }, {
+  legend: { show: true, position: 'bottom' },
   xAxis: {
     type: 'value',
     includeZero: false,
@@ -183,15 +188,25 @@ function buildWaveformData() {
     { length: WAVEFORM_POINT_COUNT },
     (_, i) => i * WAVEFORM_SAMPLE_PERIOD,
   );
-  const values = categories.map((time) => {
+  const vout = categories.map((time) => {
     const carrier = 0.45 * Math.sin(2 * Math.PI * 18_000 * time);
     const ripple = 0.015 * Math.sin(2 * Math.PI * 420_000 * time);
     const step = time >= 0.00022 ? 0.35 : 0;
     return 3.0 + carrier + ripple + step;
   });
+  const vin = categories.map((time) =>
+    3.3 + 0.02 * Math.sin(2 * Math.PI * 12_000 * time),
+  );
+  const vref = categories.map((time) =>
+    2.5 + 0.025 * Math.sin(2 * Math.PI * 24_000 * time),
+  );
   return {
     categories,
-    series: [{ name: 'Vout', data: values }],
+    series: [
+      { name: 'Vin', data: vin },
+      { name: 'Vout', data: vout },
+      { name: 'Vref', data: vref },
+    ],
   };
 }
 
@@ -202,8 +217,8 @@ function buildWaveformData() {
 onMounted(() => {
   const waveformData = buildWaveformData();
   createChart(waveformCard.value!.chartEl!, 'line', waveformData, {
-    title: 'Vout — 357,000 lossless samples',
-    legend: { show: false },
+    title: 'Voltage Waveforms — 357,000 lossless samples',
+    legend: { show: true, position: 'bottom' },
     xAxis: {
       type: 'value',
       includeZero: false,
@@ -231,10 +246,15 @@ onMounted(() => {
     tooltip: {
       customHtml: async (ctx) => {
         if (ctx.kind !== 'axis') return '';
-        const point = ctx.series[0]?.rawValue;
-        if (!Array.isArray(point)) return `${ctx.axisValueLabel}`;
-        return `<b>t = ${formatWaveTime(Number(point[0]))}</b><br/>` +
-          `Vout = ${Number(point[1]).toFixed(6)} V`;
+        const firstPoint = ctx.series.find((item) => Array.isArray(item.rawValue))?.rawValue;
+        if (!Array.isArray(firstPoint)) return `${ctx.axisValueLabel}`;
+        const values = ctx.series.map((item) => {
+          const point = item.rawValue;
+          const value = Array.isArray(point) ? point[1] : item.value;
+          return `${item.name} = ${Number(value).toFixed(6)} V`;
+        });
+        return `<b>t = ${formatWaveTime(Number(firstPoint[0]))}</b><br/>` +
+          values.join('<br/>');
       },
     },
   });

@@ -991,14 +991,50 @@ describe('buildGrid + dataZoom slider reserves', () => {
         { type: 'slider', yAxisIndex: 0 },
       ],
     });
-    expect(grid.bottom).toBe(60);
+    expect(grid.bottom).toBe(56);
     expect(grid.right).toBe(52);
   });
 
   it('reserves bottom and right space for the standard dataZoom shorthand', () => {
     const grid = buildGrid({ legend: { show: false }, dataZoom: true });
-    expect(grid.bottom).toBe(60);
+    expect(grid.bottom).toBe(56);
     expect(grid.right).toBe(52);
+  });
+
+  it('separates the default x slider from a bottom legend', () => {
+    const option = resolveBarOptions(
+      {
+        categories: ['A', 'B'],
+        series: [{ name: 'Sales', data: [10, 20] }],
+      },
+      { dataZoom: true, legend: { position: 'bottom' } },
+    ).option;
+    const legend = option.legend as Record<string, unknown>;
+    const zooms = option.dataZoom as Array<Record<string, unknown>>;
+
+    expect(legend.bottom).toBe(56);
+    expect(zooms[1].bottom).toBe(12);
+    // Plot reserve remains the sum of the legend row and slider row:
+    // padding + legend (48) + slider (56) = 104.
+    expect((option.grid as Record<string, unknown>).bottom).toBe(104);
+  });
+
+  it('keeps explicit slider positioning untouched', () => {
+    const option = resolveBarOptions(
+      {
+        categories: ['A', 'B'],
+        series: [{ name: 'Sales', data: [10, 20] }],
+      },
+      {
+        dataZoom: [{ type: 'slider', xAxisIndex: 0, bottom: 72 }],
+        legend: { position: 'bottom' },
+      },
+    ).option;
+    const legend = option.legend as Record<string, unknown>;
+    const zoom = (option.dataZoom as Array<Record<string, unknown>>)[0];
+
+    expect(legend.bottom).toBe(12);
+    expect(zoom.bottom).toBe(72);
   });
 });
 
