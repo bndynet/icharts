@@ -4,7 +4,10 @@ import type {
   AreaData,
   LineChartOptions,
   AreaChartOptions,
+  XYBandOptions,
 } from '../types.js';
+import type { CustomSeriesRenderItem } from 'echarts';
+import { mixOklab } from '@bndynet/color-hub';
 import type { ChartSetupResult, RenderContext } from './index.js';
 import { buildSparkAreaGradient, deepMerge, resolveColors } from '../utils.js';
 import {
@@ -48,6 +51,10 @@ export function resolveLineOptions(
   const isSpark = variant === 'spark';
 
   const yAxisCount = getYAxisCount(data, options);
+  const colors = resolveColors(seriesNames, options);
+  const lineSeries = buildLineSeries(data, options, xAxisType, false);
+  const bandSeries = isSpark ? [] : buildBandSeries(data, options, colors);
+  if (bandSeries.length > 0) raisePrimarySeriesAboveBands(lineSeries);
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
@@ -71,14 +78,17 @@ export function resolveLineOptions(
     tooltip: isSpark
       ? buildSparkTooltip(options, ctx)
       : buildTooltip(options, 'axis', 'cross', isTime, ctx),
-    series: buildLineSeries(data, options, xAxisType, false),
+    series: [
+      ...lineSeries,
+      ...bandSeries,
+    ],
   };
 
   applyXYInteractionOptions(eOption, options, !isSpark && (options.legend?.show ?? true));
   applyXYPerformanceDefaults(eOption, data, xAxisType, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
-  merged.color = resolveColors(seriesNames, options);
+  merged.color = colors;
   return { option: merged };
 }
 
@@ -181,6 +191,7 @@ function resolveLineRaceOptions(
   }
 
   const labelFontSize = getLabelFontSize(options);
+  const colors = resolveColors(seriesNames, options);
   const series = buildLineSeries(data, options, xAxisType, false);
   for (const s of series) {
     s.showSymbol = false;
@@ -203,6 +214,8 @@ function resolveLineRaceOptions(
       };
     }
   }
+  const bandSeries = buildBandSeries(data, options, colors);
+  if (bandSeries.length > 0) raisePrimarySeriesAboveBands(series);
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
@@ -211,7 +224,7 @@ function resolveLineRaceOptions(
     xAxis,
     yAxis: buildYAxis(options, yAxisCount),
     tooltip: buildTooltip(options, 'axis', 'cross', isTime, ctx),
-    series,
+    series: [...series, ...bandSeries],
     animationDuration: 0,
     animationDurationUpdate: frameDuration,
     animationEasing: 'linear',
@@ -222,7 +235,7 @@ function resolveLineRaceOptions(
   applyXYPerformanceDefaults(eOption, data, xAxisType, options);
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
-  merged.color = resolveColors(seriesNames, options);
+  merged.color = colors;
   return { option: merged, notMerge: false };
 }
 
@@ -238,6 +251,10 @@ export function resolveAreaOptions(
   const isSpark = variant === 'spark';
 
   const yAxisCount = getYAxisCount(data, options);
+  const colors = resolveColors(seriesNames, options);
+  const lineSeries = buildLineSeries(data, options, xAxisType, true);
+  const bandSeries = isSpark ? [] : buildBandSeries(data, options, colors);
+  if (bandSeries.length > 0) raisePrimarySeriesAboveBands(lineSeries);
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
@@ -261,13 +278,15 @@ export function resolveAreaOptions(
     tooltip: isSpark
       ? buildSparkTooltip(options, ctx)
       : buildTooltip(options, 'axis', 'cross', isTime, ctx),
-    series: buildLineSeries(data, options, xAxisType, true),
+    series: [
+      ...lineSeries,
+      ...bandSeries,
+    ],
   };
 
   applyXYInteractionOptions(eOption, options, !isSpark && (options.legend?.show ?? true));
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
-  const colors = resolveColors(seriesNames, options);
   merged.color = colors;
 
   // Spark area fill is a per-series gradient derived from each series color;
@@ -290,6 +309,118 @@ function applySparkAreaGradient(
     const hex = colors[i] ?? colors[0];
     if (hex) s.areaStyle = { color: buildSparkAreaGradient(hex) };
   });
+}
+
+function raisePrimarySeriesAboveBands(series: Record<string, unknown>[]): void {
+  for (const item of series) item.z = 2;
+}
+
+const DEFAULT_BAND_OPACITY = 0.18;
+
+type BandPoint = [string | number, number];
+
+interface BandSegment {
+  upper: BandPoint[];
+  lower: BandPoint[];
+}
+
+/**
+ * Build one custom polygon series for each requested band. Stacking two line
+ * series is not reliable for arbitrary [x, y] data on a value axis: ECharts'
+ * treats the second series as an offset from zero in that case. A polygon
+ * keeps the fill anchored to the actual lower/upper values at every x while
+ * leaving the user's line series untouched.
+ */
+function buildBandSeries(
+  data: LineData,
+  options: LineChartOptions | AreaChartOptions,
+  colors: ReadonlyArray<string>,
+): Record<string, unknown>[] {
+  if (!options.bands || options.bands.length === 0) return [];
+
+  const seriesByName = new Map(data.series.map((series) => [series.name, series]));
+  const colorByName = new Map(data.series.map((series, index) => [series.name, colors[index]]));
+  const output: Record<string, unknown>[] = [];
+
+  options.bands.forEach((band: XYBandOptions, bandIndex) => {
+    const [firstName, secondName] = band.between;
+    const first = seriesByName.get(firstName);
+    const second = seriesByName.get(secondName);
+    if (!first || !second) return;
+
+    const segments: BandSegment[] = [];
+    let current: BandSegment = { upper: [], lower: [] };
+
+    const commitSegment = (): void => {
+      if (current.upper.length >= 2) segments.push(current);
+      current = { upper: [], lower: [] };
+    };
+
+    for (let i = 0; i < data.categories.length; i++) {
+      const firstValue = first.data[i];
+      const secondValue = second.data[i];
+      const x = data.categories[i];
+
+      if (!Number.isFinite(firstValue) || !Number.isFinite(secondValue)) {
+        commitSegment();
+        continue;
+      }
+
+      const lower = Math.min(firstValue, secondValue);
+      const upper = Math.max(firstValue, secondValue);
+      current.lower.push([x, lower]);
+      current.upper.push([x, upper]);
+    }
+    commitSegment();
+    if (segments.length === 0) return;
+
+    const opacity = Number.isFinite(band.opacity)
+      ? Math.min(1, Math.max(0, band.opacity as number))
+      : DEFAULT_BAND_OPACITY;
+    const firstColor = colorByName.get(firstName);
+    const secondColor = colorByName.get(secondName);
+    // Use a perceptual midpoint for the implicit fill color. An explicit
+    // bands.color remains the highest-priority override.
+    const color = band.color ?? (
+      firstColor && secondColor
+        ? mixOklab(firstColor, secondColor, 0.5)
+        : firstColor ?? secondColor
+    );
+    const renderItem: CustomSeriesRenderItem = (params, api) => {
+      const segment = segments[params.dataIndex];
+      if (!segment) return null;
+
+      const points = [
+        ...segment.upper.map((point) => api.coord(point)),
+        ...[...segment.lower].reverse().map((point) => api.coord(point)),
+      ];
+      if (points.length < 4) return null;
+
+      return {
+        type: 'polygon',
+        shape: { points },
+        style: {
+          ...(color ? { fill: color } : {}),
+          opacity,
+        },
+      };
+    };
+
+    output.push({
+      type: 'custom',
+      id: `__icharts_band_${bandIndex}`,
+      name: `__icharts_band_${bandIndex}`,
+      coordinateSystem: 'cartesian2d',
+      data: segments.map((_, index) => index),
+      renderItem,
+      silent: true,
+      legendHoverLink: false,
+      tooltip: { show: false },
+      z: 1,
+    });
+  });
+
+  return output;
 }
 
 // ---------------------------------------------------------------------------

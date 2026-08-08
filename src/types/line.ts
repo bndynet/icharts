@@ -1,4 +1,4 @@
-import type { XYChartOptions, XYData } from './xy.js';
+import type { XYBandOptions, XYChartOptions, XYData } from './xy.js';
 
 export type LineVariant = 'default' | 'spark' | 'race';
 
@@ -45,6 +45,9 @@ export interface LineRaceOptions {
 
 export interface LineChartOptions extends XYChartOptions {
   variant?: LineVariant;
+
+  /** Optional filled regions between two named line series. */
+  bands?: XYBandOptions[];
 
   /**
    * Line `race` variant options. Only consulted when `variant === 'race'`.

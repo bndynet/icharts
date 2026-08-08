@@ -126,6 +126,7 @@ export {
   type WordCloudDataItem,
   // Per-chart options (each extends ChartOptions / XYChartOptions)
   type XYChartOptions,
+  type XYBandOptions,
   type DataZoomOptions,
   type DataZoomConfig,
   type ToolboxOptions,

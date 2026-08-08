@@ -22,6 +22,21 @@ export interface XYData {
   series: XYDataSeries[];
 }
 
+/**
+ * Fill the area between two named XY series.
+ *
+ * The fill follows the lower and upper value at each x position, so the
+ * visual remains correct when the two series cross.
+ */
+export interface XYBandOptions {
+  /** Names of the two series whose values define the band boundaries. */
+  between: [string, string];
+  /** Optional fill color. Defaults to the perceptual midpoint of both series colors. */
+  color?: string;
+  /** Fill opacity from 0 to 1. Defaults to 0.18. */
+  opacity?: number;
+}
+
 /** Typed subset of ECharts dataZoom options used by XY charts. */
 export interface DataZoomOptions {
   type?: 'inside' | 'slider';

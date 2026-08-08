@@ -5,7 +5,7 @@
     <DemoCard
       ref="waveformCard"
       title="Numeric Waveform — 357k Samples / 3 Channels"
-      tag="3 lines + legend + auto performance + X/Y zoom"
+      tag="3 lines + legend + X/Y zoom"
       :card-style="{ gridColumn: '1 / -1' }"
       :box-style="{ height: '420px' }"
     >
@@ -35,6 +35,31 @@
     },
     restore: { title: '还原' },
   }},
+});</pre>
+      </template>
+    </DemoCard>
+
+    <DemoCard
+      ref="bandCard"
+      title="Band Fill — Between Two Curves"
+      tag="bands: Vout ↔ Vref"
+      :card-style="{ gridColumn: '1 / -1' }"
+      :box-style="{ height: '300px' }"
+    >
+      <template #code>
+        <pre v-pre class="code-block">createChart(el, 'line', {
+  categories: timeArray,
+  series: [
+    { name: 'Vout', data: voutValues },
+    { name: 'Vref', data: vrefValues },
+  ],
+}, {
+  xAxis: { type: 'value' },
+  series: { '*': { lineWidth: 0 } },
+  bands: [{
+    between: ['Vout', 'Vref'],
+    opacity: 1,
+  }],
 });</pre>
       </template>
     </DemoCard>
@@ -133,6 +158,7 @@ type CardRef = InstanceType<typeof DemoCard>;
 
 const lineCard = ref<CardRef>();
 const waveformCard = ref<CardRef>();
+const bandCard = ref<CardRef>();
 const areaCard = ref<CardRef>();
 const stackedAreaCard = ref<CardRef>();
 const markCard = ref<CardRef>();
@@ -210,6 +236,25 @@ function buildWaveformData() {
   };
 }
 
+function buildBandData() {
+  const count = 2400;
+  const categories = Array.from({ length: count }, (_, i) => i * 1e-7);
+  const vout = categories.map((time) =>
+    3.0 + 0.28 * Math.sin(2 * Math.PI * 1400 * time) +
+    0.04 * Math.sin(2 * Math.PI * 8200 * time),
+  );
+  const vref = categories.map((time) =>
+    2.72 + 0.12 * Math.sin(2 * Math.PI * 900 * time + 0.8),
+  );
+  return {
+    categories,
+    series: [
+      { name: 'Vout', data: vout },
+      { name: 'Vref', data: vref },
+    ],
+  };
+}
+
 // No manual cleanup needed — `IChart` installs a hidden sentinel custom
 // element in each container; the browser's `disconnectedCallback` fires the
 // moment Vue tears this view's DOM down, which auto-disposes every chart
@@ -257,6 +302,22 @@ onMounted(() => {
           values.join('<br/>');
       },
     },
+  });
+  const bandData = buildBandData();
+  createChart(bandCard.value!.chartEl!, 'line', bandData, {
+    title: 'Vout and Vref — Filled Difference',
+    legend: { show: true, position: 'bottom' },
+    xAxis: {
+      type: 'value',
+      includeZero: false,
+      formatLabel: (value) => `${(Number(value) * 1e6).toFixed(1)} µs`,
+    },
+    yAxis: {
+      includeZero: false,
+      formatLabel: (value) => `${Number(value).toFixed(2)} V`,
+    },
+    series: { '*': { lineWidth: 0 } },
+    bands: [{ between: ['Vout', 'Vref'], opacity: 1 }],
   });
   createChart(lineCard.value!.chartEl!, 'line', xyData, { title: 'Monthly Financials' });
   createChart(areaCard.value!.chartEl!, 'area', weekData, { title: 'Weekly Visits' });

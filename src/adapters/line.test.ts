@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import type { CustomSeriesRenderItem } from 'echarts';
+import { mixOklab } from '@bndynet/color-hub';
 import type { XYData } from '../types.js';
 import { resolveLineOptions } from './line.js';
 import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
@@ -106,6 +108,56 @@ describe('line adapter', () => {
           restore: { title: '还原' },
         },
       });
+    });
+
+    it('fills the area between two named series when bands are enabled', () => {
+      const { option } = resolveLineOptions(
+        {
+          categories: [0, 1, 2],
+          series: [
+            { name: 'Vout', data: [1, 4, -2] },
+            { name: 'Vref', data: [3, 2, -4] },
+          ],
+        },
+        {
+          xAxis: { type: 'value' },
+          bands: [{ between: ['Vout', 'Vref'], opacity: 0.25 }],
+        },
+      );
+      const series = option.series as Record<string, unknown>[];
+      const colors = option.color as string[];
+
+      expect(series).toHaveLength(3);
+      expect(series.slice(0, 2).map((item) => item.name)).toEqual(['Vout', 'Vref']);
+      expect(series.slice(0, 2).every((item) => item.z === 2)).toBe(true);
+      expect(series[2]).toMatchObject({
+        name: '__icharts_band_0',
+        type: 'custom',
+        coordinateSystem: 'cartesian2d',
+        data: [0],
+        silent: true,
+        tooltip: { show: false },
+      });
+
+      const renderItem = series[2].renderItem as CustomSeriesRenderItem;
+      const rendered = renderItem(
+        { dataIndex: 0 } as Parameters<CustomSeriesRenderItem>[0],
+        {
+          coord: (point) => {
+            const [x, y] = point as [number, number];
+            return [Number(x), Number(y)];
+          },
+        } as Parameters<CustomSeriesRenderItem>[1],
+      ) as unknown as { shape: { points: number[][] }; style: Record<string, unknown> };
+      expect(rendered.shape.points).toEqual([
+        [0, 3], [1, 4], [2, -2],
+        [2, -4], [1, 2], [0, 1],
+      ]);
+      expect(rendered.style).toEqual({
+        fill: mixOklab(colors[0], colors[1], 0.5),
+        opacity: 0.25,
+      });
+      expect((option.legend as Record<string, unknown>).data).toEqual(['Vout', 'Vref']);
     });
 
     it('expands dataZoom true to the standard waveform controls', () => {
