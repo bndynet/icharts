@@ -106,8 +106,8 @@ chart.update(data.map((slice) => ({ ...slice, value: slice.value + 5 })));</pre>
       card-style="grid-column: 1 / -1;"
     >
       <template #code>
-        <pre v-pre class="code-block">const total = pieData.reduce((s, d) =&gt; s + d.value, 0);
-const byName = new Map(pieData.map((d) =&gt; [d.name, d.value]));
+        <pre v-pre class="code-block">const pieTotal = pieData.reduce((sum, d) =&gt; sum + d.value, 0);
+const pieByName = new Map(pieData.map((d) =&gt; [d.name, d.value]));
 const iconByName: Record&lt;string, string&gt; = {
   Chrome: '🌐',
   Safari: '🧭',
@@ -121,17 +121,17 @@ createChart(el, 'pie', pieData, {
     show: true,
     position: 'right',
     formatLabel: (name) =&gt; {
-      const v = byName.get(name) ?? 0;
-      const pct = ((v / total) * 100).toFixed(1);
+      const v = pieByName.get(name) ?? 0;
+      const pct = ((v / pieTotal) * 100).toFixed(0);
       return {
         segments: [
           {
             text: `${iconByName[name] ?? '•'} ${name === 'Chrome' ? 'Google Chrome' : name}`,
-            width: 60,
-            style: { fontSize: 24, verticalAlign: 'middle', lineHeight: 46 },
+            width: 80,
+            style: { fontWeight: 800 },
           },
           {
-            text: `${v}\n(${pct}%)`,
+            text: `${v} (${pct}%)`,
             width: 60,
             align: 'right',
             style: { color: '#9aa1ad' },

@@ -37,6 +37,12 @@ const COLORS: ChartThemeColors = {
 const PALETTE = ['#60a5fa', '#34d399'];
 
 describe('buildEChartsTheme — data-label colors are themed', () => {
+  it('legend inactive border follows the chart item divider color', () => {
+    const itemDivider = '#1e293b';
+    const theme = buildEChartsTheme({ ...COLORS, itemDivider }, PALETTE);
+    expect(theme.legend.inactiveBorderColor).toBe(itemDivider);
+  });
+
   it('bar.label.color follows textPrimary (covers race value labels + showLabel)', () => {
     const theme = buildEChartsTheme(COLORS, PALETTE);
     expect(theme.bar.label.color).toBe(COLORS.textPrimary);

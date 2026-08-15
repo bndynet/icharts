@@ -103,6 +103,9 @@ export function buildEChartsTheme(
 
     legend: {
       textStyle: { color: colors.textPrimary },
+      // Keep an inactive legend symbol's fill area aligned with its active
+      // state when the series has a border (pie slices use itemDivider).
+      inactiveBorderColor: colors.itemDivider ?? colors.surface,
     },
 
     visualMap: {
