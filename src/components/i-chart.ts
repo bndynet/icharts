@@ -49,7 +49,7 @@ export class IChartElement extends LitElement {
       this.engine?.resize();
     });
     this.resizeObserver.observe(this);
-    this.renderChart();
+    this.renderChart(true);
   }
 
   override updated(changed: PropertyValues): void {
@@ -60,7 +60,7 @@ export class IChartElement extends LitElement {
     ) {
       // Skip the very first update — handled by firstUpdated
       if (changed.has('type') && !changed.get('type') && this.engine === null) return;
-      this.renderChart();
+      this.renderChart(changed.has('options'));
     }
   }
 
@@ -77,7 +77,7 @@ export class IChartElement extends LitElement {
     return this.engine;
   }
 
-  private renderChart(): void {
+  private renderChart(optionsChanged: boolean): void {
     if (!this.data) return;
 
     const container = this.shadowRoot?.querySelector(
@@ -89,7 +89,7 @@ export class IChartElement extends LitElement {
       this.engine = new IChart(container, this.type, this.data, this.options);
     } else {
       this.engine.setType(this.type);
-      this.engine.update(this.data, this.options);
+      this.engine.update(this.data, optionsChanged ? this.options : undefined);
     }
   }
 }

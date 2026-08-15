@@ -22,6 +22,7 @@ import {
 } from './themes/index.js';
 import { chartRegistry } from './registry.js';
 import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
+import { LegendSelectionController } from './legend-selection.js';
 
 // NOTE: `@echarts-x/custom-word-cloud` + `@echarts-x/custom-liquid-fill`
 // are NOT imported here. Both packages touch `window` / `document` at
@@ -44,6 +45,7 @@ export class IChart implements IChartInstance {
   private _type: string;
   private _data: ChartData;
   private _options: AnyChartOptions;
+  private _legendSelection: LegendSelectionController;
   private _activeTheme: string;
   /**
    * Wall-clock time (ms since page-load) of the previous `update()` call.
@@ -167,6 +169,7 @@ export class IChart implements IChartInstance {
     this._type = type;
     this._data = data;
     this._options = options;
+    this._legendSelection = new LegendSelectionController(container, options);
     this._activeTheme = resolveThemeName(options.theme);
     this._inShadowDom =
       typeof ShadowRoot !== 'undefined' &&
@@ -197,7 +200,10 @@ export class IChart implements IChartInstance {
           ? adapter.mergeData(this._data, newData)
           : newData;
     }
-    if (newOptions) this._options = { ...this._options, ...newOptions };
+    if (newOptions) {
+      this._legendSelection.setExplicitSelected(newOptions);
+      this._options = { ...this._options, ...newOptions };
+    }
 
     // Sample the inter-update interval BEFORE re-rendering so adapters can
     // use it as a default for their per-frame animation duration. The first
@@ -271,6 +277,7 @@ export class IChart implements IChartInstance {
     // to the event wrappers so they (and the options closure they hold) can
     // be collected.
     this._boundEvents = [];
+    this._legendSelection.dispose();
     // Run the adapter's final teardown (e.g. disconnect a ResizeObserver)
     // before ECharts tears down the instance.
     this._runApplyCleanup();
@@ -356,9 +363,11 @@ export class IChart implements IChartInstance {
       endColorRender(this);
     }
     const { option, onInit, notMerge } = resolved;
+    const legendModeChanged = this._legendSelection.prepare(option, this._options);
     applyConfiguredFontFamilyToOption(option, getConfig().fontFamily);
     this._observeGridRight(option);
-    this.ecInstance.setOption(option, notMerge ?? true);
+    this.ecInstance.setOption(option, legendModeChanged || (notMerge ?? true));
+    this._legendSelection.render(this._options);
     this._rebindAsyncTooltipDismiss(option);
     this._rebindEvents();
     // Tear down the previous render's adapter effect before re-running

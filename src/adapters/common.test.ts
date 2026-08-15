@@ -311,6 +311,14 @@ describe('buildLegend', () => {
     expect(legend.formatter).toBeUndefined();
   });
 
+  it('does not send independent selection to ECharts', () => {
+    const legend = buildLegend(['A', 'B'], {
+      legend: { selection: { selected: ['A'] } },
+    });
+    expect(legend.selected).toBeUndefined();
+    expect(legend.selectedMode).toBeUndefined();
+  });
+
   it('formatLabel: falls back to the raw name when the user function throws', () => {
     const legend = buildLegend(['A'], {
       legend: {

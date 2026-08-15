@@ -82,9 +82,28 @@ export interface RichTextSpec {
 /** Formatter input accepted by rich-text aware formatters. */
 export type RichTextInput = string | RichTextSpec;
 
+export interface LegendSelectionChangeEvent {
+  /** Original legend name, independent of formatLabel. */
+  name: string;
+  /** Whether the clicked item is highlighted after the change. */
+  active: boolean;
+  /** All highlighted original names, in legend order. */
+  selected: string[];
+}
+
+export interface LegendSelectionOptions {
+  /** Highlight multiple entries by default, or at most one. */
+  mode?: 'multiple' | 'single';
+  /** Initial highlights; explicitly passing this again to update() resets them. */
+  selected?: string[];
+  onChange?: (event: LegendSelectionChangeEvent) => void;
+}
+
 export interface LegendOptions {
   show?: boolean;
   position?: 'top' | 'bottom' | 'left' | 'right';
+  /** Enable independent background highlighting without hiding chart data. */
+  selection?: LegendSelectionOptions;
   /**
    * Legend layout height in pixels.
    *

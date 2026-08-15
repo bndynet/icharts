@@ -35,10 +35,11 @@ vi.mock('@echarts-x/custom-word-cloud', () => ({
 
 import { IChart } from './core.js';
 import { registerAdapter, type RenderContext } from './adapters/index.js';
+import { buildLegend } from './adapters/common/index.js';
 import { configure, resetConfiguration } from './config.js';
 import { resolveColors } from './utils.js';
 import { switchTheme, resetColorMap } from './themes/index.js';
-import type { ChartData, ChartOptions } from './types.js';
+import type { ChartData, ChartOptions, LineChartOptions, XYData } from './types.js';
 import * as echarts from 'echarts';
 
 const observations: Array<RenderContext | undefined> = [];
@@ -123,6 +124,71 @@ describe('IChart engine — RenderContext threading', () => {
     chart.setTheme('default');
     expect(observations).toHaveLength(1);
     expect(observations[0]?.observedFrameMs).toBeUndefined();
+    chart.dispose();
+  });
+});
+
+describe('IChart engine — legend selection', () => {
+  const data: XYData = {
+    categories: ['Jan'],
+    series: [{ name: 'Revenue', data: [10] }, { name: 'Cost', data: [5] }],
+  };
+
+  beforeEach(() => {
+    registerAdapter('legend-stub', {
+      validate: () => true,
+      resolve: (chartData, options) => ({
+        option: {
+          legend: buildLegend(
+            (chartData as XYData).series.map((series) => series.name),
+            options as LineChartOptions,
+          ),
+          series: [],
+        },
+      }),
+    });
+  });
+
+  it('uses a hidden, non-filtering native legend only in custom selection mode', () => {
+    const chart = new IChart(fakeContainer(), 'legend-stub', data, {
+      legend: { selection: { selected: ['Cost'] } },
+    } as LineChartOptions);
+    const ec = chart.getEChartsInstance() as unknown as {
+      on: ReturnType<typeof vi.fn>;
+      setOption: ReturnType<typeof vi.fn>;
+    };
+    const lastLegend = (): { selected: Record<string, boolean>; selectedMode: boolean; show: boolean } => {
+      const option = ec.setOption.mock.lastCall?.[0] as {
+        legend: { selected: Record<string, boolean>; selectedMode: boolean; show: boolean };
+      };
+      return option.legend;
+    };
+    expect(lastLegend()).toMatchObject({
+      selected: { Revenue: true, Cost: true }, selectedMode: false, show: false,
+    });
+    chart.update({ ...data, series: [...data.series, { name: 'Profit', data: [5] }] });
+    expect(lastLegend().selected).toEqual({ Revenue: true, Cost: true, Profit: true });
+    chart.setTheme('dark');
+    chart.resize();
+    expect(lastLegend().selected).toEqual({ Revenue: true, Cost: true, Profit: true });
+    expect(ec.on.mock.calls.some((call) => call[0] === 'legendselectchanged')).toBe(false);
+    chart.update(undefined, { legend: {} } as LineChartOptions);
+    expect(lastLegend().show).toBe(true);
+    expect(lastLegend().selected).toBeUndefined();
+    expect(ec.setOption.mock.lastCall?.[1]).toBe(true);
+    chart.dispose();
+  });
+
+  it('preserves native legend behavior when selection is disabled', () => {
+    const chart = new IChart(fakeContainer(), 'legend-stub', data);
+    const ec = chart.getEChartsInstance() as unknown as {
+      setOption: ReturnType<typeof vi.fn>;
+    };
+    const option = ec.setOption.mock.lastCall?.[0] as {
+      legend: { selected?: Record<string, boolean>; show: boolean };
+    };
+    expect(option.legend.show).toBe(true);
+    expect(option.legend.selected).toBeUndefined();
     chart.dispose();
   });
 });
