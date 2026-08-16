@@ -108,6 +108,11 @@ export default defineConfig({
       page: () => import('./views/CustomLegendView.vue'),
     },
     {
+      label: 'Chart Status',
+      icon: 'activity',
+      page: () => import('./views/ChartStatusView.vue'),
+    },
+    {
       label: 'Advanced',
       icon: 'sparkles',
       page: () => import('./views/AdvancedView.vue'),

@@ -1,6 +1,11 @@
 import { LitElement, html, css, type PropertyValues } from 'lit';
-import { property } from 'lit/decorators.js';
-import type { ChartData, AnyChartOptions, IChartInstance } from '../types.js';
+import { property, state } from 'lit/decorators.js';
+import type {
+  ChartData,
+  AnyChartOptions,
+  IChartInstance,
+  ChartStatus,
+} from '../types.js';
 import { IChart } from '../core.js';
 
 /**
@@ -21,10 +26,55 @@ export class IChartElement extends LitElement {
       display: block;
       width: 100%;
       height: 100%;
+      position: relative;
     }
     .ichart-container {
       width: 100%;
       height: 100%;
+    }
+    .ichart-status-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      padding: 16px;
+      text-align: center;
+      color: var(--ichart-status-color, CanvasText);
+      background: var(--ichart-status-background, color-mix(in srgb, Canvas 84%, transparent));
+      backdrop-filter: blur(1px);
+    }
+    .ichart-status-layer[hidden] {
+      display: none;
+    }
+    .ichart-status-view {
+      display: none;
+      pointer-events: auto;
+    }
+    .ichart-status-layer[data-status='loading'] [data-view='loading'],
+    .ichart-status-layer[data-status='empty'] [data-view='empty'],
+    .ichart-status-layer[data-status='error'] [data-view='error'] {
+      display: block;
+    }
+    .ichart-status-fallback {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .ichart-status-spinner {
+      width: 22px;
+      height: 22px;
+      box-sizing: border-box;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: ichart-status-spin 0.8s linear infinite;
+    }
+    @keyframes ichart-status-spin {
+      to { transform: rotate(360deg); }
     }
   `;
 
@@ -37,11 +87,59 @@ export class IChartElement extends LitElement {
   @property({ type: Object })
   options: AnyChartOptions = {};
 
+  /** Set the loading / empty / error display. Named slots can replace each view. */
+  @property({ attribute: false })
+  status: ChartStatus | null = null;
+
+  @state()
+  private engineStatus: ChartStatus = { type: 'ready' };
+  private hasEngineStatus = false;
+
   private engine: IChart | null = null;
   private resizeObserver: ResizeObserver | null = null;
+  private statusContainer: HTMLElement | null = null;
+  private readonly statusChangeListener = (event: Event): void => {
+    this.engineStatus = (event as CustomEvent<ChartStatus>).detail;
+    this.hasEngineStatus = true;
+  };
 
   override render() {
-    return html`<div class="ichart-container"></div>`;
+    const status = this.currentStatus();
+    const customRenderer = Boolean(this.options.statusRenderer);
+    const hidden = status.type === 'ready' || customRenderer;
+    return html`
+      <div class="ichart-container"></div>
+      <div
+        class="ichart-status-layer"
+        data-status=${status.type}
+        role=${status.type === 'error' ? 'alert' : 'status'}
+        aria-live="polite"
+        ?hidden=${hidden}
+      >
+        <div class="ichart-status-view" data-view="loading">
+          <slot name="loading">
+            <div class="ichart-status-fallback">
+              <span class="ichart-status-spinner" aria-hidden="true"></span>
+              <span>${status.type === 'loading' ? status.message ?? 'Loading…' : 'Loading…'}</span>
+            </div>
+          </slot>
+        </div>
+        <div class="ichart-status-view" data-view="empty">
+          <slot name="empty">
+            <div class="ichart-status-fallback">
+              <span>${status.type === 'empty' ? status.message ?? 'No data available' : 'No data available'}</span>
+            </div>
+          </slot>
+        </div>
+        <div class="ichart-status-view" data-view="error">
+          <slot name="error">
+            <div class="ichart-status-fallback">
+              <span>${status.type === 'error' ? status.message ?? 'Unable to load chart' : 'Unable to load chart'}</span>
+            </div>
+          </slot>
+        </div>
+      </div>
+    `;
   }
 
   override firstUpdated(): void {
@@ -62,12 +160,19 @@ export class IChartElement extends LitElement {
       if (changed.has('type') && !changed.get('type') && this.engine === null) return;
       this.renderChart(changed.has('options'));
     }
+    if (changed.has('status')) {
+      const status = this.currentStatus();
+      this.engine?.setStatus(status);
+      this.engineStatus = status;
+    }
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.statusContainer?.removeEventListener('ichartstatuschange', this.statusChangeListener);
+    this.statusContainer = null;
     this.engine?.dispose();
     this.engine = null;
   }
@@ -78,19 +183,56 @@ export class IChartElement extends LitElement {
   }
 
   private renderChart(optionsChanged: boolean): void {
-    if (!this.data) return;
-
     const container = this.shadowRoot?.querySelector(
       '.ichart-container',
     ) as HTMLElement | null;
     if (!container) return;
+    this.bindStatusListener(container);
+
+    if (!this.data) {
+      const status = this.currentStatus();
+      this.engine?.setStatus(status);
+      this.engineStatus = status;
+      return;
+    }
 
     if (!this.engine) {
-      this.engine = new IChart(container, this.type, this.data, this.options);
+      this.engine = new IChart(container, this.type, this.data, this.optionsWithStatusRenderer());
+      this.engine.setStatus(this.currentStatus());
     } else {
       this.engine.setType(this.type);
-      this.engine.update(this.data, optionsChanged ? this.options : undefined);
+      this.engine.update(
+        this.data,
+        optionsChanged ? this.optionsWithStatusRenderer() : undefined,
+      );
+      this.engine.setStatus(this.currentStatus());
     }
+  }
+
+  private currentStatus(): ChartStatus {
+    if (this.status) return this.status;
+    if (this.hasEngineStatus) return this.engineStatus;
+    return this.options.status ?? this.engineStatus;
+  }
+
+  private bindStatusListener(container: HTMLElement): void {
+    if (this.statusContainer === container) return;
+    this.statusContainer?.removeEventListener('ichartstatuschange', this.statusChangeListener);
+    this.statusContainer = container;
+    this.statusContainer.addEventListener('ichartstatuschange', this.statusChangeListener);
+  }
+
+  private optionsWithStatusRenderer(): AnyChartOptions {
+    if (this.options.statusRenderer) return this.options;
+    return {
+      ...this.options,
+      statusRenderer: (_status, layer) => {
+        // The Web Component renders its named slots in Lit's static template;
+        // keep the imperative overlay hidden while still using the shared
+        // instance state/event lifecycle.
+        layer.style.display = 'none';
+      },
+    };
   }
 }
 

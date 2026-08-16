@@ -11,6 +11,7 @@ import type {
   ChartEventType,
   ChartEventHandler,
   ChartHighlightTarget,
+  ChartStatus,
 } from './types.js';
 import { applyConfiguredFontFamilyToOption } from './adapters/common/font-family.js';
 import {
@@ -23,6 +24,7 @@ import {
 import { chartRegistry } from './registry.js';
 import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
 import { LegendSelectionController } from './legend-selection.js';
+import { ChartStatusOverlay } from './status-overlay.js';
 
 // NOTE: `@echarts-x/custom-word-cloud` + `@echarts-x/custom-liquid-fill`
 // are NOT imported here. Both packages touch `window` / `document` at
@@ -45,7 +47,9 @@ export class IChart implements IChartInstance {
   private _type: string;
   private _data: ChartData;
   private _options: AnyChartOptions;
+  private _container: HTMLElement;
   private _legendSelection: LegendSelectionController;
+  private _statusOverlay!: ChartStatusOverlay;
   private _activeTheme: string;
   /**
    * Wall-clock time (ms since page-load) of the previous `update()` call.
@@ -169,6 +173,7 @@ export class IChart implements IChartInstance {
     this._type = type;
     this._data = data;
     this._options = options;
+    this._container = container;
     this._legendSelection = new LegendSelectionController(container, options);
     this._activeTheme = resolveThemeName(options.theme);
     this._inShadowDom =
@@ -177,6 +182,8 @@ export class IChart implements IChartInstance {
     this.ecInstance = echarts.init(container, this._activeTheme);
     chartRegistry.add(this);
     this._apply();
+    this._statusOverlay = new ChartStatusOverlay(container, options.statusRenderer);
+    this.setStatus(options.status ?? { type: 'ready' });
     // Auto-dispose on container detach. Installed AFTER `_apply()` so a
     // throwing adapter doesn't leave behind a sentinel whose disposer
     // would race a half-initialized chart through `dispose()`. See
@@ -203,6 +210,9 @@ export class IChart implements IChartInstance {
     if (newOptions) {
       this._legendSelection.setExplicitSelected(newOptions);
       this._options = { ...this._options, ...newOptions };
+      if ('statusRenderer' in newOptions) {
+        this._statusOverlay.setRenderer(newOptions.statusRenderer);
+      }
     }
 
     // Sample the inter-update interval BEFORE re-rendering so adapters can
@@ -218,6 +228,22 @@ export class IChart implements IChartInstance {
       observedFrameMs,
       maxRaceGridRight: this._maxGridRight || undefined,
     });
+    if (newOptions && 'status' in newOptions) {
+      this.setStatus(newOptions.status ?? { type: 'ready' });
+    }
+  }
+
+  setStatus(status: ChartStatus): void {
+    if (this._disposed) return;
+    this._statusOverlay.setStatus(status);
+    if (
+      typeof CustomEvent !== 'undefined' &&
+      typeof this._container.dispatchEvent === 'function'
+    ) {
+      this._container.dispatchEvent(
+        new CustomEvent<ChartStatus>('ichartstatuschange', { detail: status }),
+      );
+    }
   }
 
   setTheme(theme: string): void {
@@ -281,6 +307,7 @@ export class IChart implements IChartInstance {
     // Run the adapter's final teardown (e.g. disconnect a ResizeObserver)
     // before ECharts tears down the instance.
     this._runApplyCleanup();
+    this._statusOverlay.dispose();
     // Release this chart's consistentColors name lease so any auto-assigned
     // palette slot it was the last holder of is recycled. This is the primary
     // cleanup path that makes the registry / sentinel sweeps a fallback rather

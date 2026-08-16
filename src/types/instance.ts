@@ -28,7 +28,7 @@ import type {
   WordCloudData,
   WordCloudChartOptions,
 } from './word-cloud.js';
-import type { ChartHighlightTarget } from './shared.js';
+import type { ChartHighlightTarget, ChartStatus } from './shared.js';
 
 // ---------------------------------------------------------------------------
 // Aggregate unions
@@ -169,6 +169,8 @@ export type ChartOptionsFor<T> = T extends keyof ChartTypeRegistry
  */
 export interface IChartInstance<T extends string = string> {
   update(data?: ChartDataFor<T>, options?: ChartOptionsFor<T>): void;
+  /** Show or clear a loading / empty / error layer without replacing chart options. */
+  setStatus(status: ChartStatus): void;
   /** Switch ECharts theme without disposing the instance (ECharts 6+). Updates series colors from the active palette. */
   setTheme(theme: string): void;
   resize(): void;

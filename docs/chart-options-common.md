@@ -175,6 +175,10 @@ Cross-cutting `ChartOptions` shared by every chart type. `legend` and `grid` liv
     onMouseOut?: (ctx: ChartEventContext) => void;
   };
 
+  // Optional initial state + custom DOM presentation for loading/empty/error.
+  status?: { type: 'ready' | 'loading' | 'empty' | 'error'; message?: string; error?: unknown };
+  statusRenderer?: (status, layer: HTMLElement) => void | (() => void);
+
   // Advanced passthrough — for anything not covered above
   echarts?: Record<string, unknown>;
 }

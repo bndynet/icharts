@@ -171,6 +171,8 @@ export {
   type ChartEventType,
   type ChartEventHandler,
   type ChartEventHandlers,
+  type ChartStatus,
+  type ChartStatusRenderer,
   type ChartHighlightTarget,
   type EmphasisOptions,
   type CreateAsyncTooltipFormatterOptions,

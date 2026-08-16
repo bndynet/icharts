@@ -3,6 +3,8 @@ import type {
   TooltipOptions,
   ChartEventHandlers,
   EmphasisOptions,
+  ChartStatus,
+  ChartStatusRenderer,
 } from './shared.js';
 
 // ---------------------------------------------------------------------------
@@ -95,6 +97,11 @@ export interface ChartOptions {
    * them on the live instance and keeps them in sync across `update()`.
    */
   events?: ChartEventHandlers;
+
+  /** Initial display state. Use `chart.setStatus()` to change it at runtime. */
+  status?: ChartStatus;
+  /** Optional custom DOM renderer for loading / empty / error states. */
+  statusRenderer?: ChartStatusRenderer;
 
   /** Raw ECharts options merged last — escape hatch for advanced users */
   echarts?: Record<string, unknown>;

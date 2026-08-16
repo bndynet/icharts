@@ -60,6 +60,84 @@ chart.resize();
 chart.dispose();
 ```
 
+### Loading, empty, and error states
+
+Set an initial state in the chart options or change it on the instance. The
+chart data remains mounted underneath the status layer, so a loading overlay
+does not blank the previous result. Empty data is explicit because the library
+cannot infer emptiness consistently across all chart data formats.
+
+```ts
+const chart = createChart(el, 'line', data, {
+  statusRenderer: (status, layer) => {
+    const content = document.createElement('section');
+    content.className = `report-state report-state-${status.type}`;
+    content.textContent = status.message ?? (
+      status.type === 'loading' ? 'Loading report…' :
+      status.type === 'empty' ? 'No results' : 'Report unavailable'
+    );
+
+    if (status.type === 'error') {
+      const image = document.createElement('img');
+      image.src = '/images/report-error.svg';
+      image.alt = '';
+      const retry = document.createElement('button');
+      retry.textContent = 'Retry';
+      retry.onclick = () => reloadReport();
+      content.replaceChildren(image, document.createTextNode(status.message ?? 'Unable to load report'), retry);
+    }
+
+    layer.appendChild(content);
+    return () => content.remove(); // optional renderer cleanup
+  },
+});
+
+chart.setStatus({ type: 'loading', message: 'Refreshing…' });
+// After your request completes:
+chart.update(nextData);
+chart.setStatus({ type: 'ready' });
+
+// Or show an explicit empty / error state:
+chart.setStatus({ type: 'empty', message: 'No results for these filters' });
+chart.setStatus({ type: 'error', message: 'Could not load report', error });
+```
+
+The default status view is a small accessible overlay. A custom
+`statusRenderer(status, layer)` can append any DOM, including images, icons,
+buttons, or a framework mount point. It may return a cleanup function, which
+runs before the next status render and when the chart is disposed. Content is
+created as DOM rather than inserted from an HTML string.
+
+For `<i-chart>`, provide named slots to replace individual views:
+
+```html
+<i-chart id="report-chart" type="line">
+  <section slot="loading" class="report-state">
+    <img src="/images/spinner.svg" alt="" /> Updating report…
+  </section>
+  <section slot="empty" class="report-state">
+    <img src="/images/no-results.svg" alt="" /> No results
+  </section>
+  <section slot="error" class="report-state">
+    <img src="/images/report-error.svg" alt="" />
+    <p>Report unavailable</p>
+    <button onclick="reloadReport()">Try again</button>
+  </section>
+</i-chart>
+```
+
+```ts
+const element = document.querySelector('i-chart');
+if (element) element.status = { type: 'error', message: 'Report unavailable' };
+```
+
+Slots are named `loading`, `empty`, and `error`; when a slot is absent, the
+component's default view is used. Style the default overlay with
+`--ichart-status-color` and `--ichart-status-background` on the chart host.
+The `status` property also works before `data` is available, so the component
+can show its initial loading state while the application fetches the first
+frame.
+
 ### Option 3 — CDN (no bundler)
 
 ```html
@@ -336,7 +414,7 @@ All options fields are optional. Each chart type extends the base `ChartOptions`
 
 `createChart` accepts `AnyChartOptions` — a chart-specific literal type-checks without importing the subtype. For stricter validation, import the matching `XxxChartOptions` and annotate explicitly.
 
-Cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `labelFontSize`, `tooltip`, `echarts`): [docs/chart-options-common.md](docs/chart-options-common.md).
+Cross-cutting fields (`theme`, `title`, `padding`, `colors`, `colorMap`, `labelFontSize`, `tooltip`, `status`, `statusRenderer`, `echarts`): [docs/chart-options-common.md](docs/chart-options-common.md).
 
 Internal design notes: [docs/COLORS.md](docs/COLORS.md) (color pipeline), [docs/LAYOUT.md](docs/LAYOUT.md) (title + legend layout).
 
@@ -507,6 +585,7 @@ Notes:
 | Method | Description |
 |--------|-------------|
 | `update(data?, options?)` | Re-render with new data / options |
+| `setStatus(status)` | Show a loading, empty, error, or ready state without replacing chart data |
 | `setTheme(name)` | Switch to a registered theme without re-creating the instance |
 | `resize()` | Trigger resize (e.g. after container size change) |
 | `dispose()` | Destroy the chart and free memory. Called automatically when the container leaves the DOM (idempotent — safe to call again). |

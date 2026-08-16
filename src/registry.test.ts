@@ -37,6 +37,7 @@ function makeFakeChart(opts: {
 
   const instance: IChartInstance = {
     update: (_d?: ChartData, _o?: AnyChartOptions) => {},
+    setStatus: () => {},
     setTheme: (_t: string) => {},
     resize: () => {},
     dispose: disposeSpy,
@@ -85,6 +86,7 @@ describe('pruneDetachedCharts', () => {
     // Simulate an environment without a real DOM container.
     const headless: IChartInstance = {
       update: () => {},
+      setStatus: () => {},
       setTheme: () => {},
       resize: () => {},
       dispose: vi.fn(),

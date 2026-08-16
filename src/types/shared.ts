@@ -19,6 +19,24 @@ export interface TitleOptions {
   padding?: number;
 }
 
+/** Runtime display state for the optional chart status layer. */
+export type ChartStatus =
+  | { type: 'ready' }
+  | { type: 'loading'; message?: string }
+  | { type: 'empty'; message?: string }
+  | { type: 'error'; message?: string; error?: unknown };
+
+/**
+ * Render custom DOM inside the chart's status layer. The renderer can append
+ * any trusted DOM, including images, icons, buttons, or a framework mount
+ * point. Return a cleanup callback when mounting framework roots or external
+ * resources.
+ */
+export type ChartStatusRenderer = (
+  status: Exclude<ChartStatus, { type: 'ready' }>,
+  layer: HTMLElement,
+) => void | (() => void);
+
 /**
  * Rich-text style object passed through to ECharts `*.rich.<key>`.
  *
