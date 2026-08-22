@@ -7,6 +7,7 @@ import type {
   ChartStatus,
 } from '../types.js';
 import { IChart } from '../core.js';
+import { getConfig } from '../config.js';
 
 /**
  * `<i-chart>` web component backed by ECharts.
@@ -53,6 +54,13 @@ export class IChartElement extends LitElement {
       display: none;
       pointer-events: auto;
     }
+    .ichart-global-status-content {
+      display: contents;
+      pointer-events: auto;
+    }
+    .ichart-global-status-content[hidden] {
+      display: none;
+    }
     .ichart-status-layer[data-status='loading'] [data-view='loading'],
     .ichart-status-layer[data-status='empty'] [data-view='empty'],
     .ichart-status-layer[data-status='error'] [data-view='error'] {
@@ -96,17 +104,23 @@ export class IChartElement extends LitElement {
   private hasEngineStatus = false;
 
   private engine: IChart | null = null;
+  private globalStatusCleanup: (() => void) | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private statusContainer: HTMLElement | null = null;
   private readonly statusChangeListener = (event: Event): void => {
     this.engineStatus = (event as CustomEvent<ChartStatus>).detail;
     this.hasEngineStatus = true;
   };
+  private readonly globalConfigChangeListener = (): void => {
+    this.requestUpdate();
+  };
 
   override render() {
     const status = this.currentStatus();
-    const customRenderer = Boolean(this.options.statusRenderer);
-    const hidden = status.type === 'ready' || customRenderer;
+    const localRenderer = Boolean(this.options.statusRenderer);
+    const hasStatusSlot = this.hasStatusSlot(status.type);
+    const globalRenderer = Boolean(getConfig().statusRenderer) && !localRenderer && !hasStatusSlot;
+    const hidden = status.type === 'ready' || localRenderer;
     return html`
       <div class="ichart-container"></div>
       <div
@@ -116,25 +130,29 @@ export class IChartElement extends LitElement {
         aria-live="polite"
         ?hidden=${hidden}
       >
-        <div class="ichart-status-view" data-view="loading">
+        <div
+          class="ichart-global-status-content"
+          ?hidden=${!globalRenderer}
+        ></div>
+        <div class="ichart-status-view" data-view="loading" ?hidden=${globalRenderer}>
           <slot name="loading">
             <div class="ichart-status-fallback">
               <span class="ichart-status-spinner" aria-hidden="true"></span>
-              <span>${status.type === 'loading' ? status.message ?? 'Loading…' : 'Loading…'}</span>
+              <span>${status.type === 'loading' ? status.message ?? getConfig().statusMessages?.loading ?? 'Loading…' : getConfig().statusMessages?.loading ?? 'Loading…'}</span>
             </div>
           </slot>
         </div>
-        <div class="ichart-status-view" data-view="empty">
+        <div class="ichart-status-view" data-view="empty" ?hidden=${globalRenderer}>
           <slot name="empty">
             <div class="ichart-status-fallback">
-              <span>${status.type === 'empty' ? status.message ?? 'No data available' : 'No data available'}</span>
+              <span>${status.type === 'empty' ? status.message ?? getConfig().statusMessages?.empty ?? 'No data available' : getConfig().statusMessages?.empty ?? 'No data available'}</span>
             </div>
           </slot>
         </div>
-        <div class="ichart-status-view" data-view="error">
+        <div class="ichart-status-view" data-view="error" ?hidden=${globalRenderer}>
           <slot name="error">
             <div class="ichart-status-fallback">
-              <span>${status.type === 'error' ? status.message ?? 'Unable to load chart' : 'Unable to load chart'}</span>
+              <span>${status.type === 'error' ? status.message ?? getConfig().statusMessages?.error ?? 'Unable to load chart' : getConfig().statusMessages?.error ?? 'Unable to load chart'}</span>
             </div>
           </slot>
         </div>
@@ -150,6 +168,13 @@ export class IChartElement extends LitElement {
     this.renderChart(true);
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('ichartconfigchange', this.globalConfigChangeListener);
+    }
+  }
+
   override updated(changed: PropertyValues): void {
     if (
       changed.has('type') ||
@@ -157,18 +182,23 @@ export class IChartElement extends LitElement {
       changed.has('options')
     ) {
       // Skip the very first update — handled by firstUpdated
-      if (changed.has('type') && !changed.get('type') && this.engine === null) return;
-      this.renderChart(changed.has('options'));
+      const firstTypeUpdate = changed.has('type') && !changed.get('type') && this.engine === null;
+      if (!firstTypeUpdate) this.renderChart(changed.has('options'));
     }
     if (changed.has('status')) {
       const status = this.currentStatus();
       this.engine?.setStatus(status);
       this.engineStatus = status;
     }
+    this.renderGlobalStatus();
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('ichartconfigchange', this.globalConfigChangeListener);
+    }
+    this.clearGlobalStatus();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.statusContainer?.removeEventListener('ichartstatuschange', this.statusChangeListener);
@@ -233,6 +263,56 @@ export class IChartElement extends LitElement {
         layer.style.display = 'none';
       },
     };
+  }
+
+  private renderGlobalStatus(): void {
+    const renderer = getConfig().statusRenderer;
+    const status = this.currentStatus();
+    const layer = this.shadowRoot?.querySelector(
+      '.ichart-global-status-content',
+    ) as HTMLElement | null;
+    this.clearGlobalStatus();
+    if (
+      !renderer ||
+      this.options.statusRenderer ||
+      status.type === 'ready' ||
+      this.hasStatusSlot(status.type) ||
+      !layer
+    ) return;
+
+    try {
+      const cleanup = renderer(status, layer);
+      this.globalStatusCleanup = typeof cleanup === 'function' ? cleanup : null;
+    } catch {
+      layer.replaceChildren();
+      const message = layer.ownerDocument.createElement('span');
+      message.textContent = status.message ?? (
+        status.type === 'loading'
+          ? getConfig().statusMessages?.loading ?? 'Loading…'
+          : status.type === 'empty'
+            ? getConfig().statusMessages?.empty ?? 'No data available'
+            : getConfig().statusMessages?.error ?? 'Unable to load chart'
+      );
+      layer.appendChild(message);
+    }
+  }
+
+  private clearGlobalStatus(): void {
+    const cleanup = this.globalStatusCleanup;
+    this.globalStatusCleanup = null;
+    try {
+      cleanup?.();
+    } catch {
+      // Ignore renderer cleanup errors during status transitions or disposal.
+    }
+    this.shadowRoot
+      ?.querySelector('.ichart-global-status-content')
+      ?.replaceChildren();
+  }
+
+  private hasStatusSlot(type: ChartStatus['type']): boolean {
+    if (type === 'ready') return false;
+    return Array.from(this.children).some((child) => child.getAttribute('slot') === type);
   }
 }
 

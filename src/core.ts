@@ -182,7 +182,10 @@ export class IChart implements IChartInstance {
     this.ecInstance = echarts.init(container, this._activeTheme);
     chartRegistry.add(this);
     this._apply();
-    this._statusOverlay = new ChartStatusOverlay(container, options.statusRenderer);
+    this._statusOverlay = new ChartStatusOverlay(
+      container,
+      options.statusRenderer ?? getConfig().statusRenderer,
+    );
     this.setStatus(options.status ?? { type: 'ready' });
     // Auto-dispose on container detach. Installed AFTER `_apply()` so a
     // throwing adapter doesn't leave behind a sentinel whose disposer
@@ -211,7 +214,9 @@ export class IChart implements IChartInstance {
       this._legendSelection.setExplicitSelected(newOptions);
       this._options = { ...this._options, ...newOptions };
       if ('statusRenderer' in newOptions) {
-        this._statusOverlay.setRenderer(newOptions.statusRenderer);
+        this._statusOverlay.setRenderer(
+          newOptions.statusRenderer ?? getConfig().statusRenderer,
+        );
       }
     }
 
@@ -242,6 +247,24 @@ export class IChart implements IChartInstance {
     ) {
       this._container.dispatchEvent(
         new CustomEvent<ChartStatus>('ichartstatuschange', { detail: status }),
+      );
+    }
+  }
+
+  /** @internal Re-resolve the inherited renderer after global configuration changes. */
+  refreshStatusRenderer(): void {
+    if (this._disposed) return;
+    this._statusOverlay.setRenderer(
+      this._options.statusRenderer ?? getConfig().statusRenderer,
+    );
+    if (
+      typeof CustomEvent !== 'undefined' &&
+      typeof this._container.dispatchEvent === 'function'
+    ) {
+      this._container.dispatchEvent(
+        new CustomEvent<ChartStatus>('ichartstatuschange', {
+          detail: this._statusOverlay.getStatus(),
+        }),
       );
     }
   }

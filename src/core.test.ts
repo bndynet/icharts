@@ -419,6 +419,18 @@ describe('IChart engine — onInit teardown lifecycle', () => {
   });
 });
 
+describe('IChart engine — global status renderer', () => {
+  it('refreshes mounted charts when the configured renderer changes', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    const refresh = vi.spyOn(chart, 'refreshStatusRenderer');
+
+    configure({ statusRenderer: () => {} });
+
+    expect(refresh).toHaveBeenCalledOnce();
+    chart.dispose();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // `inShadowDom` threading — the engine samples the container's root once at
 // construction and forwards it on every render. The flag is the contract the

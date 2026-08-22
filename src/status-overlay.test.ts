@@ -1,8 +1,13 @@
 /** @vitest-environment jsdom */
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { ChartStatusOverlay } from './status-overlay.js';
+import { configure, resetConfiguration } from './config.js';
 
 describe('ChartStatusOverlay', () => {
+  afterEach(() => {
+    resetConfiguration();
+  });
+
   it('renders default states accessibly and restores container positioning', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
@@ -66,6 +71,21 @@ describe('ChartStatusOverlay', () => {
     overlay.setStatus({ type: 'ready' });
 
     expect(container.style.position).toBe('absolute');
+    overlay.dispose();
+    container.remove();
+  });
+
+  it('uses global fallback messages unless the chart status has its own message', () => {
+    configure({ statusMessages: { loading: 'Loading all reports…' } });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const overlay = new ChartStatusOverlay(container);
+
+    overlay.setStatus({ type: 'loading' });
+    expect(container.textContent).toContain('Loading all reports…');
+    overlay.setStatus({ type: 'loading', message: 'Refreshing this chart…' });
+    expect(container.textContent).toContain('Refreshing this chart…');
+
     overlay.dispose();
     container.remove();
   });

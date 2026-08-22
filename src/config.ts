@@ -5,17 +5,28 @@ import {
   switchTheme,
   type ChartThemeConfig,
 } from './themes/index.js';
+import type { ChartStatusMessages, ChartStatusRenderer, IChartInstance } from './types.js';
+
+interface StatusRendererConfigTarget extends IChartInstance {
+  refreshStatusRenderer?: () => void;
+}
 
 export interface IChartsConfig {
   consistentColors: boolean;
   fontFamily?: string;
   theme?: ChartThemeConfig;
+  /** Default loading / empty / error renderer used by charts without an override. */
+  statusRenderer?: ChartStatusRenderer;
+  /** Default messages used by the built-in status views. */
+  statusMessages?: ChartStatusMessages;
 }
 
 const DEFAULT_CONFIG: Readonly<IChartsConfig> = {
   consistentColors: false,
   fontFamily: undefined,
   theme: undefined,
+  statusRenderer: undefined,
+  statusMessages: undefined,
 };
 
 let currentConfig: IChartsConfig = { ...DEFAULT_CONFIG };
@@ -23,6 +34,12 @@ let currentConfig: IChartsConfig = { ...DEFAULT_CONFIG };
 export function configure(opts: Partial<IChartsConfig>): void {
   const prev = { ...currentConfig };
   currentConfig = { ...currentConfig, ...opts };
+  if (opts.statusMessages) {
+    currentConfig.statusMessages = {
+      ...prev.statusMessages,
+      ...opts.statusMessages,
+    };
+  }
 
   if (opts.theme) {
     const shouldRegister =
@@ -52,6 +69,19 @@ export function configure(opts: Partial<IChartsConfig>): void {
     pruneDetachedCharts();
     for (const chart of chartRegistry) {
       chart.update();
+    }
+  }
+
+  const statusMessagesChanged =
+    prev.statusMessages?.loading !== currentConfig.statusMessages?.loading ||
+    prev.statusMessages?.empty !== currentConfig.statusMessages?.empty ||
+    prev.statusMessages?.error !== currentConfig.statusMessages?.error;
+  if (prev.statusRenderer !== currentConfig.statusRenderer || statusMessagesChanged) {
+    for (const chart of chartRegistry) {
+      (chart as StatusRendererConfigTarget).refreshStatusRenderer?.();
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('ichartconfigchange'));
     }
   }
 }

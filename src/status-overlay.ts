@@ -1,4 +1,5 @@
 import type { ChartStatus, ChartStatusRenderer } from './types.js';
+import { getConfig } from './config.js';
 
 /** Owns the DOM layer used to render non-ready chart states. */
 export class ChartStatusOverlay {
@@ -51,6 +52,10 @@ export class ChartStatusOverlay {
     }
     this.prepareLayer();
     this.render();
+  }
+
+  getStatus(): ChartStatus {
+    return this.status;
   }
 
   dispose(): void {
@@ -128,8 +133,10 @@ export class ChartStatusOverlay {
     }
 
     const message = layer.ownerDocument.createElement('span');
+    const configuredMessage = getConfig().statusMessages?.[status.type];
     message.textContent =
       status.message ??
+      configuredMessage ??
       (status.type === 'loading'
         ? 'Loading…'
         : status.type === 'empty'

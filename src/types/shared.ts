@@ -26,6 +26,13 @@ export type ChartStatus =
   | { type: 'empty'; message?: string }
   | { type: 'error'; message?: string; error?: unknown };
 
+/** Global fallback copy for built-in loading / empty / error status views. */
+export interface ChartStatusMessages {
+  loading?: string;
+  empty?: string;
+  error?: string;
+}
+
 /**
  * Render custom DOM inside the chart's status layer. The renderer can append
  * any trusted DOM, including images, icons, buttons, or a framework mount

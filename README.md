@@ -466,6 +466,55 @@ configure({
 
 `options.theme` still takes precedence over the global config for that specific chart.
 
+### Global Status Messages
+
+Customize the built-in status text without supplying a renderer or custom
+elements. Per-chart `status.message` overrides the matching global message.
+
+```ts
+configure({
+  statusMessages: {
+    loading: '正在加载…',
+    empty: '暂无数据',
+    error: '加载失败，请稍后重试',
+  },
+});
+```
+
+Partial updates merge with existing messages. Pass `statusMessages: undefined`
+to restore all built-in defaults.
+
+### Global Default Status Renderer
+
+Set a shared loading / empty / error presentation once with `configure`. Charts
+use it by default, including `<i-chart>` while it is waiting for its first data
+frame. A chart-level `statusRenderer` or matching named slot takes precedence
+when a chart needs a different presentation. Updating or clearing the global
+renderer also refreshes charts that are already mounted.
+
+```ts
+import { configure } from '@bndynet/icharts';
+
+configure({
+  statusRenderer: (status, layer) => {
+    const content = document.createElement('section');
+    content.className = `app-chart-state app-chart-state-${status.type}`;
+    const icon = document.createElement('img');
+    icon.alt = '';
+    icon.src = `/assets/${status.type}.svg`;
+    const message = document.createElement('span');
+    message.textContent = status.message ?? 'Please wait…';
+    content.append(icon, message);
+    layer.append(content);
+    return () => content.remove();
+  },
+});
+```
+
+Use `configure({ statusRenderer: undefined })` to return to the built-in
+loading / empty / error UI. Each chart still controls its own runtime state via
+`chart.setStatus(...)` or the `<i-chart>` `status` property.
+
 ### Consistent Colors Across Charts
 
 When building dashboards with multiple charts, enable `consistentColors` so that the same name always gets the same color — regardless of which chart it appears in or how many series that chart has.

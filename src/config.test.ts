@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { configure, getConfig, resetConfiguration } from './config.js';
 
 describe('configuration reset', () => {
@@ -14,6 +14,8 @@ describe('configuration reset', () => {
         name: 'config-test-theme',
         palette: ['#123456', '#abcdef'],
       },
+      statusRenderer: undefined,
+      statusMessages: undefined,
     });
     expect(getConfig()).toEqual({
       consistentColors: true,
@@ -29,7 +31,31 @@ describe('configuration reset', () => {
       consistentColors: false,
       fontFamily: undefined,
       theme: undefined,
+      statusRenderer: undefined,
+      statusMessages: undefined,
     });
+  });
+
+  it('stores and resets a global status renderer', () => {
+    const renderer = vi.fn();
+    configure({ statusRenderer: renderer });
+    expect(getConfig().statusRenderer).toBe(renderer);
+
+    resetConfiguration();
+    expect(getConfig().statusRenderer).toBeUndefined();
+  });
+
+  it('merges global status message overrides and clears them on reset', () => {
+    configure({ statusMessages: { loading: '正在加载…' } });
+    configure({ statusMessages: { error: '加载失败' } });
+
+    expect(getConfig().statusMessages).toEqual({
+      loading: '正在加载…',
+      error: '加载失败',
+    });
+
+    resetConfiguration();
+    expect(getConfig().statusMessages).toBeUndefined();
   });
 
   it('stores configured global theme object', () => {
