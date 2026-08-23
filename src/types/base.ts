@@ -45,6 +45,12 @@ export enum ChartType {
  * See [AGENTS.md](../../AGENTS.md) for the rule and rationale.
  */
 export interface ChartOptions {
+  /**
+   * Automatically resize the chart when its container changes size.
+   * Enabled by default. Set to `false` when managing `chart.resize()` yourself.
+   */
+  autoResize?: boolean;
+
   theme?: string;
   /** Chart title. Pass a plain string as shorthand or a TitleOptions object for full control. */
   title?: string | TitleOptions;

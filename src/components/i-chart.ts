@@ -105,7 +105,6 @@ export class IChartElement extends LitElement {
 
   private engine: IChart | null = null;
   private globalStatusCleanup: (() => void) | null = null;
-  private resizeObserver: ResizeObserver | null = null;
   private statusContainer: HTMLElement | null = null;
   private readonly statusChangeListener = (event: Event): void => {
     this.engineStatus = (event as CustomEvent<ChartStatus>).detail;
@@ -161,10 +160,6 @@ export class IChartElement extends LitElement {
   }
 
   override firstUpdated(): void {
-    this.resizeObserver = new ResizeObserver(() => {
-      this.engine?.resize();
-    });
-    this.resizeObserver.observe(this);
     this.renderChart(true);
   }
 
@@ -199,8 +194,6 @@ export class IChartElement extends LitElement {
       window.removeEventListener('ichartconfigchange', this.globalConfigChangeListener);
     }
     this.clearGlobalStatus();
-    this.resizeObserver?.disconnect();
-    this.resizeObserver = null;
     this.statusContainer?.removeEventListener('ichartstatuschange', this.statusChangeListener);
     this.statusContainer = null;
     this.engine?.dispose();

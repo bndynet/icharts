@@ -51,6 +51,11 @@ export class IChart implements IChartInstance {
   private _legendSelection: LegendSelectionController;
   private _statusOverlay!: ChartStatusOverlay;
   private _activeTheme: string;
+  private _resizeObserver: ResizeObserver | null = null;
+  private _resizeWindow: Window | null = null;
+  private _cancelAutoResizeTask: (() => void) | null = null;
+  private _pendingAutoResizeSize: { width: number; height: number } | null = null;
+  private _lastAutoResizeSize: { width: number; height: number } | null = null;
   /**
    * Wall-clock time (ms since page-load) of the previous `update()` call.
    * Used to compute `RenderContext.observedFrameMs` so race / streaming
@@ -193,6 +198,7 @@ export class IChart implements IChartInstance {
     // disconnect-sentinel.ts for the full rationale (Vue Teleport
     // self-healing, HMR, `<i-chart>` double-dispose ordering).
     this._sentinel = installSentinel(container, () => this.dispose());
+    this._syncAutoResize();
   }
 
   update(newData?: ChartData, newOptions?: AnyChartOptions): void {
@@ -218,6 +224,7 @@ export class IChart implements IChartInstance {
           newOptions.statusRenderer ?? getConfig().statusRenderer,
         );
       }
+      if ('autoResize' in newOptions) this._syncAutoResize();
     }
 
     // Sample the inter-update interval BEFORE re-rendering so adapters can
@@ -292,6 +299,7 @@ export class IChart implements IChartInstance {
 
   resize(): void {
     this.ecInstance.resize();
+    this._rememberCurrentSize();
     // Re-invoke the adapter so container-aware sizing (e.g. gauge
     // `percentage` ring thickness / inner font size, both computed from
     // `min(containerWidth, containerHeight)` in `RenderContext`) re-flows
@@ -318,6 +326,7 @@ export class IChart implements IChartInstance {
     // disposed-but-still-registered chart).
     this._sentinel?.remove();
     this._sentinel = null;
+    this._disconnectAutoResize();
     // ECharts' own `dispose()` clears every listener internally, so we
     // only need to drop our local reference — no `off('hideTip', ...)`
     // call here (which would throw post-dispose on some ECharts builds).
@@ -338,6 +347,105 @@ export class IChart implements IChartInstance {
     releaseColorOwner(this);
     chartRegistry.delete(this);
     this.ecInstance.dispose();
+  }
+
+  /** Install the shared container observer used by createChart() and <i-chart>. */
+  private _syncAutoResize(): void {
+    this._disconnectAutoResize();
+    if (this._options.autoResize === false || this._disposed) return;
+
+    if (typeof ResizeObserver !== 'undefined') {
+      this._resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries.find((item) => item.target === this._container);
+        if (!entry) return;
+        this._queueAutoResize(entry.contentRect.width, entry.contentRect.height);
+      });
+      this._resizeObserver.observe(this._container);
+      return;
+    }
+
+    const view = this._container.ownerDocument?.defaultView;
+    if (view) {
+      this._resizeWindow = view;
+      view.addEventListener('resize', this._onWindowResize);
+    }
+  }
+
+  private readonly _onWindowResize = (): void => {
+    const { width, height } = this._readContainerSize();
+    this._queueAutoResize(width, height);
+  };
+
+  private _disconnectAutoResize(): void {
+    this._resizeObserver?.disconnect();
+    this._resizeObserver = null;
+    if (this._resizeWindow) {
+      this._resizeWindow.removeEventListener('resize', this._onWindowResize);
+      this._resizeWindow = null;
+    }
+    this._cancelAutoResizeTask?.();
+    this._cancelAutoResizeTask = null;
+    this._pendingAutoResizeSize = null;
+    this._lastAutoResizeSize = null;
+  }
+
+  private _queueAutoResize(width: number, height: number): void {
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return;
+    }
+    if (
+      this._lastAutoResizeSize?.width === width &&
+      this._lastAutoResizeSize.height === height
+    ) {
+      return;
+    }
+    this._pendingAutoResizeSize = { width, height };
+    if (this._cancelAutoResizeTask) return;
+
+    const view = this._container.ownerDocument?.defaultView;
+    if (view?.requestAnimationFrame) {
+      const frame = view.requestAnimationFrame(() => this._flushAutoResize());
+      this._cancelAutoResizeTask = () => view.cancelAnimationFrame(frame);
+    } else {
+      const timer = setTimeout(() => this._flushAutoResize(), 0);
+      this._cancelAutoResizeTask = () => clearTimeout(timer);
+    }
+  }
+
+  private _flushAutoResize(): void {
+    this._cancelAutoResizeTask = null;
+    const requestedSize = this._pendingAutoResizeSize;
+    this._pendingAutoResizeSize = null;
+    if (!requestedSize || this._disposed) return;
+
+    // A chart may have become hidden between the observer notification and
+    // this frame. Keep the last good dimensions so the next visible size
+    // notification can resize it again.
+    const currentSize = this._readContainerSize();
+    const size = currentSize.width > 0 && currentSize.height > 0
+      ? currentSize
+      : requestedSize;
+    if (currentSize.width === 0 || currentSize.height === 0) return;
+    if (
+      this._lastAutoResizeSize?.width === size.width &&
+      this._lastAutoResizeSize.height === size.height
+    ) {
+      return;
+    }
+    this.resize();
+    this._lastAutoResizeSize = size;
+  }
+
+  private _readContainerSize(): { width: number; height: number } {
+    return {
+      width: this._container.clientWidth,
+      height: this._container.clientHeight,
+    };
+  }
+
+  private _rememberCurrentSize(): void {
+    const size = this._readContainerSize();
+    if (size.width > 0 && size.height > 0) this._lastAutoResizeSize = size;
   }
 
   getEChartsInstance(): echarts.ECharts {
