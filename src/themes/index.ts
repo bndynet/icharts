@@ -40,6 +40,30 @@ const paletteRegistry = new PaletteRegistry();
 
 const knownThemeNames = new Set<string>(chartThemes.map((t) => t.name));
 
+// ---------------------------------------------------------------------------
+// Explicit theme lookup — name → definition
+// ---------------------------------------------------------------------------
+//
+// `ColorHub` only exposes `getCurrentTheme()` / `switchTheme()`: there is no
+// `getTheme(name)`, and `appendTheme()` pushes duplicates (it cannot act as a
+// name index). This map is therefore the single lookup used by
+// `getTheme()` / `getThemeColors(name)` and by the color resolvers when they
+// are handed an explicit theme name instead of relying on the mutable
+// "current theme" global.
+const themeByName = new Map<string, ChartTheme>(
+  chartThemes.map((theme) => [theme.name, theme]),
+);
+
+/**
+ * Resolve a theme name to its definition. Unknown names fall back to `light`
+ * — matching `ColorHub.switchTheme()`'s long-standing behaviour (it falls
+ * back to its first registered theme), so palette resolution and the ECharts
+ * theme agree on what "unknown" means.
+ */
+function themeFor(name: string): ChartTheme {
+  return themeByName.get(name) ?? lightTheme;
+}
+
 let registered = false;
 
 /**
@@ -115,8 +139,36 @@ export function getCurrentTheme(): ChartTheme {
   return colorHub.getCurrentTheme();
 }
 
-export function getThemeColors(): ChartThemeColors | undefined {
-  return colorHub.getCurrentTheme().colors;
+/**
+ * Theme definition for `name`, or the active theme when `name` is omitted.
+ *
+ * This is the **explicit** counterpart to {@link getCurrentTheme}: it never
+ * mutates global state and never depends on which chart rendered last, so a
+ * chart that carries its own `options.theme` can look up the theme it is
+ * actually painting with:
+ *
+ * ```ts
+ * const theme = getTheme(options.theme);   // undefined → active theme
+ * ```
+ *
+ * Unknown names fall back to the built-in `light` theme — the same policy
+ * `ColorHub.switchTheme()` and palette resolution use.
+ */
+export function getTheme(name?: string): ChartTheme {
+  return name === undefined ? colorHub.getCurrentTheme() : themeFor(name);
+}
+
+/**
+ * UI color tokens of a theme.
+ *
+ * Without an argument this returns the **active** theme's tokens (unchanged
+ * behaviour). Pass a theme name to read another theme without switching to
+ * it.
+ */
+export function getThemeColors(name?: string): ChartThemeColors | undefined {
+  return name === undefined
+    ? colorHub.getCurrentTheme().colors
+    : themeFor(name).colors;
 }
 
 /**
@@ -134,6 +186,11 @@ export function registerTheme(config: ChartThemeConfig): void {
     palette: config.palette ?? base.palette!,
   };
   colorHub.appendTheme(theme);
+  // Keep the explicit-lookup index in sync. `appendTheme()` pushes, so a
+  // re-registration with the same name would otherwise leave the older
+  // definition reachable through ColorHub while the resolvers read the newer
+  // one — the map always points at the latest registration.
+  themeByName.set(theme.name, theme);
   knownThemeNames.add(theme.name);
   echarts.registerTheme(theme.name, buildEChartsTheme(theme.colors!, theme.palette!));
 }
@@ -149,23 +206,29 @@ export function resolveThemeName(name?: string): string {
 
 /**
  * Build the palette color array for a chart given series names, user colors/colorMap,
- * and the active theme.
+ * and a theme.
  *
  * This is the `consistentColors: true` resolver — names map to colors through
  * {@link PaletteRegistry} so the same name keeps the same color across charts.
+ *
+ * `themeName` defaults to the **active** theme (the historical behaviour used
+ * by callers that have no chart context). Pass the chart's own theme name
+ * explicitly to resolve against it without touching any global state — this
+ * is what the adapter pipeline does, so a per-chart `options.theme` never
+ * leaks into the active theme. Unknown names fall back to `light` for
+ * palette lookup while their name still partitions the name→color state.
  */
 export function resolveSeriesColors(
   seriesNames: string[],
   userColors?: string[],
   userColorMap?: Record<string, string>,
+  themeName: string = colorHub.getCurrentTheme().name,
 ): string[] {
   if (userColors && userColors.length >= seriesNames.length) {
     return userColors.slice(0, seriesNames.length);
   }
 
-  const theme = colorHub.getCurrentTheme();
-  const themeName = theme.name;
-  const palette = theme.palette ?? [];
+  const palette = themeFor(themeName).palette ?? [];
   return seriesNames.map((name) => {
     if (userColorMap?.[name]) return userColorMap[name];
     return paletteRegistry.resolve(themeName, name, palette);
@@ -234,17 +297,22 @@ export function resetColorMap(themeName?: string): void {
 /**
  * Resolve colors by palette position (index 0, 1, 2, …) independent of series names.
  * Each chart starts from palette[0], cycling if more names than palette entries.
+ *
+ * `themeName` defaults to the active theme; pass an explicit name to resolve
+ * against that theme without mutating global state (same contract as
+ * {@link resolveSeriesColors}).
  */
 export function resolveColorsByPosition(
   seriesNames: string[],
   userColors?: string[],
   userColorMap?: Record<string, string>,
+  themeName: string = colorHub.getCurrentTheme().name,
 ): string[] {
   if (userColors && userColors.length >= seriesNames.length) {
     return userColors.slice(0, seriesNames.length);
   }
 
-  const palette = colorHub.getCurrentTheme().palette ?? [];
+  const palette = themeFor(themeName).palette ?? [];
   return seriesNames.map((name, i) => {
     if (userColorMap?.[name]) return userColorMap[name];
     return palette[i % palette.length] ?? '#888888';

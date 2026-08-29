@@ -39,6 +39,11 @@ import {
   registerTheme,
   resolveSeriesColors,
   resolveColorsByPosition,
+  getCurrentTheme,
+  getTheme,
+  getThemeColors,
+  chartLightTheme,
+  chartDarkTheme,
 } from './index.js';
 import { configure, resetConfiguration } from '../config.js';
 
@@ -277,5 +282,54 @@ describe('resolveColorsByPosition — unaffected by name state', () => {
       ['#aaaaaa', '#bbbbbb'],
     );
     expect(colors).toEqual(['#aaaaaa', '#bbbbbb']);
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Explicit theme lookup — no global state involved
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('getTheme / getThemeColors — explicit lookup', () => {
+  it('getTheme() without a name returns the active theme', () => {
+    expect(getTheme()).toBe(getCurrentTheme());
+  });
+
+  it('getTheme(name) returns the named theme without switching to it', () => {
+    expect(getTheme('light')).toBe(chartLightTheme);
+    expect(getTheme('dark')).toBe(chartDarkTheme);
+    expect(getTheme('dark').colorMode).toBe('dark');
+    // The lookup must not mutate the active theme.
+    expect(getCurrentTheme().name).toBe('light');
+  });
+
+  it('getThemeColors(name) reads another theme\'s tokens without switching', () => {
+    expect(getThemeColors('light')?.textPrimary).toBe('#111827');
+    expect(getThemeColors('dark')?.textPrimary).toBe('#f1f5f9');
+    expect(getCurrentTheme().name).toBe('light');
+  });
+
+  it('falls back to light for unknown names (same policy as ColorHub.switchTheme)', () => {
+    expect(getTheme('theme-that-does-not-exist')).toBe(chartLightTheme);
+    expect(getThemeColors('theme-that-does-not-exist')?.textPrimary).toBe('#111827');
+  });
+
+  it('resolves palettes against an explicit theme name without touching the active theme', () => {
+    const dark = resolveSeriesColors(
+      ['explicit-A', 'explicit-B'],
+      undefined,
+      undefined,
+      'dark',
+    );
+    expect(dark).toEqual(['#60a5fa', '#34d399']);
+    expect(getCurrentTheme().name).toBe('light');
+
+    const positional = resolveColorsByPosition(
+      ['explicit-C'],
+      undefined,
+      undefined,
+      'dark',
+    );
+    expect(positional).toEqual(['#60a5fa']);
+    expect(getCurrentTheme().name).toBe('light');
   });
 });
