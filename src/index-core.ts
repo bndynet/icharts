@@ -248,3 +248,11 @@ export {
   type SyncThemeWithMediaQueryOptions,
   type SyncThemeWithPreferenceOptions,
 } from './auto-theme.js';
+
+// Theme-change notifications (callback + `icharts:themechange` DOM event).
+export {
+  onThemeChange,
+  THEME_CHANGE_EVENT,
+  type ThemeChangeDetail,
+  type ThemeChangeListener,
+} from './theme-events.js';

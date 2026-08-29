@@ -15,6 +15,10 @@ import {
   switchTheme,
   listThemes,
   syncThemeWithPreference,
+  onThemeChange,
+  THEME_CHANGE_EVENT,
+  type ThemeChangeDetail,
+  type ThemeChangeListener,
   hasTheme,
   type ChartTheme,
   type ChartThemeColors,
@@ -55,6 +59,36 @@ describe('@bndynet/icharts/core — theme introspection API', () => {
 describe('@bndynet/icharts/core — auto-sync helpers', () => {
   it('exposes syncThemeWithPreference()', () => {
     expect(typeof syncThemeWithPreference).toBe('function');
+  });
+});
+
+describe('@bndynet/icharts/core — theme-change notifications', () => {
+  it('exposes onThemeChange() and the DOM event name', () => {
+    expect(typeof onThemeChange).toBe('function');
+    expect(THEME_CHANGE_EVENT).toBe('icharts:themechange');
+
+    const detail: ThemeChangeDetail = {
+      name: 'dark',
+      previous: 'light',
+      colorMode: 'dark',
+    };
+    const listener: ThemeChangeListener = () => {};
+    const off = onThemeChange(listener);
+    expect(typeof off).toBe('function');
+    off();
+    expect(detail.name).toBe('dark');
+  });
+
+  it('types window listeners through WindowEventMap', () => {
+    // Type-level only (never invoked in node): `event.detail` must be
+    // `ThemeChangeDetail` thanks to the global augmentation.
+    const subscribe = (): void => {
+      window.addEventListener(THEME_CHANGE_EVENT, (event) => {
+        const detail: ThemeChangeDetail = event.detail;
+        void detail;
+      });
+    };
+    void subscribe;
   });
 });
 

@@ -14,6 +14,7 @@ import { darkTheme, lightTheme, chartThemes } from './presets.js';
 import type { ChartTheme, ChartThemeColors, ChartThemeConfig } from './types.js';
 import type { IChartInstance } from '../types.js';
 import { chartRegistry, pruneDetachedCharts } from '../registry.js';
+import { emitThemeChange } from '../theme-events.js';
 import { PaletteRegistry } from './palette-registry.js';
 
 // ---------------------------------------------------------------------------
@@ -166,6 +167,7 @@ export function switchTheme(
     warnUnknownTheme(name);
     return;
   }
+  const previous = colorHub.getCurrentTheme().name;
   colorHub.switchTheme(name);
   paletteRegistry.resetTheme(name);
   // Drop charts whose container is no longer attached BEFORE re-themeing —
@@ -178,6 +180,13 @@ export function switchTheme(
   const force = options.force === true;
   for (const chart of chartRegistry) {
     (chart as GlobalThemeTarget).applyGlobalTheme(name, force);
+  }
+  if (previous !== name) {
+    emitThemeChange({
+      name,
+      previous,
+      colorMode: getThemeMode(name),
+    });
   }
 }
 

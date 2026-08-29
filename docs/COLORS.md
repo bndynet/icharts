@@ -500,6 +500,7 @@ From `src/index.ts`:
 | `listThemes()`, `hasTheme(name)` | Theme-registry introspection: registered names (built-ins first) / availability check. |
 | `switchTheme(name, options?)` | Switch every live chart that does not pin its own theme. `{ force: true }` overrides pinned charts too. |
 | `getCurrentTheme()`, `getTheme(name?)`, `getThemeColors(name?)` | Inspect the active theme, or any registered theme's definition / tokens by name. Reading never switches the active theme. |
+| `onThemeChange(listener)` | Subscribe to active-theme changes (also dispatched as `icharts:themechange` on `window`). |
 | `getThemeMode(name?)`, `isDarkTheme(name?)` | Resolved `'light'` / `'dark'` mode — for the active theme or any registered one. |
 | `getSeriesColor(name)` | Hex set `{ default, hover, active, disabled }` for a given name. |
 | `setColorMap(map, themeName?)` | Pre-bind `name → color` (effective only with `consistentColors: true`). |

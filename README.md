@@ -622,6 +622,8 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `syncThemeWithElementAttribute(attribute, options?)` | Watch a DOM element attribute (default `<html>`) and switch every unpinned chart whenever it changes |
 | `syncThemeWithMediaQuery(query?, options?)` | Follow the OS color scheme (`prefers-color-scheme`) and switch every unpinned chart |
 | `syncThemeWithPreference(options?)` | Combine an attribute and the OS preference with one precedence rule (attribute wins) |
+| `onThemeChange(listener)` | Subscribe to active-theme changes; returns an unsubscribe function |
+| `THEME_CHANGE_EVENT` | The DOM event name dispatched on `window` (`'icharts:themechange'`) |
 | `registerTheme(config)` | Register a custom theme |
 | `listThemes()` | Names of every registered theme (built-ins first) |
 | `hasTheme(name)` | Whether a theme name is registered |
@@ -780,6 +782,37 @@ const stop2 = syncThemeWithPreference({
   and media `change` events; `stop()` tears down both watchers.
 - Unknown names resolve through the normal theme fallback (warned once), and
   pinned per-chart themes are still left untouched.
+
+### Theme change notifications
+
+React to an active-theme change with the callback API, or with the DOM event
+when the listener is not part of the icharts consumer (e.g. a stylesheet
+manager). `switchTheme()`, `configure({ theme })` and both auto-sync helpers
+notify; per-chart `setTheme()` / `update(_, { theme })` do not.
+
+```ts
+import { onThemeChange, THEME_CHANGE_EVENT } from '@bndynet/icharts';
+
+const off = onThemeChange(({ name, previous, colorMode }) => {
+  document.documentElement.dataset.theme = name;
+});
+
+// Or, for non-icharts code:
+window.addEventListener(THEME_CHANGE_EVENT, (event) => {
+  event.detail; // { name, previous, colorMode }
+});
+
+off(); // unsubscribe
+```
+
+- Fires only when the active theme **name** changes — re-switching the same
+  theme, or re-registering a theme's tokens under the same name, does not fire.
+- Unknown theme names are a no-op (no event).
+- Fires after the switch, once every unpinned chart has been repainted.
+- A throwing listener is isolated and cannot abort `switchTheme()`.
+- SSR-safe: the callback works, the DOM event is skipped without `window`.
+- `WindowEventMap` is augmented, so `addEventListener('icharts:themechange',
+  …)` types `event.detail` as `ThemeChangeDetail`.
 
 ---
 
