@@ -220,6 +220,8 @@ export {
 export {
   switchTheme,
   registerTheme,
+  listThemes,
+  hasTheme,
   getSeriesColor,
   getCurrentTheme,
   getTheme,

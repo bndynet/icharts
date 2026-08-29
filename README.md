@@ -455,6 +455,18 @@ createChart(el, 'bar', data, { theme: 'ocean' });
 
 Call `registerTheme` once at application start, before any charts are created.
 
+Restore a persisted preference safely and build a picker from the registry:
+
+```ts
+import { hasTheme, isDarkTheme, listThemes, switchTheme } from '@bndynet/icharts';
+
+// Unknown names are already a warned no-op — the check keeps it quiet.
+if (hasTheme(saved)) switchTheme(saved);
+
+// Built-ins first, then every theme you registered.
+const options = listThemes().map((name) => ({ name, dark: isDarkTheme(name) }));
+```
+
 ### Global Default Theme via `configure`
 
 You can also set a library-level default theme through `configure`. When a chart does not specify `options.theme`, this configured theme will be used.
@@ -610,6 +622,8 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `syncThemeWithElementAttribute(attribute, options?)` | Watch a DOM element attribute (default `<html>`) and switch every unpinned chart whenever it changes |
 | `syncThemeWithMediaQuery(query?, options?)` | Follow the OS color scheme (`prefers-color-scheme`) and switch every unpinned chart |
 | `registerTheme(config)` | Register a custom theme |
+| `listThemes()` | Names of every registered theme (built-ins first) |
+| `hasTheme(name)` | Whether a theme name is registered |
 | `setColorMap(map, themeName?)` | Pre-register name → color mappings (all themes or one) |
 | `resetColorMap(themeName?)` | Clear accumulated color assignments (all themes or one) |
 | `getSeriesColor(name)` | Get the assigned color (with hover/active/disabled states) for a name |

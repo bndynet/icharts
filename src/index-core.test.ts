@@ -13,6 +13,8 @@ import {
   getCurrentTheme,
   getThemeColors,
   switchTheme,
+  listThemes,
+  hasTheme,
   type ChartTheme,
   type ChartThemeColors,
   type ColorMode,
@@ -46,5 +48,13 @@ describe('@bndynet/icharts/core — theme introspection API', () => {
     } finally {
       switchTheme('light');
     }
+  });
+});
+
+describe('@bndynet/icharts/core — theme registry introspection', () => {
+  it('lists registered themes and answers hasTheme()', () => {
+    expect(listThemes().slice(0, 2)).toEqual(['light', 'dark']);
+    expect(hasTheme('light')).toBe(true);
+    expect(hasTheme('no-such-theme')).toBe(false);
   });
 });

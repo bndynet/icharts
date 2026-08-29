@@ -38,6 +38,8 @@ import {
   setColorMap,
   resetColorMap,
   registerTheme,
+  listThemes,
+  hasTheme,
   resolveSeriesColors,
   resolveColorsByPosition,
   getCurrentTheme,
@@ -535,5 +537,35 @@ describe('registerTheme — ColorHub does not accumulate duplicates', () => {
       appendSpy.mockRestore();
       switchTheme('light');
     }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Theme registry introspection
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('theme registry introspection', () => {
+  it('lists built-in themes first, then registered ones', () => {
+    registerTheme({ name: 'introspect-theme', palette: ['#010101'] });
+
+    const names = listThemes();
+    expect(names.slice(0, 2)).toEqual(['light', 'dark']);
+    expect(names).toContain('introspect-theme');
+  });
+
+  it('does not duplicate an entry when a theme is re-registered', () => {
+    registerTheme({ name: 'introspect-dup', palette: ['#010101'] });
+    registerTheme({ name: 'introspect-dup', palette: ['#020202'] });
+
+    expect(listThemes().filter((n) => n === 'introspect-dup')).toHaveLength(1);
+  });
+
+  it('hasTheme() reports registration state', () => {
+    expect(hasTheme('light')).toBe(true);
+    expect(hasTheme('dark')).toBe(true);
+    expect(hasTheme('nope-introspect')).toBe(false);
+
+    registerTheme({ name: 'introspect-new', palette: ['#030303'] });
+    expect(hasTheme('introspect-new')).toBe(true);
   });
 });

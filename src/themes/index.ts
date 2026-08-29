@@ -334,6 +334,27 @@ export function registerTheme(config: ChartThemeConfig): void {
 }
 
 /**
+ * Names of every registered theme, in registration order — built-ins
+ * (`light`, `dark`) first, then themes added through {@link registerTheme}.
+ *
+ * The theme-registry counterpart of `listAdapters()`: use it to build a
+ * theme picker, or to validate a stored preference before calling
+ * {@link switchTheme} (an unknown name is now a warned no-op, so an
+ * explicit `hasTheme()` check keeps callers warning-free).
+ *
+ * Re-registering a name updates its definition in place and keeps its
+ * original position; the list never contains duplicates.
+ */
+export function listThemes(): string[] {
+  return [...themeByName.keys()];
+}
+
+/** Whether `name` is a registered theme (built-in or added via {@link registerTheme}). */
+export function hasTheme(name: string): boolean {
+  return themeByName.has(name);
+}
+
+/**
  * Resolve the effective ECharts theme name.
  *
  * - no name → the active theme;
