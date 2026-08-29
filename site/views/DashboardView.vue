@@ -861,14 +861,15 @@ onMounted(() => {
 });
 
 // Re-apply the active dashboard theme whenever the user picks a different
-// one. `switchTheme` walks the live registry and re-themes every chart in
-// place — no re-creation needed.
+// one. `switchTheme` walks the live registry and re-themes every chart that
+// does not pin its own `options.theme` — no re-creation needed.
 //
 // The dashboard themes are tagged with a `colorMode` so picking e.g.
 // `dash-midnight` (dark) on a light-mode site flips the whole site to dark.
 // `site.config.ts` already watches `siteTheme` and calls
-// `switchTheme(siteMode)`, which would clobber our chart palette — so we
-// wait one tick for that watcher to run, then re-apply the dashboard theme.
+// `switchTheme(siteMode)`, which would switch our (unpinned) charts to the
+// site palette — so we wait one tick for that watcher to run, then re-apply
+// the dashboard theme.
 //
 // After the theme swap we MUST also resize every chart. Themes like
 // `dash-scifi` add the `.is-scifi` class on the dashboard root, which

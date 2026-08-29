@@ -213,7 +213,7 @@ const svg = renderChartToSVGString(
     ],
   },
   { width: 800, height: 400 },                                         // SSR options
-  { title: 'Quarterly Revenue', theme: 'default' },                    // chart options
+  { title: 'Quarterly Revenue', theme: 'dark' },                       // chart options
 );
 
 writeFileSync('chart.svg', svg);
