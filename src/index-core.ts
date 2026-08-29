@@ -235,9 +235,12 @@ export {
   type SwitchThemeOptions,
 } from './themes/index.js';
 
-// Auto-sync theme from a DOM element attribute (e.g. `<html data-theme="dark">`).
+// Auto-sync theme from a DOM element attribute (e.g. `<html data-theme="dark">`)
+// or from a CSS media query (e.g. `prefers-color-scheme: dark`).
 // Browser-only: degrades to a no-op in SSR / non-DOM environments.
 export {
   syncThemeWithElementAttribute,
+  syncThemeWithMediaQuery,
   type SyncThemeWithElementAttributeOptions,
+  type SyncThemeWithMediaQueryOptions,
 } from './auto-theme.js';

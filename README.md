@@ -608,6 +608,7 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `configure(opts)` | Set global options (e.g. `{ consistentColors: true }` or `{ theme: { name, colors, palette } }`) |
 | `switchTheme(name, options?)` | Switch every chart that does not pin its own theme. `{ force: true }` overrides pinned charts too. |
 | `syncThemeWithElementAttribute(attribute, options?)` | Watch a DOM element attribute (default `<html>`) and switch every unpinned chart whenever it changes |
+| `syncThemeWithMediaQuery(query?, options?)` | Follow the OS color scheme (`prefers-color-scheme`) and switch every unpinned chart |
 | `registerTheme(config)` | Register a custom theme |
 | `setColorMap(map, themeName?)` | Pre-register name → color mappings (all themes or one) |
 | `resetColorMap(themeName?)` | Clear accumulated color assignments (all themes or one) |
@@ -662,6 +663,37 @@ explicitly for dark themes so the stored theme reports the right mode:
 ```ts
 registerTheme({ name: 'ocean', colorMode: 'dark', colors: { ... } });
 ```
+
+### Auto-sync theme from the OS preference
+
+When the app should follow the system color scheme instead of (or in addition
+to) a DOM attribute, call `syncThemeWithMediaQuery` once at app start. It
+watches `(prefers-color-scheme: dark)` — matching switches to `dark`, the
+rest to `light`:
+
+```ts
+import { syncThemeWithMediaQuery } from '@bndynet/icharts';
+
+const stop = syncThemeWithMediaQuery();
+
+// Custom themes:
+const stopCustom = syncThemeWithMediaQuery('(prefers-color-scheme: dark)', {
+  resolve: (isDark) => (isDark ? 'ocean-dark' : 'ocean-light'),
+});
+
+// On unmount:
+stop();
+```
+
+Notes:
+
+- The current preference is applied **immediately** on start.
+- The listener fires on every OS / browser color-scheme change; `resolve`
+  returning `undefined` keeps the current theme.
+- Charts that pin their own theme (`options.theme` / `chart.setTheme()`) are
+  left untouched — same precedence as `switchTheme()`.
+- Browser-only: without `window.matchMedia` (SSR, older environments) it
+  returns a no-op stop handle instead of throwing.
 
 ### Auto-sync theme from a DOM attribute
 

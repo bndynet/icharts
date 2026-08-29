@@ -86,3 +86,85 @@ export function syncThemeWithElementAttribute(
 
   return () => observer.disconnect();
 }
+
+/**
+ * Options for {@link syncThemeWithMediaQuery}.
+ */
+export interface SyncThemeWithMediaQueryOptions {
+  /**
+   * Map the boolean media-query match to a registered theme name. Return
+   * `undefined` to keep the current theme.
+   *
+   * Defaults to `'dark'` when the query matches (e.g. the OS prefers dark)
+   * and `'light'` otherwise — the two built-in themes.
+   */
+  resolve?: (matches: boolean) => string | undefined;
+}
+
+/** Default query: the OS / browser dark-mode preference. */
+const DEFAULT_DARK_MEDIA_QUERY = '(prefers-color-scheme: dark)';
+
+/**
+ * Keep every unpinned live chart in sync with a CSS media query — most
+ * commonly the OS / browser color-scheme preference.
+ *
+ * ```ts
+ * const stop = syncThemeWithMediaQuery();
+ * // '(prefers-color-scheme: dark)' matches → switchTheme('dark')
+ * //                              no match → switchTheme('light')
+ *
+ * // Custom themes:
+ * const stopCustom = syncThemeWithMediaQuery('(prefers-color-scheme: dark)', {
+ *   resolve: (isDark) => (isDark ? 'ocean-dark' : 'ocean-light'),
+ * });
+ * ```
+ *
+ * The current value is applied once immediately, then again on every
+ * `change` event. Charts that pin their own theme (`options.theme` /
+ * `chart.setTheme()`) are left untouched — same precedence as a manual
+ * `switchTheme()` call. Browser-only: without `window.matchMedia` (SSR,
+ * older environments) this returns a no-op stop handle instead of throwing.
+ *
+ * @returns A stop function that removes the listener.
+ */
+export function syncThemeWithMediaQuery(
+  query: string = DEFAULT_DARK_MEDIA_QUERY,
+  options: SyncThemeWithMediaQueryOptions = {},
+): () => void {
+  if (
+    typeof window === 'undefined' ||
+    typeof window.matchMedia !== 'function'
+  ) {
+    return () => {};
+  }
+
+  const media = window.matchMedia(query);
+  if (!media) {
+    return () => {};
+  }
+
+  const resolve =
+    options.resolve ?? ((matches: boolean) => (matches ? 'dark' : 'light'));
+
+  const apply = (): void => {
+    const name = resolve(media.matches);
+    if (!name) return;
+    if (name !== getCurrentTheme().name) {
+      switchTheme(name);
+    }
+  };
+
+  // Apply the current preference once so charts created before this call
+  // already match the OS state.
+  apply();
+
+  const onChange = (): void => apply();
+  if (typeof media.addEventListener === 'function') {
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }
+
+  // Safari < 14
+  media.addListener(onChange);
+  return () => media.removeListener(onChange);
+}
