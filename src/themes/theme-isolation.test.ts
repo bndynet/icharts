@@ -68,11 +68,24 @@ describe('theme isolation — rendering never mutates the active theme', () => {
     expect(getCurrentTheme().name).toBe('light');
   });
 
-  it('falls back to light for unknown theme names without switching', () => {
-    expect(resolveColors(['iso-unknown'], { theme: 'no-such-theme' })).toEqual([
-      LIGHT_FIRST,
-    ]);
-    expect(getCurrentTheme().name).toBe('light');
+  it('falls back to the active theme for unknown theme names without switching', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(
+        resolveColors(['iso-unknown'], { theme: 'no-such-theme' }),
+      ).toEqual([LIGHT_FIRST]);
+      expect(getCurrentTheme().name).toBe('light');
+
+      // The fallback follows the active theme, not a hardcoded light.
+      switchTheme('dark');
+      expect(
+        resolveColors(['iso-unknown-dark'], { theme: 'no-such-theme' }),
+      ).toEqual([DARK_FIRST]);
+      expect(getCurrentTheme().name).toBe('dark');
+    } finally {
+      warn.mockRestore();
+      switchTheme('light');
+    }
   });
 
   it('node resolvers use the chart theme too', () => {

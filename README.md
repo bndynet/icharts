@@ -664,6 +664,10 @@ explicitly for dark themes so the stored theme reports the right mode:
 registerTheme({ name: 'ocean', colorMode: 'dark', colors: { ... } });
 ```
 
+Unregistered theme names never mix two themes: `switchTheme('typo')` is a
+no-op, while a per-chart `theme: 'typo'` renders with the **active** theme —
+both log a one-time console warning pointing at `registerTheme`.
+
 ### Auto-sync theme from the OS preference
 
 When the app should follow the system color scheme instead of (or in addition

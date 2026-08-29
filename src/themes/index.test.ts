@@ -311,9 +311,23 @@ describe('getTheme / getThemeColors — explicit lookup', () => {
     expect(getCurrentTheme().name).toBe('light');
   });
 
-  it('falls back to light for unknown names (same policy as ColorHub.switchTheme)', () => {
-    expect(getTheme('theme-that-does-not-exist')).toBe(chartLightTheme);
-    expect(getThemeColors('theme-that-does-not-exist')?.textPrimary).toBe('#111827');
+  it('falls back to the active theme for unknown names (and warns once)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(getTheme('theme-that-does-not-exist')).toBe(chartLightTheme);
+      expect(getThemeColors('theme-that-does-not-exist')?.textPrimary).toBe('#111827');
+
+      // The fallback follows the *active* theme, not a hardcoded light.
+      switchTheme('dark');
+      expect(getTheme('theme-that-does-not-exist')).toBe(chartDarkTheme);
+      expect(getThemeColors('theme-that-does-not-exist')?.textPrimary).toBe('#f1f5f9');
+
+      // One warning per unknown name, however many lookups touch it.
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      switchTheme('light');
+    }
   });
 
   it('resolves palettes against an explicit theme name without touching the active theme', () => {
@@ -461,8 +475,38 @@ describe('getThemeMode / isDarkTheme', () => {
     expect(isDarkTheme('mode-api-test')).toBe(false);
   });
 
-  it('falls back to light for unknown names', () => {
-    expect(getThemeMode('no-such-theme-mode')).toBe('light');
-    expect(isDarkTheme('no-such-theme-mode')).toBe(false);
+  it('falls back to the active theme mode for unknown names', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      expect(getThemeMode('no-such-theme-mode')).toBe('light');
+      expect(isDarkTheme('no-such-theme-mode')).toBe(false);
+
+      switchTheme('dark');
+      expect(getThemeMode('no-such-theme-mode')).toBe('dark');
+    } finally {
+      warn.mockRestore();
+      switchTheme('light');
+    }
+  });
+});
+
+describe('switchTheme — unknown names', () => {
+  it('is a no-op (with one warning) instead of resetting another theme', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    switchTheme('dark');
+    try {
+      expect(resolveSeriesColors(['noop-A'])).toEqual(['#60a5fa']);
+
+      switchTheme('totally-unknown-switch');
+
+      // The active theme did not change...
+      expect(getCurrentTheme().name).toBe('dark');
+      // ...and the dark palette cursor was not reset by the failed switch.
+      expect(resolveSeriesColors(['noop-B'])).toEqual(['#34d399']);
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+      switchTheme('light');
+    }
   });
 });

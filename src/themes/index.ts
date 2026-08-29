@@ -59,13 +59,45 @@ const themeByName = new Map<string, ChartTheme>(
 );
 
 /**
- * Resolve a theme name to its definition. Unknown names fall back to `light`
- * — matching `ColorHub.switchTheme()`'s long-standing behaviour (it falls
- * back to its first registered theme), so palette resolution and the ECharts
- * theme agree on what "unknown" means.
+ * Resolve a theme name to its definition. Unknown names warn **once** and
+ * fall back to the active theme — the same theme the chart would render with
+ * if it had not specified one, so palette, tokens and the ECharts theme stay
+ * consistent instead of mixing two definitions.
  */
 function themeFor(name: string): ChartTheme {
-  return themeByName.get(name) ?? lightTheme;
+  const theme = themeByName.get(name);
+  if (theme) return theme;
+  warnUnknownTheme(name);
+  return activeTheme();
+}
+
+/**
+ * The active theme, resolved through the name index (never the ColorHub
+ * clone, so identity matches {@link getCurrentTheme}).
+ */
+function activeTheme(): ChartTheme {
+  return themeByName.get(colorHub.getCurrentTheme().name) ?? lightTheme;
+}
+
+const warnedUnknownThemes = new Set<string>();
+
+/**
+ * Warn once per unknown theme name. Deduped so a registry-wide theme switch
+ * (or a loop over charts) doesn't flood the console with the same message.
+ */
+function warnUnknownTheme(name: string): void {
+  if (warnedUnknownThemes.has(name)) return;
+  warnedUnknownThemes.add(name);
+  if (
+    typeof console === 'undefined' ||
+    typeof console.warn !== 'function'
+  ) {
+    return;
+  }
+  console.warn(
+    `[icharts] Unknown theme "${name}" — falling back to the active theme. ` +
+      'Register custom themes with registerTheme() before using them.',
+  );
 }
 
 let registered = false;
@@ -127,6 +159,13 @@ export function switchTheme(
   name: string,
   options: SwitchThemeOptions = {},
 ): void {
+  if (!themeByName.has(name)) {
+    // Unknown name: change nothing (no ColorHub switch, no palette reset, no
+    // chart repaint) and tell the caller once. A typo must not flip the app
+    // to a different theme or reset the wrong palette bucket.
+    warnUnknownTheme(name);
+    return;
+  }
   colorHub.switchTheme(name);
   paletteRegistry.resetTheme(name);
   // Drop charts whose container is no longer attached BEFORE re-themeing —
@@ -194,8 +233,9 @@ export function getCurrentTheme(): ChartTheme {
  * const theme = getTheme(options.theme);   // undefined → active theme
  * ```
  *
- * Unknown names fall back to the built-in `light` theme — the same policy
- * `ColorHub.switchTheme()` and palette resolution use.
+ * Unknown names fall back to the **active** theme (with a one-time console
+ * warning), so palette, tokens and the ECharts theme stay on the same
+ * definition instead of mixing two themes.
  */
 export function getTheme(name?: string): ChartTheme {
   return themeFor(name ?? colorHub.getCurrentTheme().name);
@@ -283,11 +323,23 @@ export function registerTheme(config: ChartThemeConfig): void {
 
 /**
  * Resolve the effective ECharts theme name.
- * When no explicit name is provided, falls back to the currently active
- * ColorHub theme so charts created after a theme switch pick up the right theme.
+ *
+ * - no name → the active theme;
+ * - a registered name → itself;
+ * - an unregistered name → the active theme, with a one-time console warning.
+ *
+ * Normalising here is what keeps the ECharts theme (`init` / `setTheme`),
+ * the resolved palette and the UI tokens on the same definition when a
+ * consumer passes a typo. The alternative — forwarding the raw name to
+ * ECharts — makes ECharts fall back to its own built-in theme while the
+ * palette falls back to ours, i.e. two themes on one chart.
  */
 export function resolveThemeName(name?: string): string {
-  return name || colorHub.getCurrentTheme().name;
+  const active = colorHub.getCurrentTheme().name;
+  if (!name) return active;
+  if (themeByName.has(name)) return name;
+  warnUnknownTheme(name);
+  return active;
 }
 
 /**
@@ -301,8 +353,9 @@ export function resolveThemeName(name?: string): string {
  * by callers that have no chart context). Pass the chart's own theme name
  * explicitly to resolve against it without touching any global state — this
  * is what the adapter pipeline does, so a per-chart `options.theme` never
- * leaks into the active theme. Unknown names fall back to `light` for
- * palette lookup while their name still partitions the name→color state.
+ * leaks into the active theme. Unknown names fall back to the active theme's
+ * palette (with a one-time warning) while their name still partitions the
+ * name→color state.
  */
 export function resolveSeriesColors(
   seriesNames: string[],

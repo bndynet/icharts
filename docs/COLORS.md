@@ -344,6 +344,12 @@ Per-chart precedence is deliberate: `options.theme` wins over global switches,
 `update(undefined, { theme: undefined })`) unpins a chart; `chart.getTheme()`
 reports the theme it is actually rendering with.
 
+Unregistered theme names never mix two themes: `switchTheme('typo')` is a
+no-op (no state change, one console warning), and an unknown per-chart
+`theme` resolves to the **active** theme — so the ECharts theme, the palette
+and the UI tokens always come from the same definition. Register custom
+themes with `registerTheme()` first.
+
 ---
 
 ## 6. Per-type color behavior

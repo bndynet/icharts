@@ -125,7 +125,7 @@ describe('IChart engine — RenderContext threading', () => {
     const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
     observations.length = 0;
 
-    chart.setTheme('default');
+    chart.setTheme('dark');
     expect(observations).toHaveLength(1);
     expect(observations[0]?.observedFrameMs).toBeUndefined();
     chart.dispose();
@@ -511,7 +511,7 @@ describe('IChart engine — inShadowDom detection and threading', () => {
     observations.length = 0;
 
     chart.update(stubData);
-    chart.setTheme('default');
+    chart.setTheme('dark');
 
     expect(observations).toHaveLength(2);
     expect(observations[0]?.inShadowDom).toBe(true);
@@ -1132,5 +1132,34 @@ describe('IChart engine — per-chart theme precedence', () => {
     switchTheme('dark');
     expect(lastTheme()).toBe('dark');
     chart.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Unknown theme names must not mix two themes (ECharts' built-in fallback +
+// the icharts palette). They resolve to the active theme and warn once.
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — unknown theme names', () => {
+  it('renders an unregistered explicit theme with the active theme', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    switchTheme('dark');
+    try {
+      const chart = new IChart(
+        fakeContainer(),
+        'observed-stub',
+        stubData,
+        { theme: 'not-a-registered-theme' } as ChartOptions,
+      );
+
+      const initMock = vi.mocked(echarts.init);
+      expect(initMock.mock.lastCall?.[1]).toBe('dark');
+      expect(chart.getTheme().name).toBe('dark');
+      expect(warn).toHaveBeenCalledTimes(1);
+      chart.dispose();
+    } finally {
+      warn.mockRestore();
+      switchTheme('light');
+    }
   });
 });
