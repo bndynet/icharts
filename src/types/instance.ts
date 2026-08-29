@@ -1,5 +1,6 @@
 import type * as echarts from 'echarts';
 import type { ChartOptions } from './base.js';
+import type { ChartTheme } from '../themes/types.js';
 import type { XYData, XYChartOptions } from './xy.js';
 import type { LineVariant, LineData, LineChartOptions } from './line.js';
 import type { BarVariant, BarData, BarChartOptions } from './bar.js';
@@ -171,8 +172,17 @@ export interface IChartInstance<T extends string = string> {
   update(data?: ChartDataFor<T>, options?: ChartOptionsFor<T>): void;
   /** Show or clear a loading / empty / error layer without replacing chart options. */
   setStatus(status: ChartStatus): void;
-  /** Switch ECharts theme without disposing the instance (ECharts 6+). Updates series colors from the active palette. */
+  /**
+   * Pin this chart to a registered theme (ECharts 6+) without re-creating
+   * the instance. Pinned charts keep this theme when `switchTheme()` /
+   * `configure({ theme })` run; call {@link clearTheme} to follow the global
+   * theme again.
+   */
   setTheme(theme: string): void;
+  /** Theme the chart is currently rendering with (pinned or active global). */
+  getTheme(): ChartTheme;
+  /** Drop a pinned per-chart theme and follow global theme switches again. */
+  clearTheme(): void;
   resize(): void;
   dispose(): void;
   getEChartsInstance(): echarts.ECharts;

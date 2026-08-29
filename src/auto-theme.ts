@@ -20,11 +20,13 @@ export interface SyncThemeWithElementAttributeOptions {
 }
 
 /**
- * Keep every live chart in sync with a DOM element attribute.
+ * Keep every unpinned live chart in sync with a DOM element attribute.
  *
  * Watches `attribute` on `options.target` (default `<html>`) with a
  * `MutationObserver` and calls {@link switchTheme} whenever the resolved
- * theme name differs from the active theme. The current value is applied
+ * theme name differs from the active theme. Charts that pin their own theme
+ * (`options.theme` / `chart.setTheme()`) are left untouched — same
+ * precedence as a manual `switchTheme()` call. The current value is applied
  * once immediately, so charts created before this call (and the very first
  * paint) already match the document state.
  *

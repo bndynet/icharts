@@ -25,6 +25,10 @@ vi.mock('echarts', () => ({
     on: vi.fn(),
     off: vi.fn(),
     dispatchAction: vi.fn(),
+    // Used by `pruneDetachedCharts()`, which `switchTheme()` /
+    // `configure({ consistentColors })` run over the live registry.
+    isDisposed: vi.fn(() => false),
+    getDom: vi.fn(() => undefined),
   })),
   registerTheme: vi.fn(),
 }));
@@ -989,6 +993,144 @@ describe('IChart engine — theme changes via update()', () => {
 
     expect(ec.clear).toHaveBeenCalledTimes(1);
     expect(ec.setTheme).toHaveBeenCalledWith('dark');
+    chart.dispose();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-chart theme precedence.
+//
+// `options.theme` (and `chart.setTheme()`) pins a chart: global switches —
+// `switchTheme()`, `configure({ theme })`, DOM attribute sync — must not
+// repaint it. `switchTheme(name, { force: true })` is the escape hatch.
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — per-chart theme precedence', () => {
+  const seenThemes: Array<string | undefined> = [];
+
+  beforeEach(() => {
+    seenThemes.length = 0;
+    registerAdapter('theme-precedence-stub', {
+      validate: () => true,
+      resolve: (_data, options) => {
+        seenThemes.push(options.theme);
+        return { option: { series: [] } };
+      },
+    });
+  });
+
+  const lastTheme = (): string | undefined =>
+    seenThemes[seenThemes.length - 1];
+
+  it('keeps an explicit options.theme across switchTheme()', () => {
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+      { theme: 'dark' } as ChartOptions,
+    );
+
+    switchTheme('light');
+
+    expect(lastTheme()).toBe('dark');
+    expect(chart.getTheme().name).toBe('dark');
+    chart.dispose();
+  });
+
+  it('keeps an explicit options.theme across configure({ theme })', () => {
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+      { theme: 'dark' } as ChartOptions,
+    );
+
+    configure({ theme: { name: 'precedence-cfg', palette: ['#111111'] } });
+
+    expect(lastTheme()).toBe('dark');
+    expect(chart.getTheme().name).toBe('dark');
+    chart.dispose();
+  });
+
+  it('switchTheme(..., { force: true }) overrides the pinned theme', () => {
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+      { theme: 'dark' } as ChartOptions,
+    );
+
+    switchTheme('light', { force: true });
+    expect(lastTheme()).toBe('light');
+    expect(chart.getTheme().name).toBe('light');
+
+    // The force pass drops the pin, so the chart follows the next switch.
+    switchTheme('dark');
+    expect(lastTheme()).toBe('dark');
+    chart.dispose();
+  });
+
+  it('unpinned charts follow switchTheme() and keep options.theme injected', () => {
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+    );
+    expect(lastTheme()).toBeUndefined();
+
+    switchTheme('dark');
+
+    // Custom adapters that read `options.theme` still see the active theme.
+    expect(lastTheme()).toBe('dark');
+    expect(chart.getTheme().name).toBe('dark');
+    chart.dispose();
+  });
+
+  it('setTheme() pins the chart for later global switches', () => {
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+    );
+
+    chart.setTheme('dark');
+    switchTheme('light');
+
+    expect(lastTheme()).toBe('dark');
+    chart.dispose();
+  });
+
+  it('update(_, { theme: undefined }) unpins and falls back to the active theme', () => {
+    switchTheme('light');
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+      { theme: 'dark' } as ChartOptions,
+    );
+
+    chart.update(stubData, { theme: undefined } as ChartOptions);
+    expect(lastTheme()).toBeUndefined();
+
+    switchTheme('dark');
+    expect(lastTheme()).toBe('dark');
+    chart.dispose();
+  });
+
+  it('clearTheme() unpins and falls back to the active theme', () => {
+    switchTheme('light');
+    const chart = new IChart(
+      fakeContainer(),
+      'theme-precedence-stub',
+      stubData,
+      { theme: 'dark' } as ChartOptions,
+    );
+
+    chart.clearTheme();
+    expect(lastTheme()).toBeUndefined();
+
+    switchTheme('dark');
+    expect(lastTheme()).toBe('dark');
     chart.dispose();
   });
 });

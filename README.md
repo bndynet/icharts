@@ -477,6 +477,27 @@ configure({
 
 `options.theme` still takes precedence over the global config for that specific chart.
 
+### Per-chart theme precedence
+
+A chart created with `options.theme` — or pinned later via `chart.setTheme(name)`
+/ `chart.update(data, { theme })` — keeps that theme when the global theme
+changes. `switchTheme()`, `configure({ theme })`, and
+`syncThemeWithElementAttribute()` all skip pinned charts:
+
+```ts
+createChart(el, 'pie', revenue, { theme: 'ocean' });
+
+switchTheme('dark');              // every OTHER chart goes dark; this one stays ocean
+configure({ theme: darkConfig }); // same — the pinned chart is untouched
+
+chart.getTheme();                 // the theme this chart actually uses
+
+chart.clearTheme();               // stop pinning → follow global switches again
+chart.update(undefined, { theme: undefined }); // same effect
+
+switchTheme('dark', { force: true }); // escape hatch: override pinned charts too
+```
+
 ### Global Status Messages
 
 Customize the built-in status text without supplying a renderer or custom
@@ -585,8 +606,8 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | Function | Description |
 |----------|-------------|
 | `configure(opts)` | Set global options (e.g. `{ consistentColors: true }` or `{ theme: { name, colors, palette } }`) |
-| `switchTheme(name)` | Switch all charts to a registered theme |
-| `syncThemeWithElementAttribute(attribute, options?)` | Watch a DOM element attribute (default `<html>`) and switch all charts whenever it changes |
+| `switchTheme(name, options?)` | Switch every chart that does not pin its own theme. `{ force: true }` overrides pinned charts too. |
+| `syncThemeWithElementAttribute(attribute, options?)` | Watch a DOM element attribute (default `<html>`) and switch every unpinned chart whenever it changes |
 | `registerTheme(config)` | Register a custom theme |
 | `setColorMap(map, themeName?)` | Pre-register name → color mappings (all themes or one) |
 | `resetColorMap(themeName?)` | Clear accumulated color assignments (all themes or one) |
@@ -647,7 +668,7 @@ registerTheme({ name: 'ocean', colorMode: 'dark', colors: { ... } });
 When your site drives its theme through an attribute on a DOM element (the
 common `html[data-theme="dark"]` pattern, or a `class="dark"` toggle), call
 `syncThemeWithElementAttribute` once at app start — the library keeps every
-live chart in sync as the attribute changes:
+unpinned chart in sync as the attribute changes:
 
 ```ts
 import { syncThemeWithElementAttribute } from '@bndynet/icharts';
@@ -689,7 +710,9 @@ Notes:
 |--------|-------------|
 | `update(data?, options?)` | Re-render with new data / options |
 | `setStatus(status)` | Show a loading, empty, error, or ready state without replacing chart data |
-| `setTheme(name)` | Switch to a registered theme without re-creating the instance |
+| `setTheme(name)` | Pin this chart to a registered theme (survives global theme switches) |
+| `getTheme()` | The theme this chart is currently rendering with |
+| `clearTheme()` | Stop pinning a per-chart theme and follow global switches again |
 | `resize()` | Trigger resize (e.g. after container size change) |
 | `dispose()` | Destroy the chart and free memory. Called automatically when the container leaves the DOM (idempotent — safe to call again). |
 | `getEChartsInstance()` | Access the underlying ECharts instance |

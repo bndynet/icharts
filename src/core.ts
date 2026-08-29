@@ -17,9 +17,11 @@ import { applyConfiguredFontFamilyToOption } from './adapters/common/font-family
 import {
   ensureThemesRegistered,
   resolveThemeName,
+  getTheme as resolveThemeDefinition,
   beginColorRender,
   endColorRender,
   releaseColorOwner,
+  type ChartTheme,
 } from './themes/index.js';
 import { chartRegistry } from './registry.js';
 import { installSentinel, type SentinelHandle } from './disconnect-sentinel.js';
@@ -51,6 +53,19 @@ export class IChart implements IChartInstance {
   private _legendSelection: LegendSelectionController;
   private _statusOverlay!: ChartStatusOverlay;
   private _activeTheme: string;
+  /**
+   * Theme this chart pins for itself (`options.theme` at construction,
+   * `update(_, { theme })`, or `setTheme()`). `undefined` means the chart
+   * follows global theme switches.
+   *
+   * This is what gives `options.theme` precedence over `switchTheme()` /
+   * `configure({ theme })`: `applyGlobalTheme()` skips charts whose
+   * `_explicitTheme` is set unless the caller forces the switch. It also
+   * keeps that precedence intact while `_options.theme` is injected with
+   * the active theme name for non-pinned charts (so custom adapters can
+   * keep reading `options.theme`).
+   */
+  private _explicitTheme: string | undefined;
   private _resizeObserver: ResizeObserver | null = null;
   private _resizeWindow: Window | null = null;
   private _cancelAutoResizeTask: (() => void) | null = null;
@@ -180,6 +195,7 @@ export class IChart implements IChartInstance {
     this._options = options;
     this._container = container;
     this._legendSelection = new LegendSelectionController(container, options);
+    this._explicitTheme = options.theme;
     this._activeTheme = resolveThemeName(options.theme);
     this._inShadowDom =
       typeof ShadowRoot !== 'undefined' &&
@@ -230,6 +246,7 @@ export class IChart implements IChartInstance {
       // instance kept its original ECharts theme (axis / title / tooltip
       // chrome). Apply it to the instance before the render pass below.
       if ('theme' in newOptions) {
+        this._explicitTheme = newOptions.theme;
         this._applyThemeName(resolveThemeName(newOptions.theme));
       }
     }
@@ -284,11 +301,52 @@ export class IChart implements IChartInstance {
   }
 
   setTheme(theme: string): void {
+    this._explicitTheme = theme;
     this._options = { ...this._options, theme };
     this._applyThemeName(resolveThemeName(theme));
     // Theme switches don't represent a frame tick — don't poison the
     // observed interval with the (potentially long) time since the last
     // user-driven update.
+    this._apply();
+  }
+
+  /**
+   * @internal Apply a global theme switch initiated by `switchTheme()`.
+   *
+   * Charts that pin their own theme (`options.theme` / `setTheme()`) are
+   * left untouched unless `force` is set — that is what gives
+   * `options.theme` precedence over the global theme. For unpinned charts
+   * the active theme name is also written into `_options.theme` (the
+   * historical behaviour) so custom adapters that read `options.theme`
+   * keep seeing the effective theme.
+   *
+   * Private on purpose: `switchTheme()` is the only caller and it also
+   * resets the palette registry, so invoking this directly would leave the
+   * ColorHub "current theme" out of sync.
+   */
+  private applyGlobalTheme(theme: string, force = false): void {
+    if (!force && this._explicitTheme !== undefined) return;
+    this._explicitTheme = undefined;
+    this._options = { ...this._options, theme };
+    this._applyThemeName(resolveThemeName(theme));
+    this._apply();
+  }
+
+  /** Theme the chart is currently rendering with. */
+  getTheme(): ChartTheme {
+    return resolveThemeDefinition(this._activeTheme);
+  }
+
+  /**
+   * Stop pinning a per-chart `theme` and follow global theme switches again.
+   *
+   * Shorthand for `update(undefined, { theme: undefined })` that also
+   * repaints immediately against the active theme.
+   */
+  clearTheme(): void {
+    this._explicitTheme = undefined;
+    this._options = { ...this._options, theme: undefined };
+    this._applyThemeName(resolveThemeName(undefined));
     this._apply();
   }
 

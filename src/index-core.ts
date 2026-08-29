@@ -232,6 +232,7 @@ export {
   type ChartThemeColors,
   type ChartThemeConfig,
   type ColorMode,
+  type SwitchThemeOptions,
 } from './themes/index.js';
 
 // Auto-sync theme from a DOM element attribute (e.g. `<html data-theme="dark">`).

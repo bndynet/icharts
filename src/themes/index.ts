@@ -12,6 +12,7 @@ import * as echarts from 'echarts';
 import { buildEChartsTheme } from './echarts-theme.js';
 import { darkTheme, lightTheme, chartThemes } from './presets.js';
 import type { ChartTheme, ChartThemeColors, ChartThemeConfig } from './types.js';
+import type { IChartInstance } from '../types.js';
 import { chartRegistry, pruneDetachedCharts } from '../registry.js';
 import { PaletteRegistry } from './palette-registry.js';
 
@@ -85,9 +86,33 @@ export function ensureThemesRegistered(): void {
 }
 
 /**
+ * Options for {@link switchTheme}.
+ */
+export interface SwitchThemeOptions {
+  /**
+   * Also override charts that pin their own theme (`options.theme` in
+   * `createChart` / `update`, or `chart.setTheme()`).
+   *
+   * Default `false`: pinned charts keep their theme — `options.theme` takes
+   * precedence over global switches. Set `true` to restore the "global theme
+   * wins" behaviour for one call.
+   */
+  force?: boolean;
+}
+
+/** Structural view of `IChart` used by the switch loop (internal method). */
+interface GlobalThemeTarget extends IChartInstance {
+  applyGlobalTheme(theme: string, force: boolean): void;
+}
+
+/**
  * Switch the active theme, clear that theme's *auto-assigned* color slots
  * (the palette restarts at index 0 for the next chart), and re-apply the
- * theme to every live chart.
+ * theme to every live chart **that does not pin its own theme**.
+ *
+ * Per-chart precedence: a chart created with `options.theme` (or pinned via
+ * `chart.setTheme()` / `update(_, { theme })`) keeps its theme and is not
+ * repainted. Pass `{ force: true }` to override those charts too.
  *
  * Pinned entries from {@link setColorMap} are preserved — they live in a
  * dedicated `pins` map inside {@link PaletteRegistry}, untouched by the auto
@@ -98,7 +123,10 @@ export function ensureThemesRegistered(): void {
  * Consumers no longer need to call {@link resetColorMap} manually before
  * each page mount; `switchTheme` does the right thing automatically.
  */
-export function switchTheme(name: string): void {
+export function switchTheme(
+  name: string,
+  options: SwitchThemeOptions = {},
+): void {
   colorHub.switchTheme(name);
   paletteRegistry.resetTheme(name);
   // Drop charts whose container is no longer attached BEFORE re-themeing —
@@ -108,8 +136,9 @@ export function switchTheme(name: string): void {
   // registry-backed pipeline this prune is a belt-and-suspenders fallback;
   // see registry.ts for the full rationale.
   pruneDetachedCharts();
+  const force = options.force === true;
   for (const chart of chartRegistry) {
-    chart.setTheme(name);
+    (chart as GlobalThemeTarget).applyGlobalTheme(name, force);
   }
 }
 

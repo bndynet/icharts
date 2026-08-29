@@ -39,6 +39,8 @@ function makeFakeChart(opts: {
     update: (_d?: ChartData, _o?: AnyChartOptions) => {},
     setStatus: () => {},
     setTheme: (_t: string) => {},
+    getTheme: () => ({ name: 'light' }),
+    clearTheme: () => {},
     resize: () => {},
     dispose: disposeSpy,
     getEChartsInstance: () => ec as unknown as ReturnType<IChartInstance['getEChartsInstance']>,
@@ -88,6 +90,8 @@ describe('pruneDetachedCharts', () => {
       update: () => {},
       setStatus: () => {},
       setTheme: () => {},
+      getTheme: () => ({ name: 'light' }),
+      clearTheme: () => {},
       resize: () => {},
       dispose: vi.fn(),
       getEChartsInstance: () =>
