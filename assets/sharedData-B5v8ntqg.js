@@ -1,0 +1,1 @@
+const a={categories:["Jan","Feb","Mar","Apr","May","Jun"],series:[{name:"Revenue",data:[820,932,901,934,1290,1330]},{name:"Expenses",data:[620,732,701,734,1090,1130]}]},e=[{name:"Chrome",value:65},{name:"Firefox",value:15},{name:"Safari",value:12},{name:"Edge",value:8}];export{e as p,a as x};
