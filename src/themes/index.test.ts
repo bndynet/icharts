@@ -42,6 +42,7 @@ import {
   getCurrentTheme,
   getTheme,
   getThemeColors,
+  getSeriesColor,
   chartLightTheme,
   chartDarkTheme,
 } from './index.js';
@@ -361,5 +362,67 @@ describe('registerTheme — colorMode default', () => {
 
     expect(getTheme('mode-dark-test').colorMode).toBe('dark');
     expect(getThemeColors('mode-dark-test')?.textPrimary).toBe('#f1f5f9');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// registerTheme — re-registering an existing name stays consistent
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('registerTheme — re-registration consistency', () => {
+  it('the active-theme getters return the latest definition', () => {
+    registerTheme({ name: 're-reg', colorMode: 'dark', palette: ['#000001'] });
+    switchTheme('re-reg');
+
+    // Re-register the same name with a new definition (no switchTheme call —
+    // the active name does not change, only the definition behind it).
+    registerTheme({ name: 're-reg', colorMode: 'light', palette: ['#000002'] });
+
+    expect(getCurrentTheme().colorMode).toBe('light');
+    expect(getCurrentTheme().palette).toEqual(['#000002']);
+    expect(getThemeColors()).toEqual(getThemeColors('re-reg'));
+    // The two public getters must agree on the object, not just the values.
+    expect(getTheme('re-reg')).toBe(getCurrentTheme());
+
+    switchTheme('light');
+  });
+
+  it('getSeriesColor picks up the new palette', () => {
+    registerTheme({
+      name: 're-reg-palette',
+      colorMode: 'light',
+      palette: ['#00aa01', '#00aa02'],
+    });
+    switchTheme('re-reg-palette');
+    expect(getSeriesColor('re-reg-series').default).toBe('#00aa01');
+
+    registerTheme({
+      name: 're-reg-palette',
+      colorMode: 'light',
+      palette: ['#00bb01', '#00bb02'],
+    });
+    resetColorMap('re-reg-palette');
+    expect(getSeriesColor('re-reg-series').default).toBe('#00bb01');
+
+    switchTheme('light');
+  });
+
+  it('re-registration preserves pins', () => {
+    registerTheme({
+      name: 're-reg-pin',
+      colorMode: 'light',
+      palette: ['#cc0001'],
+    });
+    setColorMap({ 're-reg-pinned': '#123456' }, 're-reg-pin');
+
+    registerTheme({
+      name: 're-reg-pin',
+      colorMode: 'dark',
+      palette: ['#cc0002'],
+    });
+    switchTheme('re-reg-pin');
+    expect(getSeriesColor('re-reg-pinned').default).toBe('#123456');
+
+    switchTheme('light');
   });
 });

@@ -121,7 +121,7 @@ export function switchTheme(name: string): void {
  * lighten 0.05 / darken 0.1 / alpha 0.4).
  */
 export function getSeriesColor(name: string): StateColors {
-  const theme = colorHub.getCurrentTheme();
+  const theme = getCurrentTheme();
   const base = paletteRegistry.resolve(theme.name, name, theme.palette ?? []);
   return deriveStateColors(base);
 }
@@ -135,8 +135,19 @@ function deriveStateColors(base: string): StateColors {
   };
 }
 
+/**
+ * The active theme, resolved through the same name → definition index as
+ * {@link getTheme}.
+ *
+ * Resolving by the *name* held by ColorHub (rather than returning its object
+ * directly) keeps the two getters in sync when a theme is re-registered under
+ * an existing name: `ColorHub.appendTheme()` pushes duplicates and
+ * `switchTheme()` only ever finds the first one, while this index pins the
+ * latest definition. Reading the name and re-resolving makes
+ * `getCurrentTheme()` and `getTheme(name)` return the same object.
+ */
 export function getCurrentTheme(): ChartTheme {
-  return colorHub.getCurrentTheme();
+  return themeFor(colorHub.getCurrentTheme().name);
 }
 
 /**
@@ -155,20 +166,18 @@ export function getCurrentTheme(): ChartTheme {
  * `ColorHub.switchTheme()` and palette resolution use.
  */
 export function getTheme(name?: string): ChartTheme {
-  return name === undefined ? colorHub.getCurrentTheme() : themeFor(name);
+  return themeFor(name ?? colorHub.getCurrentTheme().name);
 }
 
 /**
  * UI color tokens of a theme.
  *
- * Without an argument this returns the **active** theme's tokens (unchanged
- * behaviour). Pass a theme name to read another theme without switching to
- * it.
+ * Without an argument this returns the **active** theme's tokens. Pass a
+ * theme name to read another theme without switching to it. Both paths go
+ * through {@link getTheme}, so they always agree.
  */
 export function getThemeColors(name?: string): ChartThemeColors | undefined {
-  return name === undefined
-    ? colorHub.getCurrentTheme().colors
-    : themeFor(name).colors;
+  return getTheme(name).colors;
 }
 
 /**
