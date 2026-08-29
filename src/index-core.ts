@@ -243,6 +243,8 @@ export {
 export {
   syncThemeWithElementAttribute,
   syncThemeWithMediaQuery,
+  syncThemeWithPreference,
   type SyncThemeWithElementAttributeOptions,
   type SyncThemeWithMediaQueryOptions,
+  type SyncThemeWithPreferenceOptions,
 } from './auto-theme.js';

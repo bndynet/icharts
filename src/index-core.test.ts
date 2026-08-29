@@ -14,6 +14,7 @@ import {
   getThemeColors,
   switchTheme,
   listThemes,
+  syncThemeWithPreference,
   hasTheme,
   type ChartTheme,
   type ChartThemeColors,
@@ -48,6 +49,12 @@ describe('@bndynet/icharts/core — theme introspection API', () => {
     } finally {
       switchTheme('light');
     }
+  });
+});
+
+describe('@bndynet/icharts/core — auto-sync helpers', () => {
+  it('exposes syncThemeWithPreference()', () => {
+    expect(typeof syncThemeWithPreference).toBe('function');
   });
 });
 

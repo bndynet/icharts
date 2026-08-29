@@ -621,6 +621,7 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `switchTheme(name, options?)` | Switch every chart that does not pin its own theme. `{ force: true }` overrides pinned charts too. |
 | `syncThemeWithElementAttribute(attribute, options?)` | Watch a DOM element attribute (default `<html>`) and switch every unpinned chart whenever it changes |
 | `syncThemeWithMediaQuery(query?, options?)` | Follow the OS color scheme (`prefers-color-scheme`) and switch every unpinned chart |
+| `syncThemeWithPreference(options?)` | Combine an attribute and the OS preference with one precedence rule (attribute wins) |
 | `registerTheme(config)` | Register a custom theme |
 | `listThemes()` | Names of every registered theme (built-ins first) |
 | `hasTheme(name)` | Whether a theme name is registered |
@@ -749,6 +750,36 @@ Notes:
   one added via `registerTheme`).
 - Browser-only: in SSR / non-DOM environments it returns a no-op stop handle
   instead of throwing, so it is safe to call from client entry code.
+
+### Combining the attribute and the OS preference
+
+If the app has a site-level toggle **and** should follow the OS as a fallback,
+call one helper instead of both — running `syncThemeWithElementAttribute` and
+`syncThemeWithMediaQuery` together would let them overwrite each other.
+`syncThemeWithPreference()` applies a single rule: **the attribute wins
+whenever it maps to a theme; otherwise the media query decides.**
+
+```ts
+import { syncThemeWithPreference } from '@bndynet/icharts';
+
+const stop = syncThemeWithPreference(); // data-theme + prefers-color-scheme
+
+// Custom mapping:
+const stop2 = syncThemeWithPreference({
+  attribute: 'data-mode',
+  resolveAttribute: (value) =>
+    value === 'day' ? 'light' : value === 'night' ? 'dark' : undefined,
+  resolveMedia: (isDark) => (isDark ? 'dark' : 'light'),
+});
+```
+
+- Defaults: attribute `data-theme` on `<html>`, query
+  `(prefers-color-scheme: dark)`.
+- `null`, `'auto'` and `'system'` attribute values defer to the media query.
+- Applies the current combination **immediately**, then on attribute changes
+  and media `change` events; `stop()` tears down both watchers.
+- Unknown names resolve through the normal theme fallback (warned once), and
+  pinned per-chart themes are still left untouched.
 
 ---
 

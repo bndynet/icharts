@@ -168,3 +168,126 @@ export function syncThemeWithMediaQuery(
   media.addListener(onChange);
   return () => media.removeListener(onChange);
 }
+
+/**
+ * Options for {@link syncThemeWithPreference}.
+ */
+export interface SyncThemeWithPreferenceOptions {
+  /** Attribute watched on `target`. Default `'data-theme'`. */
+  attribute?: string;
+  /** Element carrying the attribute. Default `document.documentElement`. */
+  target?: Element;
+  /** OS-preference media query. Default `'(prefers-color-scheme: dark)'`. */
+  mediaQuery?: string;
+  /**
+   * Map the attribute value to a theme name. Return `undefined` to defer to
+   * the media query.
+   *
+   * Defaults to the attribute value itself, except `null`, `'auto'` and
+   * `'system'` — those defer to the media query.
+   */
+  resolveAttribute?: (value: string | null) => string | undefined;
+  /**
+   * Map the media-query match to a theme name.
+   * Defaults to `'dark'` on match, `'light'` otherwise.
+   */
+  resolveMedia?: (matches: boolean) => string | undefined;
+}
+
+/** `data-theme` values that mean "follow the OS preference". */
+const AUTO_THEME_VALUES = new Set(['auto', 'system']);
+
+/**
+ * Sync charts with **both** a DOM attribute and the OS color-scheme
+ * preference, using one deterministic precedence rule: **the attribute wins
+ * whenever it maps to a theme; otherwise the media query decides.**
+ *
+ * ```ts
+ * const stop = syncThemeWithPreference({
+ *   attribute: 'data-theme',            // default
+ *   mediaQuery: '(prefers-color-scheme: dark)', // default
+ * });
+ * ```
+ *
+ * With that setup `<html data-theme="dark">` always wins, while
+ * `data-theme="auto"` (or a missing attribute) follows the OS. The current
+ * state is applied once immediately, then on attribute changes and on
+ * `change` events from the media query.
+ *
+ * Charts that pin their own theme (`options.theme` / `chart.setTheme()`) are
+ * left untouched — same precedence as `switchTheme()`. Browser-only: without
+ * a DOM **and** without `matchMedia` this returns a no-op stop handle.
+ *
+ * @returns A stop function that disconnects the observer and the listener.
+ */
+export function syncThemeWithPreference(
+  options: SyncThemeWithPreferenceOptions = {},
+): () => void {
+  const hasDom = typeof document !== 'undefined';
+  const hasObserver = typeof MutationObserver !== 'undefined';
+  const mediaSupported =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function';
+
+  if (!hasDom && !mediaSupported) {
+    return () => {};
+  }
+
+  const attribute = options.attribute ?? 'data-theme';
+  const target =
+    options.target ?? (hasDom ? document.documentElement : undefined);
+  const media = mediaSupported
+    ? window.matchMedia(options.mediaQuery ?? DEFAULT_DARK_MEDIA_QUERY)
+    : undefined;
+
+  if (!target && !media) {
+    return () => {};
+  }
+
+  const resolveAttribute =
+    options.resolveAttribute ??
+    ((value: string | null) =>
+      value && !AUTO_THEME_VALUES.has(value) ? value : undefined);
+  const resolveMedia =
+    options.resolveMedia ?? ((matches: boolean) => (matches ? 'dark' : 'light'));
+
+  const apply = (): void => {
+    const fromAttribute = target
+      ? resolveAttribute(target.getAttribute(attribute))
+      : undefined;
+    const name =
+      fromAttribute ?? (media ? resolveMedia(media.matches) : undefined);
+    if (!name) return;
+    if (name !== getCurrentTheme().name) {
+      switchTheme(name);
+    }
+  };
+
+  // Apply the initial combination so charts created before this call match.
+  apply();
+
+  let observer: MutationObserver | undefined;
+  if (target && hasObserver) {
+    observer = new MutationObserver(() => apply());
+    observer.observe(target, { attributes: true, attributeFilter: [attribute] });
+  }
+
+  const onChange = (): void => apply();
+  if (media) {
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', onChange);
+    } else {
+      // Safari < 14
+      media.addListener(onChange);
+    }
+  }
+
+  return () => {
+    observer?.disconnect();
+    if (!media) return;
+    if (typeof media.removeEventListener === 'function') {
+      media.removeEventListener('change', onChange);
+    } else {
+      media.removeListener(onChange);
+    }
+  };
+}

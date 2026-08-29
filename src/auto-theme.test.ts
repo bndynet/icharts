@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   syncThemeWithElementAttribute,
   syncThemeWithMediaQuery,
+  syncThemeWithPreference,
 } from './auto-theme.js';
 import { switchTheme, getCurrentTheme } from './themes/index.js';
 
@@ -277,6 +278,92 @@ describe('syncThemeWithMediaQuery', () => {
   it('is a no-op when matchMedia is unavailable', () => {
     // Node environment: no `window` at all.
     const stop = syncThemeWithMediaQuery();
+
+    expect(typeof stop).toBe('function');
+    expect(switchTheme).not.toHaveBeenCalled();
+    expect(() => stop()).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Combined attribute + OS preference (explicit precedence)
+// ---------------------------------------------------------------------------
+
+describe('syncThemeWithPreference', () => {
+  it('prefers the attribute value over the OS preference', () => {
+    attrValues.set('data-theme', 'site-dark');
+    stubMatchMedia(new FakeMediaQueryList(true)); // OS prefers dark
+
+    syncThemeWithPreference({
+      resolveMedia: (matches) => (matches ? 'os-dark' : 'os-light'),
+    });
+
+    expect(switchTheme).toHaveBeenCalledWith('site-dark');
+  });
+
+  it('falls back to the media query when the attribute is missing', () => {
+    stubMatchMedia(new FakeMediaQueryList(true));
+
+    syncThemeWithPreference({ resolveMedia: (matches) => (matches ? 'os-dark' : 'os-light') });
+
+    expect(switchTheme).toHaveBeenCalledWith('os-dark');
+  });
+
+  it("treats 'auto' / 'system' as 'follow the OS'", () => {
+    attrValues.set('data-theme', 'auto');
+    stubMatchMedia(new FakeMediaQueryList(true));
+
+    syncThemeWithPreference({ resolveMedia: () => 'os-dark' });
+
+    expect(switchTheme).toHaveBeenCalledWith('os-dark');
+  });
+
+  it('falls back to the media query when the attribute is removed', () => {
+    attrValues.set('data-theme', 'site-dark');
+    const media = new FakeMediaQueryList(false);
+    stubMatchMedia(media);
+
+    syncThemeWithPreference({ resolveMedia: () => 'os-light' });
+    expect(switchTheme).toHaveBeenCalledWith('site-dark');
+
+    vi.mocked(switchTheme).mockClear();
+    attrValues.delete('data-theme');
+    FakeMutationObserver.instances[0].trigger();
+
+    expect(switchTheme).toHaveBeenCalledWith('os-light');
+  });
+
+  it('keeps the attribute value when the OS preference changes', () => {
+    attrValues.set('data-theme', 'site-dark');
+    const media = new FakeMediaQueryList(false);
+    stubMatchMedia(media);
+
+    syncThemeWithPreference({ resolveMedia: () => 'os-light' });
+    vi.mocked(switchTheme).mockClear();
+
+    media.dispatch(true);
+
+    // The attribute still wins — the media change must not switch to os-light.
+    expect(switchTheme).toHaveBeenCalledWith('site-dark');
+  });
+
+  it('cleans up both the observer and the media listener', () => {
+    const media = new FakeMediaQueryList(false);
+    stubMatchMedia(media);
+
+    const stop = syncThemeWithPreference();
+    expect(media.listenerCount).toBe(1);
+    expect(FakeMutationObserver.instances).toHaveLength(1);
+
+    stop();
+    expect(media.listenerCount).toBe(0);
+    expect(FakeMutationObserver.instances[0].disconnected).toBe(true);
+  });
+
+  it('is a no-op without a DOM and without matchMedia', () => {
+    vi.unstubAllGlobals();
+
+    const stop = syncThemeWithPreference();
 
     expect(typeof stop).toBe('function');
     expect(switchTheme).not.toHaveBeenCalled();
