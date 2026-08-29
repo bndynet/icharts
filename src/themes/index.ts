@@ -177,11 +177,19 @@ export function getThemeColors(name?: string): ChartThemeColors | undefined {
  * Missing `colors` tokens are automatically inherited from the built-in
  * `light` or `dark` base theme according to `colorMode` (defaults to `light`).
  * A missing `palette` is also inherited from the base.
+ *
+ * The resolved mode is written back onto the stored theme, so
+ * `getTheme(name).colorMode` / `getCurrentTheme().colorMode` are always
+ * defined for registered themes — even when the caller omitted `colorMode`
+ * and relied on the `light` default. Consumers can therefore branch on
+ * `colorMode === 'dark'` without an extra `undefined` fallback.
  */
 export function registerTheme(config: ChartThemeConfig): void {
-  const base = config.colorMode === 'dark' ? darkTheme : lightTheme;
+  const colorMode = config.colorMode ?? 'light';
+  const base = colorMode === 'dark' ? darkTheme : lightTheme;
   const theme: ChartTheme = {
     ...config,
+    colorMode,
     colors: { ...base.colors!, ...config.colors },
     palette: config.palette ?? base.palette!,
   };

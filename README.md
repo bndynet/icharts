@@ -624,8 +624,8 @@ import { getThemeColors } from '@bndynet/icharts';
 const tokens = getThemeColors(options.theme); // undefined → active theme
 ```
 
-Declare `colorMode` on custom themes so `getCurrentTheme().colorMode` is
-available for them too:
+Custom themes default to `colorMode: 'light'` when omitted; declare it
+explicitly for dark themes so the stored theme reports the right mode:
 
 ```ts
 registerTheme({ name: 'ocean', colorMode: 'dark', colors: { ... } });

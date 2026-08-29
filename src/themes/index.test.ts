@@ -333,3 +333,33 @@ describe('getTheme / getThemeColors — explicit lookup', () => {
     expect(getCurrentTheme().name).toBe('light');
   });
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// registerTheme — colorMode is always recorded
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('registerTheme — colorMode default', () => {
+  it('records light when colorMode is omitted (matching token inheritance)', () => {
+    registerTheme({ name: 'mode-default-test', palette: ['#101010'] });
+
+    // The public path consumers use: switchTheme + getCurrentTheme.
+    switchTheme('mode-default-test');
+    expect(getCurrentTheme().colorMode).toBe('light');
+    expect(getTheme('mode-default-test').colorMode).toBe('light');
+    // Missing tokens still come from the light base.
+    expect(getThemeColors('mode-default-test')?.textPrimary).toBe('#111827');
+
+    switchTheme('light');
+  });
+
+  it('preserves an explicit dark colorMode and inherits dark tokens', () => {
+    registerTheme({
+      name: 'mode-dark-test',
+      colorMode: 'dark',
+      palette: ['#202020'],
+    });
+
+    expect(getTheme('mode-dark-test').colorMode).toBe('dark');
+    expect(getThemeColors('mode-dark-test')?.textPrimary).toBe('#f1f5f9');
+  });
+});
