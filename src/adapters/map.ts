@@ -5,7 +5,7 @@ import type {
 } from '../types.js';
 import type { RenderContext } from './index.js';
 import { deepMerge, resolveColors, hexToRgb } from '../utils.js';
-import { getThemeColors } from '../themes/index.js';
+import { getThemeColors, resolveThemeName } from '../themes/index.js';
 import {
   buildTitle,
   buildAsyncTooltipFormatter,
@@ -74,7 +74,8 @@ function resolveVisualMap(
   const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
   const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
   const defaultBaseColor = resolveColors(['__map_visual__'], options)[0];
-  const surface = getThemeColors()?.surface ?? '#ffffff';
+  const surface =
+    getThemeColors(resolveThemeName(options.theme))?.surface ?? '#ffffff';
   const baseRgb = parseRgbTuple(defaultBaseColor);
   const surfaceRgb = parseRgbTuple(surface);
   const lowColor = baseRgb && surfaceRgb

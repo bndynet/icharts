@@ -5,6 +5,7 @@ import type {
 } from '../types.js';
 import type { RenderContext } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
+import { getThemeColors, resolveThemeName } from '../themes/index.js';
 import {
   buildTitle,
   buildAsyncTooltipFormatter,
@@ -111,6 +112,7 @@ export function resolveCalendarHeatmapOptions(
     baseColor,
     'horizontal',
     false,
+    getThemeColors(resolveThemeName(options.theme)),
   );
   const visualMapShown = visualMap !== undefined && visualMap.show === true;
   if (visualMap !== undefined && visualMapShown) {

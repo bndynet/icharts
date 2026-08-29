@@ -3,7 +3,7 @@ import { alpha } from '@bndynet/color-hub';
 import { getLegendReserve } from './adapters/common/legend.js';
 import { getChartPadding } from './adapters/common/shared.js';
 import { getTitleReserve } from './adapters/common/title.js';
-import { getThemeColors, getCurrentTheme } from './themes/index.js';
+import { getTheme, getThemeColors, resolveThemeName } from './themes/index.js';
 
 type LegendChartOptions = AnyChartOptions & { legend?: LegendOptions };
 
@@ -90,6 +90,8 @@ export class LegendSelectionController {
   private nativeVisible = false;
   private activeColor: string | undefined;
   private wasEnabled = false;
+  /** Theme the current chart renders with (per-chart `options.theme` wins). */
+  private themeName: string | undefined;
 
   constructor(private readonly container: HTMLElement, options: AnyChartOptions) {
     this.setExplicitSelected(options);
@@ -106,6 +108,7 @@ export class LegendSelectionController {
   /** Hide ECharts' legend only when the independent selection feature is enabled. */
   prepare(option: Record<string, unknown>, options: AnyChartOptions): boolean {
     this.option = option;
+    this.themeName = resolveThemeName(options.theme);
     this.legend = (options as LegendChartOptions).legend;
     this.settings = this.legend?.selection;
     const block = option.legend;
@@ -184,9 +187,9 @@ export class LegendSelectionController {
       panel.style.justifyContent = 'center';
     }
 
-    const colors = getThemeColors();
+    const colors = getThemeColors(this.themeName);
     this.activeColor = colors?.info;
-    const palette = getCurrentTheme().palette ?? [];
+    const palette = getTheme(this.themeName).palette ?? [];
     const swatches = swatchColors(this.option ?? {}, this.names, palette);
     this.names.forEach((name, index) => {
       const button = document.createElement('button');

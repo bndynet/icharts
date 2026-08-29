@@ -27,7 +27,7 @@ import {
   applyConfiguredFontFamilyToOption,
 } from './common/index.js';
 import { measureTextWidth } from './common/text-measure.js';
-import { getThemeColors, resolveThemeName, syncColorHubTheme } from '../themes/index.js';
+import { getThemeColors, resolveThemeName } from '../themes/index.js';
 
 // ---------------------------------------------------------------------------
 // Layout architecture
@@ -128,9 +128,8 @@ export function resolvePieOptions(
   ctx?: RenderContext,
 ): ChartSetupResult {
   const themeName = resolveThemeName(options.theme);
-  syncColorHubTheme(themeName);
-  const defaultCenterLabelPrimaryColor = getThemeColors()?.textPrimary;
-  const defaultCenterLabelSecondaryColor = getThemeColors()?.textSecondary;
+  const defaultCenterLabelPrimaryColor = getThemeColors(themeName)?.textPrimary;
+  const defaultCenterLabelSecondaryColor = getThemeColors(themeName)?.textSecondary;
 
   const variant = (options.variant ?? 'default') as PieVariant;
   const names = data.map((d) => d.name);

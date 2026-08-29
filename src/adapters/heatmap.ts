@@ -6,6 +6,7 @@ import type {
 } from '../types.js';
 import type { RenderContext } from './index.js';
 import { deepMerge, resolveColors } from '../utils.js';
+import { getThemeColors, resolveThemeName } from '../themes/index.js';
 import {
   buildTitle,
   buildGrid,
@@ -167,6 +168,8 @@ export function resolveHeatmapOptions(
     options.visualMap,
     baseColor,
     'vertical',
+    true,
+    getThemeColors(resolveThemeName(options.theme)),
   );
 
   const tooltip: Record<string, unknown> = {

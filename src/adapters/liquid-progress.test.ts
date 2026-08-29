@@ -5,7 +5,7 @@ import type {
 } from '../types.js';
 import { resolveLiquidProgressOptions } from './liquid-progress.js';
 import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
-import { getCurrentTheme } from '../themes/index.js';
+import { getCurrentTheme, switchTheme } from '../themes/index.js';
 import { hexToRgb } from '../utils.js';
 
 const sample: LiquidProgressData = { value: 72, max: 100, label: 'Storage' };
@@ -56,6 +56,21 @@ describe('liquid-progress adapter', () => {
     const result = resolveLiquidProgressOptions(sample, { title: 'Storage Usage' });
     const payload = payloadOf(result);
     expect(payload.center).toEqual(['50%', '58%']);
+  });
+
+  it('uses the chart theme — not the active theme — for the dark-mode alpha', () => {
+    switchTheme('light');
+    try {
+      const result = resolveLiquidProgressOptions(sample, { theme: 'dark' });
+      const payload = payloadOf(result);
+      const seriesColor = (seriesOf(result).itemStyle as { color: string }).color;
+      const bg = payload.backgroundStyle as Record<string, unknown>;
+      // Dark chart theme on a light app theme: the alpha must come from the
+      // chart's own colorMode, not from whatever rendered last.
+      expect(bg.color).toBe(`rgba(${hexToRgb(seriesColor)}, 0.24)`);
+    } finally {
+      switchTheme('light');
+    }
   });
 
   it('honors waveCount and clamps wave data into [0,1]', () => {

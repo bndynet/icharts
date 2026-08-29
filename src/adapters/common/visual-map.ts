@@ -1,5 +1,5 @@
 import { hexToRgb } from '../../utils.js';
-import { getThemeColors } from '../../themes/index.js';
+import { getThemeColors, type ChartThemeColors } from '../../themes/index.js';
 import { parseRgbTuple, blendRgb } from './color-ramp.js';
 
 /**
@@ -64,6 +64,12 @@ export interface VisualMapOptions {
  * `defaultShow` supplies the default `show` value; the calendar heatmap
  * passes `false` so the color bar is hidden by default while the
  * value→color encoding still applies to the cells.
+ *
+ * `themeColors` supplies the UI tokens of the **chart's** theme. Callers pass
+ * `getThemeColors(resolveThemeName(options.theme))` so a per-chart
+ * `options.theme` drives the low-stop blend instead of whichever theme
+ * happens to be active globally. Defaults to the active theme's tokens for
+ * backwards compatibility.
  */
 export function buildVisualMap(
   values: ReadonlyArray<number>,
@@ -71,6 +77,7 @@ export function buildVisualMap(
   baseColor: string,
   defaultOrient: 'horizontal' | 'vertical',
   defaultShow = true,
+  themeColors: ChartThemeColors | undefined = getThemeColors(),
 ): Record<string, unknown> | undefined {
   if (cfg?.show === false) return undefined;
 
@@ -80,7 +87,7 @@ export function buildVisualMap(
   const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
   const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
 
-  const surface = getThemeColors()?.surface ?? '#ffffff';
+  const surface = themeColors?.surface ?? '#ffffff';
   const baseRgb = parseRgbTuple(baseColor);
   const surfaceRgb = parseRgbTuple(surface);
   const lowColor =

@@ -2,7 +2,7 @@ import type {
   LiquidProgressData,
   LiquidProgressChartOptions,
 } from '../types.js';
-import { getCurrentTheme } from '../themes/index.js';
+import { getTheme, resolveThemeName, type ChartTheme } from '../themes/index.js';
 import { deepMerge, hexToRgb, resolveColors } from '../utils.js';
 import {
   buildTitle,
@@ -66,10 +66,13 @@ function resolveLiquidLabelFontSize(
   return clampRound(ref * LIQUID_LABEL_RATIO, LIQUID_LABEL_MIN, LIQUID_LABEL_MAX);
 }
 
-function resolveLiquidBackgroundColor(seriesColor: string): string {
+function resolveLiquidBackgroundColor(
+  seriesColor: string,
+  theme: ChartTheme,
+): string {
   if (!seriesColor.startsWith('#')) return seriesColor;
   const alpha =
-    getCurrentTheme().colorMode === 'dark'
+    theme.colorMode === 'dark'
       ? LIQUID_BG_ALPHA_DARK
       : LIQUID_BG_ALPHA_LIGHT;
   return `rgba(${hexToRgb(seriesColor)}, ${alpha})`;
@@ -141,14 +144,15 @@ export function resolveLiquidProgressOptions(
   const secondaryLabelFontSize = getLabelFontSize(options);
   const names = [data.label ?? 'Progress'];
   const colors = resolveColors(names, options);
-  const themeColors = getCurrentTheme().colors;
+  const theme = getTheme(resolveThemeName(options.theme));
+  const themeColors = theme.colors;
   const seriesColor = colors[0];
   const secondaryLabelColor = resolveSecondaryLabelColor(
     themeColors?.textSecondary,
     themeColors?.textPrimary,
     seriesColor,
   );
-  const backgroundColor = resolveLiquidBackgroundColor(seriesColor);
+  const backgroundColor = resolveLiquidBackgroundColor(seriesColor, theme);
 
   const eOption: Record<string, unknown> = {
     title: buildTitle(options),
