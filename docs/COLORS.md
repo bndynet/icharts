@@ -483,10 +483,16 @@ From `src/index.ts`:
 | `getConfig()` | Read current global config. |
 | `registerTheme(config)` | Register a custom theme (palette + UI tokens). |
 | `switchTheme(name)` | Switch every live chart to a registered theme. |
-| `getCurrentTheme()`, `getThemeColors()` | Inspect the active theme. |
+| `getCurrentTheme()`, `getThemeColors(name?)` | Inspect the active theme, or any registered theme's tokens by name. Reading never switches the active theme. |
 | `getSeriesColor(name)` | Hex set `{ default, hover, active, disabled }` for a given name. |
 | `setColorMap(map, themeName?)` | Pre-bind `name → color` (effective only with `consistentColors: true`). |
 | `resetColorMap(themeName?)` | Clear ColorHub's accumulated map. |
+
+Rendering is side-effect free with respect to the active theme: `resolveColors`
+passes `resolveThemeName(options.theme)` down to `resolveSeriesColors` /
+`resolveColorsByPosition` as an explicit trailing argument, so a per-chart
+theme never changes what `getCurrentTheme()` reports, the default theme of
+charts created afterwards, or a subsequent SSR render.
 
 `ChartOptions` fields:
 

@@ -2,7 +2,6 @@ import type { ChartOptions } from './types.js';
 import {
   resolveSeriesColors,
   resolveColorsByPosition,
-  syncColorHubTheme,
   resolveThemeName,
 } from './themes/index.js';
 import { getConfig } from './config.js';
@@ -170,8 +169,13 @@ export function buildSparkAreaGradient(hex: string): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve a color for each name using the active theme, `options.colors`,
- * `options.colorMap`, and `configure({ consistentColors })`.
+ * Resolve a color for each name using the chart's theme (`options.theme`),
+ * `options.colors`, `options.colorMap`, and `configure({ consistentColors })`.
+ *
+ * The theme is passed to the resolver explicitly — this function NEVER
+ * mutates the active (global) theme, so rendering a chart with a per-chart
+ * `options.theme` cannot change what later charts (or a server-rendered
+ * request) resolve against.
  *
  * Returns an array of the same length as `names`. Returns an empty array
  * when `names` is empty (used by chart types without named series, e.g. gauge).
@@ -181,11 +185,11 @@ export function resolveColors(
   options: ChartOptions,
 ): string[] {
   if (names.length === 0) return [];
-  syncColorHubTheme(resolveThemeName(options.theme));
+  const themeName = resolveThemeName(options.theme);
   const resolve = getConfig().consistentColors
     ? resolveSeriesColors
     : resolveColorsByPosition;
-  return resolve(names as string[], options.colors, options.colorMap);
+  return resolve(names as string[], options.colors, options.colorMap, themeName);
 }
 
 /**

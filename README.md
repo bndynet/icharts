@@ -591,13 +591,45 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `setColorMap(map, themeName?)` | Pre-register name → color mappings (all themes or one) |
 | `resetColorMap(themeName?)` | Clear accumulated color assignments (all themes or one) |
 | `getSeriesColor(name)` | Get the assigned color (with hover/active/disabled states) for a name |
-| `getCurrentTheme()` | Get the active theme object |
-| `getThemeColors()` | Get the active theme's UI color tokens |
+| `getCurrentTheme()` | Get the active **application** theme object (set by `switchTheme` / `configure`) |
+| `getThemeColors(name?)` | Get a theme's UI color tokens (defaults to the active theme) |
 | `registerAdapter(type, adapter)` | Register a custom chart type adapter (warns when shadowing a built-in type) |
 | `getAdapter(type)` | Look up the registered adapter for a type (or `undefined`) |
 | `hasAdapter(type)` | Whether an adapter is registered for `type` |
 | `listAdapters()` | Type strings of every registered adapter (built-in + custom) |
 | `unregisterAdapter(type)` | Remove a registered adapter; returns whether one existed |
+
+### Reading the active theme (light / dark)
+
+```ts
+import { getCurrentTheme } from '@bndynet/icharts';
+
+const { colorMode, name } = getCurrentTheme(); // colorMode: 'light' | 'dark'
+const isDark = colorMode === 'dark';
+```
+
+`getCurrentTheme()` / `getThemeColors()` describe the **application** theme —
+the one selected by `switchTheme()`, `configure({ theme })`, or
+`syncThemeWithElementAttribute()`. Rendering never changes it: a chart with
+`options.theme: 'ocean'` paints with ocean without affecting
+`getCurrentTheme()`, the default theme of charts created afterwards, or a
+subsequent server-side render.
+
+That also means an adapter should ask for the theme it is actually painting
+with instead of the active one:
+
+```ts
+import { getThemeColors } from '@bndynet/icharts';
+
+const tokens = getThemeColors(options.theme); // undefined → active theme
+```
+
+Declare `colorMode` on custom themes so `getCurrentTheme().colorMode` is
+available for them too:
+
+```ts
+registerTheme({ name: 'ocean', colorMode: 'dark', colors: { ... } });
+```
 
 ### Auto-sync theme from a DOM attribute
 

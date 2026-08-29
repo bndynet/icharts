@@ -319,18 +319,6 @@ export function resolveColorsByPosition(
   });
 }
 
-/**
- * Sync the active theme before resolving colors.
- *
- * Internal-only — does NOT trigger the auto-reset behavior of the public
- * {@link switchTheme}. This is used by `resolveColors` on every adapter
- * call to set the right theme context, and must NOT clear auto assignments
- * (doing so would defeat `consistentColors`).
- */
-export function syncColorHubTheme(name: string): void {
-  colorHub.switchTheme(name);
-}
-
 // ---------------------------------------------------------------------------
 // Render-session refcounting (internal — not part of the public package API)
 // ---------------------------------------------------------------------------

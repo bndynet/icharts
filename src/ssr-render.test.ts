@@ -24,6 +24,7 @@ import {
   type RenderChartToSVGStringOptions,
 } from './ssr-render.js';
 import { registerAdapter } from './adapters/index.js';
+import { getCurrentTheme, switchTheme } from './themes/index.js';
 
 const lineData = {
   categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May'],
@@ -186,6 +187,29 @@ describe('renderChartToSVGString — adapter output reaches the markup', () => {
     // the theme changes. If themes were silently dropped, both calls
     // would emit identical strings.
     expect(defaultSvg).not.toEqual(darkSvg);
+  });
+
+  it('does not leak the requested theme into later renders', () => {
+    // Regression: the adapter pipeline used to sync the module-global
+    // "active theme" on every resolve, so rendering one `theme: 'dark'`
+    // chart made every later SSR request dark until someone called
+    // switchTheme() again. Rendering must be self-contained.
+    switchTheme('light');
+    const size = { width: 800, height: 400 };
+    // ECharts stamps each instance with a fresh `zr<N>` id (`zr0-cls-0`,
+    // `zr2-cls-12`, …). That counter is instance state, not theme state, so
+    // normalize it before comparing the markup.
+    const normalize = (svg: string): string =>
+      svg.replace(/zr\d+(?:-cls-\d+)?/g, 'zr');
+
+    const baseline = normalize(renderChartToSVGString('line', lineData, size));
+
+    renderChartToSVGString('line', lineData, size, { theme: 'dark' });
+
+    expect(normalize(renderChartToSVGString('line', lineData, size))).toBe(
+      baseline,
+    );
+    expect(getCurrentTheme().name).toBe('light');
   });
 });
 
