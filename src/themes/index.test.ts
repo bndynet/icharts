@@ -42,6 +42,8 @@ import {
   getCurrentTheme,
   getTheme,
   getThemeColors,
+  getThemeMode,
+  isDarkTheme,
   getSeriesColor,
   chartLightTheme,
   chartDarkTheme,
@@ -424,5 +426,43 @@ describe('registerTheme — re-registration consistency', () => {
     expect(getSeriesColor('re-reg-pinned').default).toBe('#123456');
 
     switchTheme('light');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// getThemeMode / isDarkTheme — the public light/dark test
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('getThemeMode / isDarkTheme', () => {
+  it('reports the active theme mode', () => {
+    switchTheme('light');
+    expect(getThemeMode()).toBe('light');
+    expect(isDarkTheme()).toBe(false);
+
+    switchTheme('dark');
+    try {
+      expect(getThemeMode()).toBe('dark');
+      expect(isDarkTheme()).toBe(true);
+    } finally {
+      switchTheme('light');
+    }
+  });
+
+  it('reads a named theme without switching to it', () => {
+    expect(getThemeMode('dark')).toBe('dark');
+    expect(isDarkTheme('dark')).toBe(true);
+    expect(getThemeMode('light')).toBe('light');
+    expect(getCurrentTheme().name).toBe('light');
+  });
+
+  it('treats custom themes without an explicit mode as light (P0-2)', () => {
+    registerTheme({ name: 'mode-api-test', palette: ['#010101'] });
+    expect(getThemeMode('mode-api-test')).toBe('light');
+    expect(isDarkTheme('mode-api-test')).toBe(false);
+  });
+
+  it('falls back to light for unknown names', () => {
+    expect(getThemeMode('no-such-theme-mode')).toBe('light');
+    expect(isDarkTheme('no-such-theme-mode')).toBe(false);
   });
 });

@@ -3,6 +3,9 @@ import {
   lighten,
   darken,
   alpha,
+  isDark,
+  isValidColor,
+  type ColorMode,
   type StateColors,
 } from '@bndynet/color-hub';
 import * as echarts from 'echarts';
@@ -178,6 +181,43 @@ export function getTheme(name?: string): ChartTheme {
  */
 export function getThemeColors(name?: string): ChartThemeColors | undefined {
   return getTheme(name).colors;
+}
+
+/**
+ * Resolved light/dark mode of a theme — the canonical way to ask "is this
+ * theme dark?" without reaching into the theme object.
+ *
+ * Registered themes always carry `colorMode` (`registerTheme` writes the
+ * `'light'` default back onto the stored theme), so this is a total function
+ * for every theme the library knows about. The token-based fallback only
+ * applies to theme objects assembled by hand outside `registerTheme`: a
+ * non-transparent, valid `colors.background` is inspected for luminance.
+ *
+ * ```ts
+ * getThemeMode();            // mode of the active theme
+ * getThemeMode('dark');      // mode of a specific theme (no switching)
+ * getThemeMode(options.theme); // mode an adapter is painting with
+ * ```
+ */
+export function getThemeMode(name?: string): ColorMode {
+  const theme = getTheme(name);
+  if (theme.colorMode) return theme.colorMode;
+
+  const background = theme.colors?.background;
+  if (
+    background &&
+    background !== 'transparent' &&
+    isValidColor(background) &&
+    isDark(background)
+  ) {
+    return 'dark';
+  }
+  return 'light';
+}
+
+/** `true` when {@link getThemeMode} resolves to `'dark'`. */
+export function isDarkTheme(name?: string): boolean {
+  return getThemeMode(name) === 'dark';
 }
 
 /**
@@ -364,5 +404,5 @@ export function releaseColorOwner(owner: object): void {
   paletteRegistry.releaseOwner(owner);
 }
 
-export type { ChartTheme, ChartThemeColors, ChartThemeConfig };
+export type { ChartTheme, ChartThemeColors, ChartThemeConfig, ColorMode };
 export { lightTheme as chartLightTheme, darkTheme as chartDarkTheme, chartThemes } from './presets.js';

@@ -592,6 +592,9 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 | `resetColorMap(themeName?)` | Clear accumulated color assignments (all themes or one) |
 | `getSeriesColor(name)` | Get the assigned color (with hover/active/disabled states) for a name |
 | `getCurrentTheme()` | Get the active **application** theme object (set by `switchTheme` / `configure`) |
+| `getTheme(name?)` | Get a theme definition (defaults to the active theme) |
+| `getThemeMode(name?)` | Resolved `'light'` / `'dark'` mode of a theme |
+| `isDarkTheme(name?)` | `true` when a theme's mode is dark |
 | `getThemeColors(name?)` | Get a theme's UI color tokens (defaults to the active theme) |
 | `registerAdapter(type, adapter)` | Register a custom chart type adapter (warns when shadowing a built-in type) |
 | `getAdapter(type)` | Look up the registered adapter for a type (or `undefined`) |
@@ -602,11 +605,19 @@ Per-chart `colors` and `colorMap` options always take highest priority regardles
 ### Reading the active theme (light / dark)
 
 ```ts
-import { getCurrentTheme } from '@bndynet/icharts';
+import { getThemeMode, isDarkTheme } from '@bndynet/icharts';
 
-const { colorMode, name } = getCurrentTheme(); // colorMode: 'light' | 'dark'
-const isDark = colorMode === 'dark';
+isDarkTheme();                  // active theme
+getThemeMode('dark');           // any registered theme, no switching
+isDarkTheme(options.theme);     // the theme this chart is painting with
 ```
+
+`getTheme(name?)` returns the theme definition, `getThemeMode(name?)` and
+`isDarkTheme(name?)` resolve its mode. With no argument they read the active
+theme; with a name they answer for that theme without switching to it.
+Registered themes always have a mode — a custom theme defaults to `'light'`
+when `colorMode` is omitted. `ChartTheme`, `ChartThemeColors` and `ColorMode`
+are exported for typing.
 
 `getCurrentTheme()` / `getThemeColors()` describe the **application** theme —
 the one selected by `switchTheme()`, `configure({ theme })`, or

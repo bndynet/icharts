@@ -483,7 +483,8 @@ From `src/index.ts`:
 | `getConfig()` | Read current global config. |
 | `registerTheme(config)` | Register a custom theme (palette + UI tokens). |
 | `switchTheme(name)` | Switch every live chart to a registered theme. |
-| `getCurrentTheme()`, `getThemeColors(name?)` | Inspect the active theme, or any registered theme's tokens by name. Reading never switches the active theme. |
+| `getCurrentTheme()`, `getTheme(name?)`, `getThemeColors(name?)` | Inspect the active theme, or any registered theme's definition / tokens by name. Reading never switches the active theme. |
+| `getThemeMode(name?)`, `isDarkTheme(name?)` | Resolved `'light'` / `'dark'` mode — for the active theme or any registered one. |
 | `getSeriesColor(name)` | Hex set `{ default, hover, active, disabled }` for a given name. |
 | `setColorMap(map, themeName?)` | Pre-bind `name → color` (effective only with `consistentColors: true`). |
 | `resetColorMap(themeName?)` | Clear ColorHub's accumulated map. |
