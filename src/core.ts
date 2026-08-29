@@ -225,6 +225,13 @@ export class IChart implements IChartInstance {
         );
       }
       if ('autoResize' in newOptions) this._syncAutoResize();
+      // `theme` is a live ECharts setting, not just an option the adapter
+      // reads: swapping it here only changed the resolved palette while the
+      // instance kept its original ECharts theme (axis / title / tooltip
+      // chrome). Apply it to the instance before the render pass below.
+      if ('theme' in newOptions) {
+        this._applyThemeName(resolveThemeName(newOptions.theme));
+      }
     }
 
     // Sample the inter-update interval BEFORE re-rendering so adapters can
@@ -278,23 +285,33 @@ export class IChart implements IChartInstance {
 
   setTheme(theme: string): void {
     this._options = { ...this._options, theme };
-    const name = resolveThemeName(theme);
-    if (this._activeTheme !== name) {
-      this._activeTheme = name;
-      // Some custom-series renderers (e.g. wordcloud) leave stale display
-      // elements in place during ECharts' diff/merge on a theme switch,
-      // which shows up as duplicated/overlapped marks. Adapters opt into a
-      // pre-repaint clear via `clearOnThemeChange`; the engine no longer
-      // hardcodes per-type behavior here.
-      if (getAdapter(this._type)?.clearOnThemeChange) {
-        this.ecInstance.clear?.();
-      }
-      this.ecInstance.setTheme(name);
-    }
+    this._applyThemeName(resolveThemeName(theme));
     // Theme switches don't represent a frame tick — don't poison the
     // observed interval with the (potentially long) time since the last
     // user-driven update.
     this._apply();
+  }
+
+  /**
+   * Point the live ECharts instance at `name` (no-op when it already is).
+   *
+   * ECharts' theme is instance state, so every path that changes the
+   * effective theme — `setTheme()` and `update(_, { theme })` — has to go
+   * through here, otherwise the adapter repaints with the new palette while
+   * the instance keeps the old theme's axis/title/tooltip chrome.
+   */
+  private _applyThemeName(name: string): void {
+    if (this._activeTheme === name) return;
+    this._activeTheme = name;
+    // Some custom-series renderers (e.g. wordcloud) leave stale display
+    // elements in place during ECharts' diff/merge on a theme switch,
+    // which shows up as duplicated/overlapped marks. Adapters opt into a
+    // pre-repaint clear via `clearOnThemeChange`; the engine no longer
+    // hardcodes per-type behavior here.
+    if (getAdapter(this._type)?.clearOnThemeChange) {
+      this.ecInstance.clear?.();
+    }
+    this.ecInstance.setTheme(name);
   }
 
   resize(): void {

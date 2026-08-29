@@ -922,3 +922,73 @@ describe('IChart engine — highlight / unhighlight', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Theme changes through update() must reach the live ECharts instance.
+//
+// `theme` is instance state (init / setTheme), not just an adapter option.
+// Before the fix, `chart.update(data, { theme })` repainted the series with
+// the new palette while the axis / title / tooltip chrome kept the old theme.
+// ---------------------------------------------------------------------------
+
+describe('IChart engine — theme changes via update()', () => {
+  const ecOf = (chart: IChart): { setTheme: ReturnType<typeof vi.fn>; clear: ReturnType<typeof vi.fn> } =>
+    chart.getEChartsInstance() as unknown as {
+      setTheme: ReturnType<typeof vi.fn>;
+      clear: ReturnType<typeof vi.fn>;
+    };
+
+  it('applies `theme` from update() to the live ECharts instance', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData);
+    const ec = ecOf(chart);
+    expect(ec.setTheme).not.toHaveBeenCalled();
+
+    chart.update(stubData, { theme: 'dark' } as ChartOptions);
+
+    expect(ec.setTheme).toHaveBeenCalledTimes(1);
+    expect(ec.setTheme).toHaveBeenCalledWith('dark');
+    chart.dispose();
+  });
+
+  it('is a no-op when update() repeats the theme the instance already uses', () => {
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData, {
+      theme: 'dark',
+    } as ChartOptions);
+    const ec = ecOf(chart);
+
+    chart.update(stubData, { theme: 'dark' } as ChartOptions);
+
+    // init() already installed 'dark'; no redundant setTheme.
+    expect(ec.setTheme).not.toHaveBeenCalled();
+    chart.dispose();
+  });
+
+  it('reverts to the active theme when update() clears `theme`', () => {
+    switchTheme('light');
+    const chart = new IChart(fakeContainer(), 'observed-stub', stubData, {
+      theme: 'dark',
+    } as ChartOptions);
+    const ec = ecOf(chart);
+
+    chart.update(stubData, { theme: undefined } as ChartOptions);
+
+    expect(ec.setTheme).toHaveBeenCalledWith('light');
+    chart.dispose();
+  });
+
+  it('clears before repainting for clearOnThemeChange adapters', () => {
+    registerAdapter('clear-update-stub', {
+      validate: () => true,
+      clearOnThemeChange: true,
+      resolve: () => ({ option: { series: [] } }),
+    });
+    const chart = new IChart(fakeContainer(), 'clear-update-stub', stubData);
+    const ec = ecOf(chart);
+
+    chart.update(undefined, { theme: 'dark' } as ChartOptions);
+
+    expect(ec.clear).toHaveBeenCalledTimes(1);
+    expect(ec.setTheme).toHaveBeenCalledWith('dark');
+    chart.dispose();
+  });
+});
