@@ -24,13 +24,14 @@ describe('@bndynet/icharts/core — theme introspection API', () => {
     // re-exported from the package root.
     const theme: ChartTheme = getTheme('dark');
     const mode: ColorMode = getThemeMode('dark');
-    const colors: ChartThemeColors | undefined = getThemeColors('light');
+    // Non-optional: `getThemeColors()` always returns a complete token set.
+    const colors: ChartThemeColors = getThemeColors('light');
 
     expect(theme.name).toBe('dark');
     expect(mode).toBe('dark');
     expect(isDarkTheme('dark')).toBe(true);
     expect(isDarkTheme('light')).toBe(false);
-    expect(colors?.textPrimary).toBe('#111827');
+    expect(colors.textPrimary).toBe('#111827');
   });
 
   it('defaults to the active theme', () => {

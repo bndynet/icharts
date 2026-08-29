@@ -188,7 +188,7 @@ export class LegendSelectionController {
     }
 
     const colors = getThemeColors(this.themeName);
-    this.activeColor = colors?.info;
+    this.activeColor = colors.info;
     const palette = getTheme(this.themeName).palette ?? [];
     const swatches = swatchColors(this.option ?? {}, this.names, palette);
     this.names.forEach((name, index) => {

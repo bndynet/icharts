@@ -247,9 +247,16 @@ export function getTheme(name?: string): ChartTheme {
  * Without an argument this returns the **active** theme's tokens. Pass a
  * theme name to read another theme without switching to it. Both paths go
  * through {@link getTheme}, so they always agree.
+ *
+ * Always returns a complete token set: every theme registered through
+ * {@link registerTheme} (and the built-in presets) carries one. A hand-built
+ * theme object without `colors` falls back to the base tokens of its
+ * `colorMode`, so callers never have to guard with `?.`.
  */
-export function getThemeColors(name?: string): ChartThemeColors | undefined {
-  return getTheme(name).colors;
+export function getThemeColors(name?: string): ChartThemeColors {
+  const theme = getTheme(name);
+  if (theme.colors) return theme.colors;
+  return (theme.colorMode === 'dark' ? darkTheme : lightTheme).colors!;
 }
 
 /**

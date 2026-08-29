@@ -74,8 +74,7 @@ function resolveVisualMap(
   const minValue = numericValues.length > 0 ? Math.min(...numericValues) : 0;
   const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : 0;
   const defaultBaseColor = resolveColors(['__map_visual__'], options)[0];
-  const surface =
-    getThemeColors(resolveThemeName(options.theme))?.surface ?? '#ffffff';
+  const surface = getThemeColors(resolveThemeName(options.theme)).surface;
   const baseRgb = parseRgbTuple(defaultBaseColor);
   const surfaceRgb = parseRgbTuple(surface);
   const lowColor = baseRgb && surfaceRgb

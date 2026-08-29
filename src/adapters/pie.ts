@@ -128,8 +128,8 @@ export function resolvePieOptions(
   ctx?: RenderContext,
 ): ChartSetupResult {
   const themeName = resolveThemeName(options.theme);
-  const defaultCenterLabelPrimaryColor = getThemeColors(themeName)?.textPrimary;
-  const defaultCenterLabelSecondaryColor = getThemeColors(themeName)?.textSecondary;
+  const defaultCenterLabelPrimaryColor = getThemeColors(themeName).textPrimary;
+  const defaultCenterLabelSecondaryColor = getThemeColors(themeName).textSecondary;
 
   const variant = (options.variant ?? 'default') as PieVariant;
   const names = data.map((d) => d.name);
