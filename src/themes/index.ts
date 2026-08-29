@@ -318,11 +318,16 @@ export function registerTheme(config: ChartThemeConfig): void {
     colors: { ...base.colors!, ...config.colors },
     palette: config.palette ?? base.palette!,
   };
-  colorHub.appendTheme(theme);
-  // Keep the explicit-lookup index in sync. `appendTheme()` pushes, so a
-  // re-registration with the same name would otherwise leave the older
-  // definition reachable through ColorHub while the resolvers read the newer
-  // one — the map always points at the latest registration.
+  // ColorHub has no "replace": appending a re-registration would push a
+  // duplicate, and `switchTheme()` only ever finds the first entry. Its clone
+  // is only consulted for the active *name* now (palettes / tokens come from
+  // `themeByName`), so skip the append for an existing name and let the index
+  // hold the latest definition.
+  if (!themeByName.has(theme.name)) {
+    colorHub.appendTheme(theme);
+  }
+  // Keep the explicit-lookup index in sync (the map always points at the
+  // latest registration).
   themeByName.set(theme.name, theme);
   knownThemeNames.add(theme.name);
   echarts.registerTheme(theme.name, buildEChartsTheme(theme.colors!, theme.palette!));

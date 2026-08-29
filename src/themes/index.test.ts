@@ -25,6 +25,7 @@
  * read pre-existing pins.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ColorHub } from '@bndynet/color-hub';
 
 // `echarts.registerTheme` is called by `registerTheme()` below. Stub it so
 // the test can run under the existing node-only Vitest environment.
@@ -506,6 +507,32 @@ describe('switchTheme — unknown names', () => {
       expect(warn).toHaveBeenCalledTimes(1);
     } finally {
       warn.mockRestore();
+      switchTheme('light');
+    }
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// registerTheme — no duplicate ColorHub entries on re-registration
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('registerTheme — ColorHub does not accumulate duplicates', () => {
+  it('appends a new theme once and skips the append on re-registration', () => {
+    const appendSpy = vi.spyOn(ColorHub.prototype, 'appendTheme');
+    try {
+      registerTheme({ name: 'dedupe-theme-test', palette: ['#010101'] });
+      expect(appendSpy).toHaveBeenCalledTimes(1);
+
+      registerTheme({ name: 'dedupe-theme-test', palette: ['#020202'] });
+      expect(appendSpy).toHaveBeenCalledTimes(1);
+
+      // The latest definition still wins everywhere.
+      expect(getTheme('dedupe-theme-test').palette).toEqual(['#020202']);
+      switchTheme('dedupe-theme-test');
+      expect(getCurrentTheme().name).toBe('dedupe-theme-test');
+      expect(getCurrentTheme().palette).toEqual(['#020202']);
+    } finally {
+      appendSpy.mockRestore();
       switchTheme('light');
     }
   });
