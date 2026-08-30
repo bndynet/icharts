@@ -1,4 +1,45 @@
-import { randomDistinctColor } from '@bndynet/color-hub';
+/**
+ * Fixed extension palette for the `consistentColors` name→color allocator.
+ *
+ * When a theme's series palette is exhausted (more distinct names than
+ * palette entries), the allocator previously fell back to
+ * `@bndynet/color-hub`'s `randomDistinctColor()` — a Math.random-based,
+ * golden-ratio-spread hue — so the same name picked a *different* color on
+ * every render/refresh ("colors shuffle after refresh").
+ *
+ * This array replaces that random fallback with a deterministic, finite set
+ * of colors. They are mid-luminance / mid-saturation (500–600-weight hues)
+ * chosen to stay legible on **both** light and dark chart backgrounds, and
+ * are kept distinct from the built-in `light` / `dark` series palettes so a
+ * chart that exhausts its theme palette still gets fresh, distinguishable
+ * colors instead of reusing an in-palette hue.
+ */
+export const EXTENSION_PALETTE = [
+  '#dc2626', // red-600
+  '#e11d48', // rose-600
+  '#f43f5e', // rose-500
+  '#db2777', // pink-600
+  '#ea580c', // orange-600
+  '#d97706', // amber-600
+  '#ca8a04', // yellow-600
+  '#65a30d', // lime-600
+  '#16a34a', // green-600
+  '#22c55e', // green-500
+  '#059669', // emerald-600
+  '#0d9488', // teal-600
+  '#14b8a6', // teal-500
+  '#0891b2', // cyan-600
+  '#0ea5e9', // sky-500
+  '#0284c7', // sky-600
+  '#2563eb', // blue-600
+  '#4f46e5', // indigo-600
+  '#7c3aed', // violet-600
+  '#9333ea', // purple-600
+  '#a855f7', // purple-500
+  '#c026d3', // fuchsia-600
+  '#d946ef', // fuchsia-500
+  '#64748b', // slate-500
+] as const;
 
 /**
  * Per-theme name → color state for the `consistentColors` pipeline.
@@ -46,7 +87,7 @@ interface Lease {
  *     implementation: pin wins; an already-seen auto name keeps its color; a
  *     new name gets the first palette color not already used by a pin or a
  *     prior auto assignment in the same theme; once the palette is exhausted a
- *     golden-ratio distinct color is generated.
+ *     fixed, deterministic color from {@link EXTENSION_PALETTE} is used.
  *   - Reference counting is driven by render *sessions*. The engine brackets
  *     each chart render with {@link beginRender} / {@link endRender}; every
  *     `resolve` made in between is recorded as that chart's *lease*. When the
@@ -105,7 +146,10 @@ export class PaletteRegistry {
     return color;
   }
 
-  /** First palette color not already used by a pin or auto assignment; golden fallback on exhaustion. */
+  /**
+   * First palette color not already used by a pin or auto assignment, then a
+   * fixed deterministic color from {@link EXTENSION_PALETTE} on exhaustion.
+   */
   private allocate(s: ThemeColorState, palette: readonly string[]): string {
     const used = new Set<string>();
     for (const c of s.pins.values()) used.add(c);
@@ -115,13 +159,18 @@ export class PaletteRegistry {
       if (!used.has(c)) return c;
     }
 
-    // Palette exhausted — mirror ColorHub's default `golden` exhaustion:
-    // pick a perceptually-spread color that doesn't collide with one in use.
-    let c: string;
-    do {
-      c = randomDistinctColor();
-    } while (used.has(c));
-    return c;
+    // Palette exhausted — fall back to the fixed extension palette instead of
+    // `randomDistinctColor()`, so the same name resolves to the same color on
+    // every render/refresh instead of shuffling.
+    for (const c of EXTENSION_PALETTE) {
+      if (!used.has(c)) return c;
+    }
+
+    // Main palette AND extension palette both exhausted (requires more distinct
+    // colors than both palettes combined). Deterministic guard: cycle the
+    // extension palette by the number of colors already in use. This may repeat
+    // a color, but it is never non-deterministic.
+    return EXTENSION_PALETTE[used.size % EXTENSION_PALETTE.length];
   }
 
   /** Pre-bind a name to a color for `theme`. Overwrites any existing pin. */

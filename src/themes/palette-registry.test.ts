@@ -12,7 +12,7 @@
  * the "no drift without a sweep" guarantee. Pins are never recycled.
  */
 import { describe, it, expect } from 'vitest';
-import { PaletteRegistry } from './palette-registry.js';
+import { PaletteRegistry, EXTENSION_PALETTE } from './palette-registry.js';
 
 const PAL = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'] as const;
 const DARK = ['#60a5fa', '#34d399'] as const;
@@ -171,5 +171,32 @@ describe('PaletteRegistry — reset interactions with live leases', () => {
     reg.releaseOwner(a);
     const c = {};
     expect(render(reg, c, T, ['C1', 'C2'])).toEqual([PAL[0], PAL[1]]);
+  });
+});
+
+describe('PaletteRegistry — deterministic extension fallback on exhaustion', () => {
+  it('uses EXTENSION_PALETTE instead of a random color once the theme palette is exhausted', () => {
+    const reg = new PaletteRegistry();
+    const a = {};
+    // Exhaust the 4-color PAL with 4 distinct names.
+    expect(render(reg, a, T, ['X1', 'X2', 'X3', 'X4'])).toEqual([
+      PAL[0], PAL[1], PAL[2], PAL[3],
+    ]);
+
+    // Overflow names come from the fixed extension palette, deterministically.
+    expect(render(reg, a, T, ['X5', 'X6'])).toEqual([
+      EXTENSION_PALETTE[0], EXTENSION_PALETTE[1],
+    ]);
+  });
+
+  it('re-resolving an overflow name returns the same color (no refresh shuffle)', () => {
+    const reg = new PaletteRegistry();
+    const a = {};
+    // Y5 overflows the palette → EXTENSION_PALETTE[0].
+    render(reg, a, T, ['Y1', 'Y2', 'Y3', 'Y4', 'Y5']);
+
+    // A later render of the same overflow name must return the exact same
+    // color — never a freshly-randomised one.
+    expect(render(reg, a, T, ['Y5'])).toEqual([EXTENSION_PALETTE[0]]);
   });
 });

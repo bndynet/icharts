@@ -384,10 +384,11 @@ function registerDashboardThemes(): void {
   // Palettes are sized to comfortably cover every unique series / node name
   // the dashboard renders (≈14 across KPI sparks, tier series, sankey nodes,
   // chord nodes, mixed-chart "Growth Rate", etc.) with headroom to spare.
-  // Once `configure({ consistentColors: true })` exhausts the palette,
-  // ColorHub falls back to randomised hues (Math.random-based) and the same
-  // name picks a different color on every refresh — keeping the palette
-  // longer than the name list keeps assignments deterministic.
+  // Names that still overflow the palette now fall back to a fixed,
+  // deterministic extension palette (EXTENSION_PALETTE) instead of randomised
+  // hues, so the same name keeps the same color on every refresh. Oversizing
+  // the dashboard palettes is belt-and-suspenders — it keeps every tier on a
+  // curated brand color rather than a generated extension color.
   registerTheme({
     name: 'dash-sunset',
     colorMode: 'light',
