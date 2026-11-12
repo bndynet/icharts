@@ -252,6 +252,7 @@ import {
   isXYData,
   isMapData,
   isPieData,
+  isPieConcentricData,
   isGaugeData,
   mergeGaugeData,
   isLiquidProgressData,
@@ -272,6 +273,7 @@ import type {
   AreaData,
   MapData,
   PieData,
+  PieConcentricData,
   GaugeData,
   LiquidProgressData,
   SankeyData,
@@ -347,9 +349,9 @@ registerAdapter(ChartType.Map, {
 });
 
 registerAdapter(ChartType.Pie, {
-  validate: isPieData,
+  validate: (data) => isPieData(data) || isPieConcentricData(data),
   resolve: (data, options, ctx) =>
-    resolvePieOptions(data as PieData, options as PieChartOptions, ctx),
+    resolvePieOptions(data as PieData | PieConcentricData, options as PieChartOptions, ctx),
 });
 
 registerAdapter(ChartType.Gauge, {

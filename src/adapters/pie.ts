@@ -1,5 +1,7 @@
 import type {
   PieData,
+  PieDataItem,
+  PieConcentricData,
   PieChartOptions,
   PieVariant,
   PieCenterLabel,
@@ -10,6 +12,7 @@ import { getConfig } from '../config.js';
 import {
   formatPieTooltipSyncHtml,
   pieParamsToTooltipContext,
+  type PieRingTooltipValue,
 } from '../tooltip-context.js';
 import { deepMerge, resolveColors } from '../utils.js';
 import {
@@ -122,8 +125,13 @@ const PIE_AUTO_RING_MAX = 36;
 const PIE_AUTO_RING_FALLBACK = 20;
 const NIGHTINGALE_INNER_CORNER_RADIUS = 4;
 
+interface PieSeriesEntry {
+  name?: string;
+  data: PieDataItem[];
+}
+
 export function resolvePieOptions(
-  data: PieData,
+  data: PieData | PieConcentricData,
   options: PieChartOptions,
   ctx?: RenderContext,
 ): ChartSetupResult {
@@ -131,14 +139,32 @@ export function resolvePieOptions(
   const defaultCenterLabelPrimaryColor = getThemeColors(themeName).textPrimary;
   const defaultCenterLabelSecondaryColor = getThemeColors(themeName).textSecondary;
 
+  // Normalize both input shapes into a series list. `Array.isArray(data)` is
+  // the legacy single-series `PieData`; `{ series: [...] }` is the new
+  // concentric shape. `isConcentric` drives every multi-ring branch below so
+  // the legacy path stays byte-for-byte identical.
+  const seriesList: PieSeriesEntry[] = Array.isArray(data)
+    ? [{ name: undefined, data }]
+    : data.series;
+  const isConcentric = seriesList.length > 1;
+
   const variant = (options.variant ?? 'default') as PieVariant;
-  const names = data.map((d) => d.name);
+  // Legend names are the union of category names across rings (first-
+  // appearance order). For a single series this is the input slice order —
+  // unchanged from before.
+  const names = isConcentric
+    ? uniqueCategoryNames(seriesList)
+    : seriesList[0].data.map((d) => d.name);
   const showLegend = options.legend?.show ?? false;
   const showSliceLabel = options.showSliceLabel ?? !showLegend;
 
-  const sorted = options.autoSort !== false
-    ? [...data].sort((a, b) => b.value - a.value)
-    : data;
+  // Each ring sorts independently by value desc (or keeps input order).
+  const sortedSeriesList: PieSeriesEntry[] = seriesList.map((s) => ({
+    name: s.name,
+    data: options.autoSort !== false
+      ? [...s.data].sort((a, b) => b.value - a.value)
+      : s.data,
+  }));
 
   // ECharts pie matches `option.color[i]` to `series.data[i]` by index, so
   // the palette has to follow the SORTED slice order — not the original
@@ -147,7 +173,7 @@ export function resolvePieOptions(
   // slice and its matching legend swatch. The legend's display order still
   // follows `names` (the user-supplied order) so callers retain control of
   // the legend layout independent of the painted slice order.
-  const sliceNames = sorted.map((d) => d.name);
+  const sliceNames = sortedSeriesList[0].data.map((d) => d.name);
 
   const tooltip: Record<string, unknown> = {
     trigger: 'item',
@@ -155,14 +181,21 @@ export function resolvePieOptions(
     appendToBody: resolveAppendToBody(options, ctx),
     position: resolveTooltipPosition(options),
   };
+  // Concentric charts aggregate the hovered category across every ring so the
+  // default tooltip can render one row per ring (compare across datasets).
+  const ringsByCategory = isConcentric ? buildRingsByCategory(seriesList) : undefined;
+  const defaultSync = (params: unknown): string =>
+    formatPieTooltipSyncHtml(params, options, ringsByCategory);
   const pieFormatter = buildAsyncTooltipFormatter({
     options,
-    defaultSync: (params) => formatPieTooltipSyncHtml(params, options),
+    defaultSync,
     toContext: pieParamsToTooltipContext,
   });
-  if (pieFormatter) {
-    tooltip.formatter = pieFormatter;
-  }
+  // Always install a formatter: with `customHtml`/`appendHtml` the async
+  // wrapper composes them around `defaultSync`; otherwise the unified default
+  // layout (single-line / header+line / concentric rows) replaces ECharts'
+  // built-in tooltip.
+  tooltip.formatter = pieFormatter ?? defaultSync;
 
   const centerLabels = normalizeCenterLabels(
     options.centerLabels,
@@ -177,7 +210,9 @@ export function resolvePieOptions(
       legend: { ...options.legend, show: showLegend },
     }),
     tooltip,
-    series: buildPieSeries(sorted, options, variant, showSliceLabel),
+    series: isConcentric
+      ? buildConcentricSeries(sortedSeriesList, options, variant, showSliceLabel)
+      : buildPieSeries(sortedSeriesList[0].data, options, variant, showSliceLabel),
     ...(centerLabels
       ? {
           graphic: [
@@ -198,7 +233,21 @@ export function resolvePieOptions(
   };
 
   const merged = deepMerge(eOption, (options.echarts ?? {}) as Record<string, unknown>);
-  merged.color = resolveColors(sliceNames, options);
+  if (isConcentric) {
+    // Concentric rings paint by NAME, not by index: resolve the union of
+    // category names once, then stamp each datum with its color so a
+    // category keeps the same color across rings even when orders differ or
+    // it's missing from some datasets.
+    const unionColors = resolveColors(names, options);
+    merged.color = unionColors;
+    paintPieSlices(merged, new Map(names.map((n, i) => [n, unionColors[i]])));
+  } else {
+    merged.color = resolveColors(sliceNames, options);
+  }
+
+  const seriesCount = Array.isArray(merged.series)
+    ? (merged.series as unknown[]).length
+    : sortedSeriesList.length;
 
   return {
     option: merged,
@@ -212,6 +261,8 @@ export function resolvePieOptions(
         names,
         centerLabels,
         centerLabelOffset,
+        sortedSeriesList.length,
+        seriesCount,
       ),
   };
 }
@@ -223,6 +274,8 @@ export function resolvePieOptions(
 interface PieLayout {
   center: [number, number];
   radius: [number | string, number | string];
+  /** Multi-ring radii (inner → outer), present only for concentric pies. */
+  radii?: Array<[number, number]>;
 }
 
 /**
@@ -259,6 +312,117 @@ function computePieLayout(
   return {
     center: [Math.round(cx), Math.round(cy)],
     radius: [innerRadius, outerRadius],
+  };
+}
+
+/**
+ * Convert an ECharts pie radius value (px number, `"NN%"` string, or a
+ * numeric string) into pixels against `ref` (ECharts resolves pie-radius
+ * percentages against `min(width, height) / 2`).
+ */
+function resolveRadiusPx(radius: number | string, ref: number): number {
+  if (typeof radius === 'number') return radius;
+  if (radius.includes('%')) {
+    const pct = parseFloat(radius);
+    return Number.isFinite(pct) ? (pct / 100) * ref : ref;
+  }
+  const px = Number(radius);
+  return Number.isFinite(px) ? px : ref;
+}
+
+/**
+ * Split the `[innerBase, outer]` span into `count` concentric, non-
+ * overlapping bands with a small gap between neighbours.
+ */
+function computeConcentricRadii(
+  outer: number,
+  options: PieChartOptions,
+  count: number,
+  ref: number,
+  availW?: number,
+  availH?: number,
+): Array<[number, number]> {
+  let innerStart: number;
+  let thickness: number;
+  let gap: number;
+
+  if (options.innerRadius !== undefined) {
+    const inner = Math.max(0, resolveRadiusPx(options.innerRadius, ref));
+    const span = Math.max(0, outer - inner);
+    gap = clampRound(span * 0.04, 2, 8);
+    thickness = Math.max(1, (span - gap * (count - 1)) / count);
+    innerStart = inner;
+  } else {
+    // Each ring gets the same auto-scaled thickness as a single doughnut
+    // (`PIE_AUTO_RING_RATIO`, clamped 8–36 px), so adding datasets adds
+    // rings instead of thinning the existing one. If they don't fit inside
+    // `outer`, squeeze them proportionally.
+    const ring = resolveAutoRingWidth(availW, availH);
+    gap = clampRound(ring * 0.3, 2, 8);
+    const desired = count * ring + gap * (count - 1);
+    if (desired <= outer) {
+      innerStart = outer - desired;
+      thickness = ring;
+    } else {
+      gap = clampRound(outer * 0.04, 1, 6);
+      thickness = Math.max(1, (outer - gap * (count - 1)) / count);
+      innerStart = Math.max(0, outer - (count * thickness + gap * (count - 1)));
+    }
+  }
+
+  const radii: Array<[number, number]> = [];
+  for (let i = 0; i < count; i += 1) {
+    const r0 = innerStart + i * (thickness + gap);
+    radii.push([round1(r0), round1(r0 + thickness)]);
+  }
+  radii[count - 1][1] = outer; // pin the outermost edge to avoid float drift
+  return radii;
+}
+
+/**
+ * Concentric multi-ring layout: a shared center plus one radius band per
+ * series. Reuses the same edge reserves / fill factors as the single-series
+ * path so title + legend layout behave identically.
+ */
+function computeConcentricLayout(
+  W: number,
+  H: number,
+  reserves: EdgeReserves,
+  variant: PieVariant,
+  options: PieChartOptions,
+  count: number,
+): PieLayout {
+  const availW = Math.max(0, W - reserves.left - reserves.right);
+  const availH = Math.max(0, H - reserves.top - reserves.bottom);
+  const ref = Math.min(W, H) / 2;
+
+  let cx: number;
+  let cy: number;
+  let outer: number;
+
+  if (variant === 'half-doughnut') {
+    const limitingRadius = Math.min(availW / 2, availH);
+    outer =
+      options.outerRadius !== undefined
+        ? resolveRadiusPx(options.outerRadius, ref)
+        : Math.max(PIE_MIN_RADIUS_PX, limitingRadius * HALF_DOUGHNUT_FILL_FACTOR);
+    cx = reserves.left + availW / 2;
+    cy = reserves.top + availH / 2 + outer / 2;
+  } else {
+    outer =
+      options.outerRadius !== undefined
+        ? resolveRadiusPx(options.outerRadius, ref)
+        : Math.max(PIE_MIN_RADIUS_PX, (Math.min(availW, availH) / 2) * PIE_FILL_FACTOR);
+    cx = reserves.left + availW / 2;
+    cy = reserves.top + availH / 2;
+  }
+
+  const radii = computeConcentricRadii(outer, options, count, ref, availW, availH);
+
+  return {
+    center: [Math.round(cx), Math.round(cy)],
+    radius: [radii[0][0], radii[count - 1][1]],
+    radii,
   };
 }
 
@@ -438,6 +602,8 @@ function applyAdaptiveLayout(
   names: ReadonlyArray<string>,
   centerLabels?: NormalizedCenterLabels,
   centerLabelOffset: [number, number] = [0, 0],
+  ringCount = 1,
+  seriesCount = 1,
 ): (() => void) | void {
   const recompute = (): void => {
     if (chart.isDisposed()) return;
@@ -450,10 +616,26 @@ function applyAdaptiveLayout(
       return;
     }
     const reserves = computeEdgeReserves(options, showLegend, showSliceLabel, names, W);
-    const layout = computePieLayout(W, H, reserves, variant, options);
-    const payload: Record<string, unknown> = {
-      series: [{ center: layout.center, radius: layout.radius }],
-    };
+    const layout =
+      ringCount > 1
+        ? computeConcentricLayout(W, H, reserves, variant, options, ringCount)
+        : computePieLayout(W, H, reserves, variant, options);
+
+    // One `{ center, radius }` entry per series. A caller that pinned an
+    // explicit `center` / `radius` on a series (via `options.echarts.series`)
+    // keeps it — we only fill in the fields they left empty.
+    const series: Record<string, unknown>[] = [];
+    const count = Math.min(ringCount, seriesCount);
+    for (let i = 0; i < count; i += 1) {
+      const explicit = explicitSeriesEntry(options, i);
+      const radius =
+        ringCount > 1 ? (layout.radii as Array<[number, number]>)[i] : layout.radius;
+      const entry: Record<string, unknown> = {};
+      if (!explicit || explicit.center === undefined) entry.center = layout.center;
+      if (!explicit || explicit.radius === undefined) entry.radius = radius;
+      if (Object.keys(entry).length > 0) series.push(entry);
+    }
+    const payload: Record<string, unknown> = { series };
     if (centerLabels) {
       payload.graphic = [
         buildCenterLabelGraphic(
@@ -481,6 +663,28 @@ function applyAdaptiveLayout(
 
   recompute();
   return attachResizeObserver(chart, recompute);
+}
+
+/**
+ * Resolve the user's explicit per-series override for `center` / `radius`,
+ * if any. `options.echarts.series` can be an array (index-addressed) or a
+ * single object (applied to every series by ECharts).
+ */
+function explicitSeriesEntry(
+  options: PieChartOptions,
+  index: number,
+): Record<string, unknown> | undefined {
+  const series = options.echarts?.series;
+  if (Array.isArray(series)) {
+    const entry = series[index];
+    return entry && typeof entry === 'object' && !Array.isArray(entry)
+      ? (entry as Record<string, unknown>)
+      : undefined;
+  }
+  if (series && typeof series === 'object' && !Array.isArray(series)) {
+    return series as Record<string, unknown>;
+  }
+  return undefined;
 }
 
 /**
@@ -556,6 +760,175 @@ function buildPieSeries(
   Object.assign(series, buildEmphasisBlur(options.emphasis, 'self'));
 
   return [series];
+}
+
+/** Ordered, de-duplicated category names across all rings (first appearance). */
+function uniqueCategoryNames(seriesList: ReadonlyArray<PieSeriesEntry>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of seriesList) {
+    for (const d of s.data) {
+      if (!seen.has(d.name)) {
+        seen.add(d.name);
+        out.push(d.name);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Map each category name to its per-ring values (in inner → outer ring
+ * order). Consumed by {@link formatPieTooltipSyncHtml} to build the
+ * concentric multi-row tooltip body.
+ */
+function buildRingsByCategory(
+  seriesList: ReadonlyArray<PieSeriesEntry>,
+): Map<string, PieRingTooltipValue[]> {
+  const map = new Map<string, PieRingTooltipValue[]>();
+  for (const s of seriesList) {
+    for (const d of s.data) {
+      const rows = map.get(d.name);
+      const row: PieRingTooltipValue = { name: s.name, value: d.value };
+      if (rows) rows.push(row);
+      else map.set(d.name, [row]);
+    }
+  }
+  return map;
+}
+
+/**
+ * Stamp each slice with its resolved color by NAME (like `paintGraphNodes`
+ * for graph types) so a category keeps the same color across rings even when
+ * orders differ or it's missing from some datasets. Respects a caller's own
+ * per-datum `itemStyle.color`.
+ */
+function paintPieSlices(
+  option: Record<string, unknown>,
+  nameToColor: ReadonlyMap<string, string>,
+): void {
+  let series = option.series;
+  if (!Array.isArray(series)) {
+    if (series && typeof series === 'object') series = [series];
+    else return;
+  }
+  for (const s of series as Record<string, unknown>[]) {
+    if (!s || typeof s !== 'object' || s.type !== 'pie') continue;
+    const data = s.data;
+    if (!Array.isArray(data)) continue;
+    for (const datum of data as Record<string, unknown>[]) {
+      if (!datum || typeof datum !== 'object') continue;
+      const name = datum.name;
+      if (typeof name !== 'string') continue;
+      const existing = (datum.itemStyle as Record<string, unknown> | undefined)?.color;
+      if (existing) continue;
+      const color = nameToColor.get(name);
+      if (color) {
+        datum.itemStyle = {
+          ...(datum.itemStyle as Record<string, unknown> | undefined),
+          color,
+        };
+      }
+    }
+  }
+}
+
+function buildConcentricSeries(
+  seriesList: ReadonlyArray<PieSeriesEntry>,
+  options: PieChartOptions,
+  variant: PieVariant,
+  showSliceLabel: boolean,
+): Record<string, unknown>[] {
+  const count = seriesList.length;
+  return seriesList.map((entry, index) => {
+    const series: Record<string, unknown> = {
+      type: 'pie',
+      center: ['50%', '50%'],
+      radius: staticConcentricRadius(index, count, variant, options),
+      avoidLabelOverlap: true,
+      data: entry.data.map((d) => ({ name: d.name, value: d.value })),
+      // Outside labels only on the outermost ring — inner-ring leader lines
+      // would collide with the outer bands.
+      label: {
+        show: showSliceLabel && index === count - 1,
+        position: 'outside',
+        formatter: '{b}: {d}%',
+        fontSize: getLabelFontSize(options),
+      },
+    };
+
+    if (entry.name) series.name = entry.name;
+    if (variant === 'half-doughnut') {
+      series.startAngle = 180;
+      series.endAngle = 360;
+      series.center = ['50%', '75%'];
+    }
+    if (variant === 'nightingale') {
+      series.roseType = 'radius';
+    }
+
+    applySliceStyle(series, options, variant);
+    Object.assign(series, buildEmphasisBlur(options.emphasis, 'self'));
+
+    return series;
+  });
+}
+
+/** Percent/px fallback radii for the very first paint (onInit refines to px). */
+function staticConcentricRadius(
+  index: number,
+  count: number,
+  variant: PieVariant,
+  options: PieChartOptions,
+): [number | string, number | string] {
+  const outer = options.outerRadius ?? defaultStaticOuter(variant);
+
+  // px-space: outer is a number → distribute `[inner, outer]` in pixels.
+  if (typeof outer === 'number') {
+    const innerBase =
+      typeof options.innerRadius === 'number'
+        ? options.innerRadius
+        : Math.max(0, outer - count * PIE_AUTO_RING_FALLBACK - (count - 1) * 3);
+    return splitStaticSpan(innerBase, outer, count, index);
+  }
+
+  // percent-space (outer is `"NN%"` or a fallback string).
+  const outerPct = parsePct(outer);
+  if (typeof options.innerRadius === 'string') {
+    const span = Math.max(0, outerPct - parsePct(options.innerRadius));
+    const gap = Math.max(0.5, span * 0.04);
+    const thickness = Math.max(0.5, (span - gap * (count - 1)) / count);
+    const r0 = parsePct(options.innerRadius) + index * (thickness + gap);
+    return [`${r0}%`, `${r0 + thickness}%`];
+  }
+  // Auto: mirror PIE_AUTO_RING_RATIO (0.075 × 2 = 15% of the radius ref).
+  const ring = 15;
+  const gap = 3;
+  const innerStart = Math.max(0, outerPct - count * ring - (count - 1) * gap);
+  const r0 = innerStart + index * (ring + gap);
+  return [`${r0}%`, `${r0 + ring}%`];
+}
+
+function defaultStaticOuter(variant: PieVariant): string {
+  return variant === 'half-doughnut' ? '90%' : '70%';
+}
+
+function parsePct(value: string): number {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function splitStaticSpan(
+  innerBase: number,
+  outer: number,
+  count: number,
+  index: number,
+): [number, number] {
+  const span = Math.max(0, outer - innerBase);
+  const gap = clampRound(span * 0.04, 1, 8);
+  const thickness = Math.max(1, (span - gap * (count - 1)) / count);
+  const r0 = innerBase + index * (thickness + gap);
+  return [r0, r0 + thickness];
 }
 
 function defaultStaticRadius(
@@ -657,6 +1030,10 @@ function normalizeCenterLabels(
 
 function clampRound(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function round1(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 function resolveCenterLabelBaseFont(w?: number, h?: number): number {
@@ -785,4 +1162,5 @@ function buildCenterLabelGraphic(
 export const __test = {
   computeEdgeReserves,
   computePieLayout,
+  computeConcentricLayout,
 };

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import type { PieData, PieChartOptions, PieVariant } from '../types.js';
-import { isPieData } from '../types.js';
+import type { PieData, PieConcentricData, PieChartOptions, PieVariant } from '../types.js';
+import { isPieData, isPieConcentricData } from '../types.js';
 import { resolvePieOptions, __test } from './pie.js';
 import { DEFAULT_LABEL_FONT_SIZE } from './common/index.js';
 import { getThemeColors } from '../themes/index.js';
 import { configure, resetConfiguration } from '../config.js';
 
-const { computeEdgeReserves, computePieLayout } = __test;
+const { computeEdgeReserves, computePieLayout, computeConcentricLayout } = __test;
 
 const sample: PieData = [
   { name: 'Premium',  value: 420 },
@@ -108,6 +108,15 @@ describe('pie adapter', () => {
       // only thing the chart ever sees.
       const result = resolvePieOptions(sample, {});
       expect(typeof result.onInit).toBe('function');
+    });
+
+    it('installs a default tooltip formatter (single series: label + value + percent on one line)', () => {
+      const result = resolvePieOptions(sample, {});
+      const tooltip = optOf(result).tooltip as Record<string, unknown>;
+      const formatter = tooltip.formatter as (params: unknown) => string;
+      expect(typeof formatter).toBe('function');
+      const html = formatter({ name: 'Premium', value: 420, percent: 25, marker: '●' });
+      expect(html).toBe('●Premium&nbsp;&nbsp;420 (25%)');
     });
 
     it('applies a palette color array sized to the number of slices', () => {
@@ -749,6 +758,244 @@ describe('pie adapter', () => {
         expect(rich.cl0.color).toBe('#f1f5f9');
       } finally {
         globalThis.ResizeObserver = originalResizeObserver;
+      }
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Concentric multi-series POC
+// ---------------------------------------------------------------------------
+
+const concentric: PieConcentricData = {
+  series: [
+    {
+      name: '2025',
+      data: [
+        { name: 'Search', value: 60 },
+        { name: 'Direct', value: 40 },
+      ],
+    },
+    {
+      name: '2026',
+      data: [
+        { name: 'Social', value: 50 },
+        { name: 'Direct', value: 25 },
+        { name: 'Search', value: 25 },
+      ],
+    },
+  ],
+};
+
+describe('pie adapter — concentric multi-series', () => {
+  afterEach(() => {
+    resetConfiguration();
+  });
+
+  describe('isPieConcentricData', () => {
+    it('accepts the { series: [...] } shape', () => {
+      expect(isPieConcentricData(concentric)).toBe(true);
+    });
+
+    it('rejects the flat array shape (that stays isPieData)', () => {
+      expect(isPieConcentricData(sample as unknown as PieConcentricData)).toBe(false);
+      expect(isPieData(sample)).toBe(true);
+    });
+
+    it('rejects empty series / malformed entries', () => {
+      expect(isPieConcentricData({ series: [] } as unknown as PieConcentricData)).toBe(false);
+      expect(
+        isPieConcentricData({ series: [{ name: 'X', data: [] }] } as unknown as PieConcentricData),
+      ).toBe(false);
+    });
+  });
+
+  describe('static option', () => {
+    it('builds one series per ring, inner → outer by input order', () => {
+      const result = resolvePieOptions(concentric, {});
+      const series = optOf(result).series as Record<string, unknown>[];
+      expect(series).toHaveLength(2);
+      expect(series.map((s) => s.name)).toEqual(['2025', '2026']);
+      const radii = series.map((s) => s.radius as [string, string]);
+      // Auto layout leaves an inner hole for concentric rings.
+      expect(Number.parseFloat(radii[0][0])).toBeGreaterThan(0);
+      expect(Number.parseFloat(radii[1][0])).toBeGreaterThan(
+        Number.parseFloat(radii[0][1]),
+      );
+    });
+
+    it('installs a default tooltip formatter that aggregates a category across rings', () => {
+      const result = resolvePieOptions(concentric, {});
+      const tooltip = optOf(result).tooltip as Record<string, unknown>;
+      const formatter = tooltip.formatter as (params: unknown) => string;
+      expect(typeof formatter).toBe('function');
+      // Hovering "Search" lists every ring's value, ordered inner → outer,
+      // with no percentage (each ring's percent is relative to its own total).
+      const html = formatter({ name: 'Search', value: 60, marker: '●' });
+      expect(html).toBe('Search<br/>●2025&nbsp;&nbsp;60<br/>●2026&nbsp;&nbsp;25');
+    });
+
+    it('paints every slice by NAME so a category keeps one color across rings', () => {
+      const result = resolvePieOptions(concentric, { autoSort: false });
+      const series = optOf(result).series as Record<string, unknown>[];
+      const colorOf = (s: Record<string, unknown>, name: string): unknown =>
+        ((s.data as Record<string, unknown>[]).find((d) => d.name === name)?.itemStyle as
+          | Record<string, unknown>
+          | undefined)?.color;
+
+      // Same category in different ring positions must resolve to one color.
+      expect(colorOf(series[0], 'Search')).toBeTruthy();
+      expect(colorOf(series[0], 'Search')).toBe(colorOf(series[1], 'Search'));
+      expect(colorOf(series[0], 'Direct')).toBe(colorOf(series[1], 'Direct'));
+      // A category present in only one ring still gets a color.
+      expect(colorOf(series[1], 'Social')).toBeTruthy();
+    });
+
+    it('respects options.colorMap by category name across rings', () => {
+      const result = resolvePieOptions(concentric, {
+        autoSort: false,
+        colorMap: { Search: '#111111', Direct: '#222222' },
+      });
+      const series = optOf(result).series as Record<string, unknown>[];
+      const itemColor = (s: Record<string, unknown>, name: string): unknown =>
+        ((s.data as Record<string, unknown>[]).find((d) => d.name === name)?.itemStyle as
+          | Record<string, unknown>
+          | undefined)?.color;
+      expect(itemColor(series[0], 'Search')).toBe('#111111');
+      expect(itemColor(series[1], 'Search')).toBe('#111111');
+      expect(itemColor(series[1], 'Direct')).toBe('#222222');
+    });
+
+    it('dedupes legend entries by category name', () => {
+      const result = resolvePieOptions(concentric, { legend: { show: true } });
+      const legend = optOf(result).legend as Record<string, unknown>;
+      expect(legend.data).toEqual(['Search', 'Direct', 'Social']);
+    });
+
+    it('shows outside slice labels only on the outermost ring', () => {
+      const result = resolvePieOptions(concentric, {});
+      const series = optOf(result).series as Record<string, unknown>[];
+      expect(((series[0].label as Record<string, unknown>).show)).toBe(false);
+      expect(((series[1].label as Record<string, unknown>).show)).toBe(true);
+    });
+
+    it('a single-dataset { series: [...] } behaves like flat array input', () => {
+      const single: PieConcentricData = { series: [{ name: 'only', data: sample }] };
+      const result = resolvePieOptions(single, {});
+      const series = optOf(result).series as Record<string, unknown>[];
+      expect(series).toHaveLength(1);
+      expect(series[0].type).toBe('pie');
+      // A single-dataset object falls back to the legacy flat-array path,
+      // which does not emit a series name (same as flat array input).
+      expect(series[0].name).toBeUndefined();
+    });
+
+    it('keeps the flat array input on the legacy single-series path', () => {
+      const result = resolvePieOptions(sample, {});
+      const series = optOf(result).series as Record<string, unknown>[];
+      expect(series).toHaveLength(1);
+      expect(series[0].name).toBeUndefined();
+      // No per-datum itemStyle colors are injected on the legacy path.
+      const datum = (series[0].data as Record<string, unknown>[])[0];
+      expect(datum.itemStyle).toBeUndefined();
+    });
+  });
+
+  describe('concentric pixel layout', () => {
+    const concentricLayout = (
+      W: number,
+      H: number,
+      count: number,
+      options: PieChartOptions = {},
+    ) => {
+      const reserves = computeEdgeReserves(
+        options,
+        options.legend?.show ?? false,
+        options.showSliceLabel ?? false,
+        ['Search', 'Direct', 'Social'],
+        W,
+      );
+      return computeConcentricLayout(W, H, reserves, 'default', options, count);
+    };
+
+    it('produces concentric, non-overlapping bands', () => {
+      const { center, radii } = concentricLayout(400, 400, 3);
+      expect(radii).toHaveLength(3);
+      for (let i = 1; i < radii!.length; i += 1) {
+        expect(radii![i][0]).toBeGreaterThan(radii![i - 1][1]);
+      }
+      // Outermost ring's outer edge equals the layout's `radius` outer bound.
+      expect(radii![2][1]).toBeGreaterThan(radii![2][0]);
+      expect(center[0]).toBe(200);
+      expect(center[1]).toBe(200);
+    });
+
+    it('honors explicit outerRadius / innerRadius as the overall band', () => {
+      const { radii } = concentricLayout(400, 400, 2, { innerRadius: 40, outerRadius: 160 });
+      expect(radii![0][0]).toBe(40);
+      expect(radii![1][1]).toBe(160);
+      expect(radii![1][0]).toBeGreaterThan(radii![0][1]);
+    });
+
+    it('keeps rings concentric and non-overlapping after a resize', () => {
+      for (const [W, H] of [[240, 240], [720, 340], [380, 800]]) {
+        const { radii } = concentricLayout(W, H, 3);
+        for (let i = 1; i < radii!.length; i += 1) {
+          expect(radii![i][0]).toBeGreaterThan(radii![i - 1][1]);
+        }
+        expect(radii![radii!.length - 1][1]).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe('adaptive onInit payload', () => {
+    it('writes one { center, radius } per ring', () => {
+      const setOptionCalls: Array<Record<string, unknown>> = [];
+      const chart = {
+        isDisposed: () => false,
+        getWidth: () => 400,
+        getHeight: () => 300,
+        getDom: () => ({}) as HTMLElement,
+        setOption: (payload: Record<string, unknown>) => {
+          setOptionCalls.push(payload);
+        },
+      } as unknown as import('echarts').ECharts;
+
+      resolvePieOptions(concentric, {}).onInit?.(chart);
+
+      const payload = setOptionCalls[setOptionCalls.length - 1] as Record<string, unknown>;
+      const series = payload.series as Record<string, unknown>[];
+      expect(series).toHaveLength(2);
+      expect(series[0].center).toEqual(series[1].center);
+      const r0 = series[0].radius as [number, number];
+      const r1 = series[1].radius as [number, number];
+      expect(r1[0]).toBeGreaterThan(r0[1]);
+    });
+
+    it('preserves explicit echarts.series center/radius overrides', () => {
+      const setOptionCalls: Array<Record<string, unknown>> = [];
+      const chart = {
+        isDisposed: () => false,
+        getWidth: () => 400,
+        getHeight: () => 300,
+        getDom: () => ({}) as HTMLElement,
+        setOption: (payload: Record<string, unknown>) => {
+          setOptionCalls.push(payload);
+        },
+      } as unknown as import('echarts').ECharts;
+
+      resolvePieOptions(concentric, {
+        // Object form applies to every series — its explicit radius is
+        // preserved across the adaptive pass; centers are still auto-filled.
+        echarts: { series: { radius: ['10%', '90%'] } },
+      }).onInit?.(chart);
+
+      const payload = setOptionCalls[setOptionCalls.length - 1] as Record<string, unknown>;
+      const series = payload.series as Record<string, unknown>[];
+      expect(series).toHaveLength(2);
+      for (const entry of series) {
+        expect(entry.radius).toBeUndefined(); // explicit radius NOT overwritten
+        expect(entry.center).toBeDefined(); // center still computed
       }
     });
   });

@@ -19,3 +19,32 @@ export const pieData = [
   { name: 'Safari', value: 12 },
   { name: 'Edge', value: 8 },
 ];
+
+/** "Traffic Sources by Year" rings — concentric multi-series pie (POC). */
+export const pieConcentricData = {
+  series: [
+    {
+      name: '2024',
+      data: [
+        { name: 'Search', value: 55 },
+        { name: 'Direct', value: 30 },
+        { name: 'Social', value: 15 },
+      ],
+    },
+    {
+      name: '2025',
+      data: [
+        { name: 'Search', value: 60 },
+        { name: 'Direct', value: 40 },
+      ],
+    },
+    {
+      name: '2026',
+      data: [
+        { name: 'Social', value: 45 },
+        { name: 'Direct', value: 30 },
+        { name: 'Search', value: 25 },
+      ],
+    },
+  ],
+};

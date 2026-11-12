@@ -36,9 +36,55 @@ export function pieParamsToTooltipContext(params: unknown): TooltipContextItem {
 }
 
 /**
- * Default synchronous pie tooltip HTML (before `customHtml` append).
+ * One ring's value for a given category, used to build the concentric
+ * multi-row tooltip body.
  */
-export function formatPieTooltipSyncHtml(params: unknown, options: ChartOptions): string {
+export interface PieRingTooltipValue {
+  /** Ring (series) name — rendered as the row label. */
+  name?: string;
+  value: number;
+}
+
+/**
+ * ECharts prefixes auto-generated series names with a NUL character
+ * (`series\0` + index) when the consumer didn't set `series.name`. Filter it
+ * out so "no real series name" and "a genuine series name" are distinct.
+ */
+const ECHARTS_DUMMY_SERIES_PREFIX = 'series\u0000';
+
+function isRealSeriesName(name: unknown): name is string {
+  return (
+    typeof name === 'string' &&
+    name.length > 0 &&
+    name.indexOf(ECHARTS_DUMMY_SERIES_PREFIX) !== 0
+  );
+}
+
+function percentSuffix(percent: number | undefined): string {
+  return percent != null && !Number.isNaN(percent)
+    ? ` (${percent.toFixed(1).replace(/\.0$/, '')}%)`
+    : '';
+}
+
+/**
+ * Default synchronous pie tooltip HTML.
+ *
+ * Layout:
+ *   - Single series, no `series.name`: `label  value (percent%)` on one line.
+ *   - Single series, with `series.name`: `series.name` header, then the
+ *     `label  value (percent%)` line.
+ *   - Concentric (`ringsByCategory` provided): category name header, then one
+ *     `ringName  value` row per ring — no percentage, because each ring's
+ *     percentage is relative to its own total and isn't cross-comparable.
+ *
+ * `ringsByCategory` maps a category name to the ordered per-ring values
+ * (inner → outer ring order). When omitted, the single-series path runs.
+ */
+export function formatPieTooltipSyncHtml(
+  params: unknown,
+  options: ChartOptions,
+  ringsByCategory?: ReadonlyMap<string, ReadonlyArray<PieRingTooltipValue>>,
+): string {
   const x = params as {
     marker?: string;
     name: string;
@@ -47,12 +93,24 @@ export function formatPieTooltipSyncHtml(params: unknown, options: ChartOptions)
     seriesName?: string;
   };
   const fmt = options.tooltip?.formatValue;
-  const valDisplay = fmt ? fmt(x.value, x.name) : String(x.value);
-  const name = x.seriesName ?? x.name;
-  if (x.percent != null && !Number.isNaN(x.percent)) {
-    return `${x.marker ?? ''}${name}<br/>${valDisplay} (${x.percent.toFixed(1)}%)`;
+  const val = (value: number, label: string): string =>
+    fmt ? String(fmt(value, label)) : String(value);
+  const marker = x.marker ?? '';
+
+  if (ringsByCategory) {
+    const rings = ringsByCategory.get(x.name) ?? [];
+    if (rings.length === 0) {
+      return `${marker}${x.name}&nbsp;&nbsp;${val(x.value, x.name)}`;
+    }
+    const rows = rings
+      .map((r) => `${marker}${r.name ?? ''}&nbsp;&nbsp;${val(r.value, x.name)}`)
+      .join('<br/>');
+    return `${x.name}<br/>${rows}`;
   }
-  return `${x.marker ?? ''}${name}<br/>${valDisplay}`;
+
+  const row = `${marker}${x.name}&nbsp;&nbsp;${val(x.value, x.name)}${percentSuffix(x.percent)}`;
+  const seriesName = isRealSeriesName(x.seriesName) ? x.seriesName : undefined;
+  return seriesName ? `${seriesName}<br/>${row}` : row;
 }
 
 /**

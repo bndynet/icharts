@@ -135,6 +135,43 @@ describe('renderChartToSVGString — adapter output reaches the markup', () => {
     expect(svg).toContain('Cherry');
   });
 
+  it('renders a concentric multi-series pie through the pie adapter', () => {
+    // The concentric path runs the pixel layout in `onInit` (SSR has real
+    // `getWidth()/getHeight()`), so this also pins that the headless render
+    // does not hit the `ResizeObserver`-less branch incorrectly.
+    const svg = renderChartToSVGString(
+      'pie',
+      {
+        series: [
+          {
+            name: '2025',
+            data: [
+              { name: 'Search', value: 60 },
+              { name: 'Direct', value: 40 },
+            ],
+          },
+          {
+            name: '2026',
+            data: [
+              { name: 'Social', value: 50 },
+              { name: 'Direct', value: 25 },
+              { name: 'Search', value: 25 },
+            ],
+          },
+        ],
+      },
+      { width: 800, height: 600 },
+      { title: 'Traffic Sources', legend: { show: true, position: 'bottom' } },
+    );
+    expect(svg).toContain('Traffic Sources');
+    // Legend entries are the de-duplicated union of category names.
+    expect(svg).toContain('Search');
+    expect(svg).toContain('Direct');
+    expect(svg).toContain('Social');
+    // Two pie rings draw noticeably more arc paths than a single pie.
+    expect(svg.length).toBeGreaterThan(2000);
+  });
+
   it('renders a treemap with hierarchical data + drill-down disabled', () => {
     // Treemap is a body-centered chart that uses ECharts' native
     // `treemap` series — no @echarts-x plugin, no DOM-only renderer.

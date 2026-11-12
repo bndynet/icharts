@@ -22,6 +22,47 @@ export function isPieData(data: ChartData): data is PieData {
   );
 }
 
+/** One dataset in a concentric (multi-ring) pie chart. */
+export interface PieConcentricSeries {
+  /**
+   * Ring label. Surfaced as `seriesName` in tooltip params / custom
+   * tooltip callbacks; it is **not** part of the legend (legend entries
+   * are the union of category names across rings).
+   */
+  name?: string;
+  data: PieDataItem[];
+}
+
+/**
+ * Concentric multi-series pie data — one ring per entry, ordered from
+ * inner to outer according to input order.
+ */
+export interface PieConcentricData {
+  series: PieConcentricSeries[];
+}
+
+export function isPieConcentricData(data: ChartData): data is PieConcentricData {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+    return false;
+  }
+  const series = (data as PieConcentricData).series;
+  return (
+    Array.isArray(series) &&
+    series.length > 0 &&
+    series.every(
+      (s) =>
+        s !== null &&
+        typeof s === 'object' &&
+        Array.isArray(s.data) &&
+        s.data.length > 0 &&
+        s.data[0] !== null &&
+        typeof s.data[0] === 'object' &&
+        'name' in s.data[0] &&
+        'value' in s.data[0],
+    )
+  );
+}
+
 export interface PieChartOptions extends ChartOptions {
   variant?: PieVariant;
   innerRadius?: string | number;

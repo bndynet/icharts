@@ -3,6 +3,8 @@ import {
   pieParamsToTooltipContext,
   sankeyChordParamsToTooltipContext,
   buildChartEventContext,
+  formatPieTooltipSyncHtml,
+  type PieRingTooltipValue,
 } from './tooltip-context.js';
 
 describe('pieParamsToTooltipContext', () => {
@@ -39,6 +41,95 @@ describe('pieParamsToTooltipContext', () => {
       color: { type: 'linear' } as unknown,
     });
     expect(ctx.color).toBeUndefined();
+  });
+});
+
+describe('formatPieTooltipSyncHtml', () => {
+  const marker = '●';
+
+  it('single series without name: label + value + percent on one line', () => {
+    const html = formatPieTooltipSyncHtml(
+      { marker, name: 'Search', value: 60, percent: 60 },
+      {},
+    );
+    expect(html).toBe(`${marker}Search&nbsp;&nbsp;60 (60%)`);
+  });
+
+  it('single series with a real series.name: header line then label line', () => {
+    const html = formatPieTooltipSyncHtml(
+      { marker, name: 'Search', value: 60, percent: 60, seriesName: '2025' },
+      {},
+    );
+    expect(html).toBe(`2025<br/>${marker}Search&nbsp;&nbsp;60 (60%)`);
+  });
+
+  it('ignores the ECharts auto-generated series name sentinel', () => {
+    const html = formatPieTooltipSyncHtml(
+      { marker, name: 'Search', value: 60, percent: 60, seriesName: 'series\u00000' },
+      {},
+    );
+    expect(html).toBe(`${marker}Search&nbsp;&nbsp;60 (60%)`);
+  });
+
+  it('concentric: category header + one row per ring, no percent', () => {
+    const rings = new Map<string, PieRingTooltipValue[]>([
+      [
+        'Search',
+        [
+          { name: '2024', value: 55 },
+          { name: '2025', value: 60 },
+          { name: '2026', value: 25 },
+        ],
+      ],
+    ]);
+    const html = formatPieTooltipSyncHtml(
+      { marker, name: 'Search', value: 60, percent: 60, seriesName: '2025' },
+      {},
+      rings,
+    );
+    expect(html).toBe(
+      `Search<br/>${marker}2024&nbsp;&nbsp;55<br/>${marker}2025&nbsp;&nbsp;60<br/>${marker}2026&nbsp;&nbsp;25`,
+    );
+  });
+
+  it('concentric omits rings that lack the hovered category', () => {
+    const rings = new Map<string, PieRingTooltipValue[]>([
+      [
+        'Search',
+        [
+          { name: '2024', value: 55 },
+          { name: '2026', value: 25 },
+        ],
+      ],
+    ]);
+    const html = formatPieTooltipSyncHtml(
+      { marker, name: 'Search', value: 55, seriesName: '2024' },
+      {},
+      rings,
+    );
+    expect(html).toBe(`Search<br/>${marker}2024&nbsp;&nbsp;55<br/>${marker}2026&nbsp;&nbsp;25`);
+  });
+
+  it('honors options.tooltip.formatValue', () => {
+    const html = formatPieTooltipSyncHtml(
+      { marker, name: 'Search', value: 60, percent: 60 },
+      { tooltip: { formatValue: (v) => `${v} 次` } },
+    );
+    expect(html).toBe(`${marker}Search&nbsp;&nbsp;60 次 (60%)`);
+  });
+
+  it('drops a trailing ".0" but keeps real decimals', () => {
+    const whole = formatPieTooltipSyncHtml(
+      { marker, name: 'A', value: 60, percent: 60 },
+      {},
+    );
+    expect(whole).toBe(`${marker}A&nbsp;&nbsp;60 (60%)`);
+
+    const fractional = formatPieTooltipSyncHtml(
+      { marker, name: 'A', value: 60, percent: 37.5 },
+      {},
+    );
+    expect(fractional).toBe(`${marker}A&nbsp;&nbsp;60 (37.5%)`);
   });
 });
 
